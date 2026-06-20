@@ -16,6 +16,7 @@
   "exclude": [
     "node_modules",
     "server",
-    "scripts"
+    "scripts",
+    "__tests__"
   ]
 }

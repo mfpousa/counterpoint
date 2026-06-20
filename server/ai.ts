@@ -17,7 +17,7 @@ export interface Enrichment {
   lean: number | null;
   /** 0..1 importance/newsworthiness for an informed general reader. */
   relevance: number;
-  /** Short (<= ~12 words) rationale. */
+  /** One-sentence relevance summary naming the core subject (<= ~22 words). */
   reason: string;
 }
 
@@ -42,7 +42,12 @@ const SYSTEM_PROMPT =
   "(science/tech/history/health/culture explainers).\n" +
   '- "relevance": 0.0..1.0 how newsworthy/substantive/important it is to an informed ' +
   "general reader. Penalize clickbait, ads, thin listicles, and pure horse-race noise.\n" +
-  '- "reason": <= 12 words on why it is worth reading.\n' +
+  '- "reason": ONE plain sentence (<= 22 words) summarizing what the item is actually ' +
+  "about — name the core subject/topic — and why it is relevant or worth the reader's time. " +
+  "Be specific and concrete (e.g. 'Breakdown of the new EU AI Act and what it means for startups'), " +
+  "not generic ('an interesting article about technology').\n" +
+  "Some articles (videos/podcasts) include a \"transcript\" of the actual spoken content — " +
+  "weigh it heavily over the title/summary when judging topic, lean, and relevance.\n" +
   "Respond with ONLY a JSON array of these objects, in the same order as the input. No prose.";
 
 /** Pull the first JSON array/object out of a model response (handles ``` fences). */
@@ -89,16 +94,23 @@ function coerceEnrichment(raw: Record<string, unknown>, fallback: FeedItem): Enr
 }
 
 /** One LLM round-trip for a batch. Returns id -> Enrichment (partial on error). */
-async function classifyBatch(batch: FeedItem[]): Promise<Map<string, Enrichment>> {
+async function classifyBatch(
+  batch: FeedItem[],
+  transcripts: Map<string, string>,
+): Promise<Map<string, Enrichment>> {
   const out = new Map<string, Enrichment>();
   if (batch.length === 0) return out;
 
-  const userPayload = batch.map((it) => ({
-    id: it.id,
-    source: it.sourceTitle,
-    title: it.title,
-    summary: it.summary.slice(0, 500),
-  }));
+  const userPayload = batch.map((it) => {
+    const transcript = transcripts.get(it.id);
+    return {
+      id: it.id,
+      source: it.sourceTitle,
+      title: it.title,
+      summary: it.summary.slice(0, 500),
+      ...(transcript ? { transcript } : {}),
+    };
+  });
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), config.ai.timeoutMs);
@@ -173,7 +185,10 @@ async function withConcurrency<T>(tasks: (() => Promise<T>)[], limit: number): P
  * Returns NEW items; the effective topic/lean are overwritten where the model
  * spoke, and relevance/aiReason are attached.
  */
-export async function enrichItems(items: FeedItem[]): Promise<FeedItem[]> {
+export async function enrichItems(
+  items: FeedItem[],
+  transcripts: Map<string, string> = new Map(),
+): Promise<FeedItem[]> {
   const slice = items.slice(0, config.ai.maxItems);
   const rest = items.slice(config.ai.maxItems);
 
@@ -183,7 +198,7 @@ export async function enrichItems(items: FeedItem[]): Promise<FeedItem[]> {
   }
 
   const maps = await withConcurrency(
-    batches.map((b) => () => classifyBatch(b)),
+    batches.map((b) => () => classifyBatch(b, transcripts)),
     config.ai.concurrency,
   );
   const enrichment = new Map<string, Enrichment>();

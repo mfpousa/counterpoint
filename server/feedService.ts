@@ -13,6 +13,7 @@ import type { FeedItem } from "../src/types";
 import { enrichItems, type Enrichment } from "./ai";
 import { config } from "./config";
 import { rankItems } from "./rank";
+import { fetchTranscripts } from "./transcripts";
 
 export interface FeedResult {
   items: FeedItem[];
@@ -54,7 +55,14 @@ async function build(): Promise<FeedResult> {
     else toEnrich.push(it);
   }
 
-  const freshlyEnriched = await enrichItems(toEnrich);
+  // Fetch YouTube transcripts for the items we're about to classify so the
+  // model judges videos on their spoken content, not just the description.
+  const transcripts = await fetchTranscripts(toEnrich);
+  if (transcripts.size > 0) {
+    console.log(`[feed] fetched ${transcripts.size} YouTube transcript(s)`);
+  }
+
+  const freshlyEnriched = await enrichItems(toEnrich, transcripts);
   // Persist new enrichments to the cache for next time.
   for (const it of freshlyEnriched) {
     if (typeof it.relevance === "number" && it.leanSource === "llm") {

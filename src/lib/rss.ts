@@ -167,7 +167,13 @@ async function fetchXml(url: string, timeoutMs: number): Promise<string | null> 
   try {
     const res = await fetch(url, {
       signal: controller.signal,
-      headers: { Accept: "application/rss+xml, application/atom+xml, application/xml, text/xml" },
+      headers: {
+        Accept: "application/rss+xml, application/atom+xml, application/xml, text/xml",
+        // Many feed hosts 403 requests without a UA (e.g. when fetched
+        // server-side from Node). Identify as a normal feed reader.
+        "User-Agent":
+          "Mozilla/5.0 (compatible; CounterpointReader/1.0; +https://github.com/counterpoint)",
+      },
     });
     if (!res.ok) return null;
     const xml = await res.text();

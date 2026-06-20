@@ -28,10 +28,12 @@ export function FeedCard({
 
   return (
     <View style={[styles.card, done && styles.cardDone]}>
-      {(item.aiReason || item.reason) && (
+      {(item.reason || item.aiReason) && (
         <View style={styles.reasonRow}>
           <Ionicons name="sparkles-outline" size={12} color={colors.accent} />
-          <Text style={styles.reason}>{item.aiReason || item.reason}</Text>
+          <Text style={styles.reason} numberOfLines={2}>
+            {item.reason || item.aiReason}
+          </Text>
         </View>
       )}
 
@@ -54,6 +56,15 @@ export function FeedCard({
         <Text style={styles.summary} numberOfLines={2}>
           {item.summary}
         </Text>
+      )}
+
+      {!!item.aiReason && item.aiReason !== item.reason && (
+        <View style={styles.aiNoteRow}>
+          <Ionicons name="bulb-outline" size={12} color={colors.textDim} />
+          <Text style={styles.aiNote} numberOfLines={2}>
+            {item.aiReason}
+          </Text>
+        </View>
       )}
 
       <View style={styles.footer}>
@@ -96,6 +107,8 @@ const styles = StyleSheet.create({
   cardDone: { opacity: 0.55 },
   reasonRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   reason: { color: colors.accent, fontSize: font.tiny, fontWeight: "600", flexShrink: 1 },
+  aiNoteRow: { flexDirection: "row", alignItems: "flex-start", gap: spacing.xs },
+  aiNote: { color: colors.textDim, fontSize: font.small, lineHeight: 18, flexShrink: 1 },
   metaRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   source: { color: colors.textDim, fontSize: font.small, fontWeight: "600", flexShrink: 1 },
   dot: { color: colors.textFaint },
