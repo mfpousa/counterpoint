@@ -31,3 +31,6 @@ yarn-error.*
 
 # Machine-local npm config (corporate registry/proxy; not for deployment)
 .npmrc
+
+# Lockfile bakes in machine-specific (corporate Nexus) resolved URLs; ignore it
+package-lock.json
