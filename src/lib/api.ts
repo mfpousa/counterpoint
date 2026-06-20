@@ -5,7 +5,15 @@
 // and returns a ranked, diversified pool. The app just renders it and applies
 // the personal layer (daily quota + lean counter-weighting) in buildFeed.
 
-import type { AnalysisStatus, Briefing, FeedItem, RewrittenArticle } from "../types";
+import type {
+  AnalysisStatus,
+  Briefing,
+  FeedItem,
+  KnowledgeInsight,
+  KnowledgeProfile,
+  RewrittenArticle,
+  SummaryGrade,
+} from "../types";
 
 const DEFAULT_BACKEND_PORT = "8787";
 
@@ -88,6 +96,49 @@ export async function fetchRewrite(id: string): Promise<RewrittenArticle> {
     throw new Error(data?.error ?? `Rewrite failed (HTTP ${res.status}).`);
   }
   return data.article;
+}
+
+/**
+ * Grade the reader's recall summary of an item against the article. Throws with
+ * a clear message on failure so the summary UI can surface it (model offline,
+ * item aged out, summary too short, ...).
+ */
+export async function gradeSummary(id: string, summary: string): Promise<SummaryGrade> {
+  const res = await fetch(`${apiBaseUrl()}/api/grade`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id, summary }),
+  });
+  const data = (await res.json().catch(() => null)) as
+    | { grade?: SummaryGrade; error?: string }
+    | null;
+  if (!res.ok || !data?.grade) {
+    throw new Error(data?.error ?? `Grading failed (HTTP ${res.status}).`);
+  }
+  return data.grade;
+}
+
+/**
+ * Ask the backend for an AI narrative + gap-filling suggestion reasons, layered
+ * on the locally-computed knowledge profile. Returns null on any failure (the
+ * Learn tab still renders the local stats without it). Never throws.
+ */
+export async function fetchKnowledgeInsight(
+  profile: KnowledgeProfile,
+  candidates: { id: string; title: string; topic: string; summary: string }[],
+): Promise<KnowledgeInsight | null> {
+  try {
+    const res = await fetch(`${apiBaseUrl()}/api/knowledge`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ profile, candidates }),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { insight?: KnowledgeInsight | null };
+    return data.insight ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /**

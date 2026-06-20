@@ -19,6 +19,7 @@ import { FeedCard } from "../../src/components/FeedCard";
 import { BriefingCard } from "../../src/components/BriefingCard";
 import { AnalysisProgress } from "../../src/components/AnalysisProgress";
 import { ArticleReader } from "../../src/components/ArticleReader";
+import { SummaryModal } from "../../src/components/SummaryModal";
 import { LeanDial, QuotaMeter } from "../../src/components/meters";
 import { colors, font, radius, spacing } from "../../src/theme";
 import type { FeedItem, Topic } from "../../src/types";
@@ -45,12 +46,21 @@ export default function FeedScreen() {
     briefing,
     loadingBriefing,
     status,
-    completeItem,
+    summaries,
+    gradeAndRecord,
     refreshFeed,
     updatePrefs,
   } = useApp();
   const [selected, setSelected] = useState<Topic | "all">("all");
   const [readingItem, setReadingItem] = useState<FeedItem | null>(null);
+  const [summarizingItem, setSummarizingItem] = useState<FeedItem | null>(null);
+
+  // Map item id -> this reader's graded summary, for the card badge + modal.
+  const summaryById = useMemo(() => {
+    const m = new Map<string, (typeof summaries)[number]>();
+    for (const s of summaries) m.set(s.id, s);
+    return m;
+  }, [summaries]);
 
   // Search box bound to the steering interest. Submitting updates the saved
   // interest, which triggers a re-fetch (the heavy analysis is cached, so this
@@ -282,7 +292,8 @@ export default function FeedScreen() {
                       <FeedCard
                         item={item}
                         done={completedSet.has(item.id)}
-                        onComplete={completeItem}
+                        summary={summaryById.get(item.id)}
+                        onSummarize={setSummarizingItem}
                         onRead={setReadingItem}
                       />
                     </View>
@@ -295,6 +306,12 @@ export default function FeedScreen() {
       </View>
     </ScrollView>
     <ArticleReader item={readingItem} onClose={() => setReadingItem(null)} />
+    <SummaryModal
+      item={summarizingItem}
+      existing={summarizingItem ? summaryById.get(summarizingItem.id) : undefined}
+      onGrade={gradeAndRecord}
+      onClose={() => setSummarizingItem(null)}
+    />
     </>
   );
 }

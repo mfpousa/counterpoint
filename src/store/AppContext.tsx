@@ -9,8 +9,9 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { fetchBriefing, fetchRankedFeed, fetchStatus } from "../lib/api";
+import { fetchBriefing, fetchRankedFeed, fetchStatus, gradeSummary } from "../lib/api";
 import { buildFeed } from "../lib/buildFeed";
+import { PASS_SCORE } from "../lib/knowledge";
 import { applyCompletion } from "../lib/lean";
 import {
   DEFAULT_PREFERENCES,
@@ -18,10 +19,12 @@ import {
   loadHistory,
   loadPreferences,
   loadProgress,
+  loadSummaries,
   resetProgressOnly,
   savePreferences,
   saveProgress,
   trailingWindow,
+  upsertSummary,
 } from "../storage/storage";
 import type {
   AnalysisStatus,
@@ -30,6 +33,8 @@ import type {
   FeedItem,
   LeanHistoryPoint,
   Preferences,
+  StoredSummary,
+  SummaryGrade,
 } from "../types";
 
 interface AppState {
@@ -48,8 +53,16 @@ interface AppState {
   loadingBriefing: boolean;
   /** Live backend analysis progress (null until first poll). */
   status: AnalysisStatus | null;
+  /** Graded recall summaries (newest first), persisted locally. */
+  summaries: StoredSummary[];
   updatePrefs: (patch: Partial<Preferences>) => Promise<void>;
   completeItem: (item: FeedItem) => Promise<void>;
+  /**
+   * Grade the reader's recall summary of an item. Persists it and, when it
+   * passes the threshold, marks the item seen. Returns the grade so the UI can
+   * show the score + feedback. Throws on grading failure (model offline, etc.).
+   */
+  gradeAndRecord: (item: FeedItem, summaryText: string) => Promise<SummaryGrade>;
   refreshFeed: (opts?: { force?: boolean }) => Promise<void>;
   resetToday: () => Promise<void>;
 }
@@ -67,14 +80,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [briefing, setBriefing] = useState<Briefing | null>(null);
   const [loadingBriefing, setLoadingBriefing] = useState(false);
   const [status, setStatus] = useState<AnalysisStatus | null>(null);
+  const [summaries, setSummaries] = useState<StoredSummary[]>([]);
 
   // Initial load of persisted state.
   useEffect(() => {
     (async () => {
-      const [p, pr, h] = await Promise.all([loadPreferences(), loadProgress(), loadHistory()]);
+      const [p, pr, h, sm] = await Promise.all([
+        loadPreferences(),
+        loadProgress(),
+        loadHistory(),
+        loadSummaries(),
+      ]);
       setPrefs(p);
       setProgress(pr);
       setHistory(h);
+      setSummaries(sm);
       setReady(true);
     })();
   }, []);
@@ -205,6 +225,34 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [progress],
   );
 
+  // Keep a ref of summaries so grading can upsert without re-creating the cb.
+  const summariesRef = useRef(summaries);
+  summariesRef.current = summaries;
+
+  const gradeAndRecord = useCallback(
+    async (item: FeedItem, summaryText: string): Promise<SummaryGrade> => {
+      const grade = await gradeSummary(item.id, summaryText);
+      const passed = grade.score >= PASS_SCORE;
+      const record: StoredSummary = {
+        id: item.id,
+        title: item.title,
+        sourceTitle: item.sourceTitle,
+        topic: item.topic,
+        url: item.url,
+        summary: summaryText.trim(),
+        grade,
+        passed,
+        gradedAt: Date.now(),
+      };
+      const next = await upsertSummary(summariesRef.current, record);
+      setSummaries(next);
+      // An item is "seen" only once the reader proves recall.
+      if (passed) await completeItem(item);
+      return grade;
+    },
+    [completeItem],
+  );
+
   const resetToday = useCallback(async () => {
     await resetProgressOnly();
     const fresh = emptyProgress();
@@ -224,8 +272,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     briefing,
     loadingBriefing,
     status,
+    summaries,
     updatePrefs,
     completeItem,
+    gradeAndRecord,
     refreshFeed,
     resetToday,
   };

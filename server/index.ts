@@ -12,9 +12,12 @@ import express from "express";
 import { aiReachable } from "./ai";
 import { config } from "./config";
 import { clearCaches, getBriefing, getFeed, getStatus } from "./feedService";
+import { gradeSummary } from "./grade";
 import { runStartupHealthcheck } from "./healthcheck";
+import { generateKnowledgeInsight, type KnowledgeCandidate } from "./knowledge";
 import { rewriteArticle } from "./rewrite";
 import { getStored } from "./store";
+import type { KnowledgeProfile } from "../src/types";
 
 const app = express();
 app.use(cors());
@@ -84,6 +87,51 @@ app.get("/api/rewrite", async (req, res) => {
   } catch (e) {
     console.error("[api] /api/rewrite failed:", e);
     res.status(500).json({ error: e instanceof Error ? e.message : "rewrite failed" });
+  }
+});
+
+app.post("/api/grade", async (req, res) => {
+  const id = typeof req.body?.id === "string" ? req.body.id : "";
+  const summary = typeof req.body?.summary === "string" ? req.body.summary : "";
+  if (!id || summary.trim().length < 10) {
+    res.status(400).json({ error: "Provide an item id and a summary of at least 10 characters." });
+    return;
+  }
+  const stored = getStored(id);
+  if (!stored) {
+    res.status(404).json({ error: "item not found (it may have aged out of the feed)" });
+    return;
+  }
+  try {
+    const grade = await gradeSummary(stored, summary);
+    if (!grade) {
+      res.status(502).json({
+        error: "Couldn't grade your summary (the model may be offline or the article unavailable).",
+      });
+      return;
+    }
+    res.json({ grade });
+  } catch (e) {
+    console.error("[api] /api/grade failed:", e);
+    res.status(500).json({ error: e instanceof Error ? e.message : "grade failed" });
+  }
+});
+
+app.post("/api/knowledge", async (req, res) => {
+  const profile = req.body?.profile as KnowledgeProfile | undefined;
+  const candidates = Array.isArray(req.body?.candidates)
+    ? (req.body.candidates as KnowledgeCandidate[])
+    : [];
+  if (!profile || typeof profile.totalGraded !== "number") {
+    res.status(400).json({ error: "missing knowledge profile" });
+    return;
+  }
+  try {
+    const insight = await generateKnowledgeInsight(profile, candidates);
+    res.json({ insight });
+  } catch (e) {
+    console.error("[api] /api/knowledge failed:", e);
+    res.status(500).json({ insight: null, error: e instanceof Error ? e.message : "failed" });
   }
 });
 

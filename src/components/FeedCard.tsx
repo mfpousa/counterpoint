@@ -5,7 +5,8 @@ import { Image, Linking, Pressable, StyleSheet, Text, View } from "react-native"
 import { Ionicons } from "@expo/vector-icons";
 import { colors, font, radius, spacing } from "../theme";
 import { topicMeta } from "../lib/topics";
-import type { FeedItem } from "../types";
+import type { FeedItem, StoredSummary } from "../types";
+import { ScorePill } from "./GradeFeedback";
 import { LeanBadge } from "./ui";
 
 const KIND_ICON: Record<FeedItem["kind"], keyof typeof Ionicons.glyphMap> = {
@@ -48,12 +49,16 @@ function ScoreBadge({ relevance }: { relevance: number }) {
 export function FeedCard({
   item,
   done,
-  onComplete,
+  summary,
+  onSummarize,
   onRead,
 }: {
   item: FeedItem;
   done: boolean;
-  onComplete: (item: FeedItem) => void;
+  /** This reader's graded recall summary for the item, if any. */
+  summary?: StoredSummary;
+  /** Open the recall-summary gate (write / review). */
+  onSummarize: (item: FeedItem) => void;
   onRead?: (item: FeedItem) => void;
 }) {
   const [imgError, setImgError] = useState(false);
@@ -138,19 +143,23 @@ export function FeedCard({
           <View style={styles.chips} />
         )}
         <Pressable
-          onPress={() => onComplete(item)}
+          onPress={() => onSummarize(item)}
           style={[styles.doneBtn, done && styles.doneBtnActive]}
           accessibilityRole="button"
-          disabled={done}
         >
-          <Ionicons
-            name={done ? "checkmark-circle" : "checkmark-circle-outline"}
-            size={16}
-            color={done ? colors.good : colors.accent}
-          />
-          <Text style={[styles.doneText, done && { color: colors.good }]}>
-            {done ? "Done" : "Mark done"}
-          </Text>
+          {summary ? (
+            <>
+              <ScorePill score={summary.grade.score} size="sm" />
+              <Text style={[styles.doneText, done && { color: colors.good }]}>
+                {done ? "Read" : "Revise"}
+              </Text>
+            </>
+          ) : (
+            <>
+              <Ionicons name="create-outline" size={16} color={colors.accent} />
+              <Text style={styles.doneText}>Summarize to mark read</Text>
+            </>
+          )}
         </Pressable>
       </View>
     </View>

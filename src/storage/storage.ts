@@ -1,13 +1,17 @@
 // Local persistence (AsyncStorage). No backend in v1.
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import type { DailyProgress, LeanHistoryPoint, Preferences, Topic } from "../types";
+import type { DailyProgress, LeanHistoryPoint, Preferences, StoredSummary, Topic } from "../types";
 
 const KEYS = {
   prefs: "cp:prefs:v1",
   progress: "cp:progress:v1",
   history: "cp:leanHistory:v1",
+  summaries: "cp:summaries:v1",
 } as const;
+
+/** Cap on stored recall summaries (newest kept). Bounds local storage. */
+const MAX_SUMMARIES = 500;
 
 const ALL_TOPICS: Topic[] = [
   "world",
@@ -134,8 +138,36 @@ export function trailingWindow(
   ];
 }
 
+/** Load all graded recall summaries (newest first). */
+export async function loadSummaries(): Promise<StoredSummary[]> {
+  try {
+    const raw = await AsyncStorage.getItem(KEYS.summaries);
+    if (!raw) return [];
+    const list = JSON.parse(raw) as StoredSummary[];
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Upsert a graded summary (keyed by item id) and persist. Returns the new list
+ * (newest first) so callers can update state without a re-read.
+ */
+export async function upsertSummary(
+  existing: StoredSummary[],
+  summary: StoredSummary,
+): Promise<StoredSummary[]> {
+  const without = existing.filter((s) => s.id !== summary.id);
+  const next = [summary, ...without]
+    .sort((a, b) => b.gradedAt - a.gradedAt)
+    .slice(0, MAX_SUMMARIES);
+  await AsyncStorage.setItem(KEYS.summaries, JSON.stringify(next));
+  return next;
+}
+
 export async function resetAll(): Promise<void> {
-  await AsyncStorage.multiRemove([KEYS.prefs, KEYS.progress, KEYS.history]);
+  await AsyncStorage.multiRemove([KEYS.prefs, KEYS.progress, KEYS.history, KEYS.summaries]);
 }
 
 export async function resetProgressOnly(): Promise<void> {

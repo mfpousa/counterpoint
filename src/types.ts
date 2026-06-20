@@ -202,3 +202,81 @@ export interface LeanHistoryPoint {
   leftMinutesSum: number;
   rightMinutesSum: number;
 }
+
+/**
+ * The AI's assessment of a reader's recall summary, graded against the actual
+ * article. `score` is 0..100; an item is considered "seen" only at/above the
+ * pass threshold. The feedback fields exist to TEACH — what was right, what was
+ * missed, what was wrong, and a one-line lesson.
+ */
+export interface SummaryGrade {
+  /** Accuracy/coverage on 0..100. */
+  score: number;
+  /** One-line overall verdict. */
+  verdict: string;
+  /** Points the reader got right. */
+  correct: string[];
+  /** Important points the reader omitted. */
+  missed: string[];
+  /** Things the reader stated that are wrong/misleading. */
+  inaccuracies: string[];
+  /** A short, concrete lesson to correct the reader's understanding. */
+  lesson: string;
+}
+
+/**
+ * A reader's graded recall summary, persisted locally so it can be revisited and
+ * rolled up into a knowledge profile. Carries enough item context to render the
+ * Learn tab without re-fetching the (possibly aged-out) feed item.
+ */
+export interface StoredSummary {
+  /** FeedItem id this summary is for. */
+  id: string;
+  title: string;
+  sourceTitle: string;
+  topic: Topic;
+  url: string;
+  /** The reader's own summary text. */
+  summary: string;
+  grade: SummaryGrade;
+  /** Whether this summary passed the threshold (item counted as seen). */
+  passed: boolean;
+  gradedAt: number;
+}
+
+/** Per-topic mastery rolled up from graded summaries. */
+export interface TopicMastery {
+  topic: Topic;
+  /** Number of graded summaries in this topic. */
+  count: number;
+  /** Mean score 0..100. */
+  avgScore: number;
+}
+
+/**
+ * Locally-computed knowledge profile: how well the reader recalls what they've
+ * read, by topic, plus recurring weak concepts (things they repeatedly miss).
+ */
+export interface KnowledgeProfile {
+  totalGraded: number;
+  avgScore: number;
+  topics: TopicMastery[];
+  /** Topics the reader recalls poorly or has barely covered (the gaps). */
+  weakTopics: Topic[];
+  /** Recurring missed concepts/keywords across summaries. */
+  weakConcepts: string[];
+}
+
+/** A gap-filling article suggestion with the AI's reason it helps. */
+export interface KnowledgeSuggestion {
+  id: string;
+  reason: string;
+}
+
+/** AI-written narrative + suggestion reasons layered on the local profile. */
+export interface KnowledgeInsight {
+  /** A short narrative describing the reader's knowledge and gaps. */
+  narrative: string;
+  /** Gap-filling suggestions (subset of the candidates sent), with reasons. */
+  suggestions: KnowledgeSuggestion[];
+}
