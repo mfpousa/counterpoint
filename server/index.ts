@@ -13,6 +13,8 @@ import { aiReachable } from "./ai";
 import { config } from "./config";
 import { clearCaches, getBriefing, getFeed, getStatus } from "./feedService";
 import { runStartupHealthcheck } from "./healthcheck";
+import { rewriteArticle } from "./rewrite";
+import { getStored } from "./store";
 
 const app = express();
 app.use(cors());
@@ -55,6 +57,33 @@ app.get("/api/briefing", async (req, res) => {
   } catch (e) {
     console.error("[api] /api/briefing failed:", e);
     res.status(500).json({ briefing: null, error: e instanceof Error ? e.message : "failed" });
+  }
+});
+
+app.get("/api/rewrite", async (req, res) => {
+  const id = typeof req.query.id === "string" ? req.query.id : "";
+  if (!id) {
+    res.status(400).json({ error: "missing item id" });
+    return;
+  }
+  const stored = getStored(id);
+  if (!stored) {
+    res.status(404).json({ error: "item not found (it may have aged out of the feed)" });
+    return;
+  }
+  try {
+    const article = await rewriteArticle(stored);
+    if (!article) {
+      res.status(502).json({
+        error:
+          "Couldn't produce a readable version (the page may be paywalled or the model is offline).",
+      });
+      return;
+    }
+    res.json({ article });
+  } catch (e) {
+    console.error("[api] /api/rewrite failed:", e);
+    res.status(500).json({ error: e instanceof Error ? e.message : "rewrite failed" });
   }
 });
 

@@ -113,6 +113,18 @@ export const config = {
     // Gap between background analysis chunks while draining the backlog.
     catchUpDelayMs: num("FEED_CATCHUP_DELAY_MS", 1500),
   },
+  reader: {
+    // In-app "AI rewrite" reader. The backend fetches the article, extracts the
+    // text, and the LLM rewrites it into a clean, readable version.
+    // Min usable extracted chars (below this we assume paywall/JS-only page).
+    minChars: num("READER_MIN_CHARS", 600),
+    // Max article chars sent to the model (keeps the rewrite prompt in budget).
+    maxChars: num("READER_MAX_CHARS", 12_000),
+    // Cap on the rewrite reply length (constrained decoding stops earlier).
+    maxTokens: num("READER_MAX_TOKENS", 2200),
+    // How long a rewritten article is cached in memory (ms). Default 6h.
+    cacheTtlMs: num("READER_CACHE_TTL_MS", 6 * 60 * 60 * 1000),
+  },
   transcripts: {
     // Fetch YouTube caption transcripts (via yt-dlp) so the model understands a
     // video's actual content, not just its description. On by default; degrades

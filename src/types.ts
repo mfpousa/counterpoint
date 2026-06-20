@@ -106,6 +106,25 @@ export interface Briefing {
   basedOn: number;
 }
 
+/**
+ * An article rewritten by the AI into clean, readable prose for in-app reading.
+ * Produced on demand by the backend from the original article (or, for videos,
+ * its transcript).
+ */
+export interface RewrittenArticle {
+  id: string;
+  /** Clean headline. */
+  title: string;
+  /** Readable body, one entry per paragraph. */
+  paragraphs: string[];
+  sourceTitle: string;
+  /** Original article/video URL (for "open original"). */
+  url: string;
+  kind: Kind;
+  /** Estimated read time in minutes. */
+  estMinutes: number;
+}
+
 /** Live backend build/analysis progress, surfaced from GET /api/status. */
 export interface AnalysisStatus {
   /** Current phase: idle | fetching | triage | transcripts | analyzing. */

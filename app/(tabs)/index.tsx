@@ -18,6 +18,7 @@ import { topicMeta, TOPIC_ORDER } from "../../src/lib/topics";
 import { FeedCard } from "../../src/components/FeedCard";
 import { BriefingCard } from "../../src/components/BriefingCard";
 import { AnalysisProgress } from "../../src/components/AnalysisProgress";
+import { ArticleReader } from "../../src/components/ArticleReader";
 import { LeanDial, QuotaMeter } from "../../src/components/meters";
 import { colors, font, radius, spacing } from "../../src/theme";
 import type { FeedItem, Topic } from "../../src/types";
@@ -49,6 +50,7 @@ export default function FeedScreen() {
     updatePrefs,
   } = useApp();
   const [selected, setSelected] = useState<Topic | "all">("all");
+  const [readingItem, setReadingItem] = useState<FeedItem | null>(null);
 
   // Search box bound to the steering interest. Submitting updates the saved
   // interest, which triggers a re-fetch (the heavy analysis is cached, so this
@@ -110,6 +112,7 @@ export default function FeedScreen() {
   const atQuota = progress.consumedMin >= prefs.dailyQuotaMin;
 
   return (
+    <>
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.bg }}
       contentContainerStyle={{
@@ -272,6 +275,7 @@ export default function FeedScreen() {
                         item={item}
                         done={completedSet.has(item.id)}
                         onComplete={completeItem}
+                        onRead={setReadingItem}
                       />
                     </View>
                   ))}
@@ -282,6 +286,8 @@ export default function FeedScreen() {
         )}
       </View>
     </ScrollView>
+    <ArticleReader item={readingItem} onClose={() => setReadingItem(null)} />
+    </>
   );
 }
 

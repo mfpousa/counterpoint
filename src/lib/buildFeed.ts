@@ -153,6 +153,60 @@ export function buildFeed(input: BuildFeedInput): FeedItem[] {
     return after <= remaining + it.estMinutes * OVERSHOOT_TOLERANCE;
   };
 
+  // INTEREST/SEARCH MODE: when the reader has set a steering interest, the point
+  // is to surface what MATCHES it. Select relevance-first (the backend already
+  // scored each item against the interest), with only light topic/source
+  // diversity and a soft lean counter-weight so the feed still reads well and
+  // stays balanced WITHIN the relevant set — instead of the balance-first engine
+  // below, which would bury the interest under forced political/topic quotas.
+  const interest = (prefs.interestPrompt ?? "").trim();
+  if (interest.length > 0) {
+    const HALF_LIFE_MS = 24 * 60 * 60 * 1000;
+    const pool = candidates.slice(); // already sorted by relevance, then recency
+    const sourceCounts = new Map<string, number>();
+    let runLeftN = 0;
+    let runRightN = 0;
+    const label = interest.length > 40 ? `${interest.slice(0, 40)}…` : interest;
+
+    while (totalMinutes < remaining && pool.length > 0) {
+      let bestIdx = -1;
+      let bestScore = -Infinity;
+      for (let i = 0; i < pool.length; i++) {
+        const it = pool[i];
+        if (!fits(it)) continue;
+        const age = Math.max(0, now - it.publishedAt);
+        const recency = Math.pow(2, -age / HALF_LIFE_MS);
+        // Relevance dominates; recency only breaks near-ties.
+        const base = 0.85 * relevanceOf(it) + 0.15 * recency;
+        const topicPen = 0.12 * (topicCounts.get(it.topic) ?? 0);
+        const sourcePen = 0.2 * (sourceCounts.get(it.sourceId) ?? 0);
+        let leanPen = 0;
+        if (isPolitical(it)) {
+          const s = it.lean as number;
+          const imbalance =
+            s < 0 ? Math.max(0, runLeftN - runRightN) : Math.max(0, runRightN - runLeftN);
+          leanPen = 0.08 * imbalance;
+        }
+        const score = base - topicPen - sourcePen - leanPen;
+        if (score > bestScore) {
+          bestScore = score;
+          bestIdx = i;
+        }
+      }
+      if (bestIdx === -1) break;
+      const chosen = pool[bestIdx];
+      sourceCounts.set(chosen.sourceId, (sourceCounts.get(chosen.sourceId) ?? 0) + 1);
+      if (isPolitical(chosen)) {
+        const s = chosen.lean as number;
+        if (s < 0) runLeftN += 1;
+        else if (s > 0) runRightN += 1;
+      }
+      const matchPct = Math.round(relevanceOf(chosen) * 100);
+      take(chosen, pool, `Matches "${label}" — ${matchPct}% relevant`);
+    }
+    return result;
+  }
+
   while (totalMinutes < remaining) {
     const wantPolitical =
       political.length > 0 &&

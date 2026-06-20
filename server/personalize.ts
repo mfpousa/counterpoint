@@ -49,6 +49,14 @@ export function interestTokens(interest: string): Set<string> {
 function conceptMatched(token: string, hay: Set<string>): boolean {
   if (hay.has(token)) return true;
   for (const syn of SYNONYMS[token] ?? []) if (hay.has(syn)) return true;
+  // Word-form match: tie together shared stems (e.g. "humanity"~"human",
+  // "economics"~"economic", "future"~"futures"). Prefix-based and length-guarded
+  // to catch plurals/derivations without the false positives of substring search.
+  if (token.length >= 5) {
+    for (const h of hay) {
+      if (h.length >= 5 && (h.startsWith(token) || token.startsWith(h))) return true;
+    }
+  }
   return false;
 }
 

@@ -5,7 +5,7 @@
 // and returns a ranked, diversified pool. The app just renders it and applies
 // the personal layer (daily quota + lean counter-weighting) in buildFeed.
 
-import type { AnalysisStatus, Briefing, FeedItem } from "../types";
+import type { AnalysisStatus, Briefing, FeedItem, RewrittenArticle } from "../types";
 
 const DEFAULT_BACKEND_PORT = "8787";
 
@@ -70,6 +70,24 @@ export async function fetchRankedFeed(
   }
   const data = (await res.json()) as FeedResponse;
   return Array.isArray(data.items) ? data.items : [];
+}
+
+/**
+ * Ask the backend to fetch + AI-rewrite an item into a clean, readable article
+ * for in-app reading. Throws with a clear message on failure so the reader UI
+ * can surface it (paywall, model offline, item aged out, ...).
+ */
+export async function fetchRewrite(id: string): Promise<RewrittenArticle> {
+  const res = await fetch(`${apiBaseUrl()}/api/rewrite?id=${encodeURIComponent(id)}`, {
+    method: "GET",
+  });
+  const data = (await res.json().catch(() => null)) as
+    | { article?: RewrittenArticle; error?: string }
+    | null;
+  if (!res.ok || !data?.article) {
+    throw new Error(data?.error ?? `Rewrite failed (HTTP ${res.status}).`);
+  }
+  return data.article;
 }
 
 /**

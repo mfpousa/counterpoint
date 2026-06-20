@@ -211,6 +211,47 @@ describe("buildFeed", () => {
     expect(feed.find((i) => i.id === undated.id)).toBeUndefined();
   });
 
+  it("interest/search mode orders by relevance and lets relevant items override the political quota", () => {
+    const items = [
+      makeItem({ lean: null, topic: "technology", relevance: 0.95 }),
+      makeItem({ lean: null, topic: "science", relevance: 0.9 }),
+      makeItem({ lean: -0.6, topic: "politics", relevance: 0.2 }),
+      makeItem({ lean: 0.6, topic: "politics", relevance: 0.15 }),
+    ];
+    const feed = buildFeed({
+      items,
+      prefs: makePrefs({ interestPrompt: "ai", dailyQuotaMin: 40 }),
+      progress: emptyProgress(),
+      now: 100000,
+    });
+    // Highest-relevance items surface first, even though they're non-political
+    // (the balance-first engine would have forced a political item to the top).
+    expect(feed[0].relevance).toBe(0.95);
+    expect(feed[1].relevance).toBe(0.9);
+    expect(feed[0].lean).toBeNull();
+    // Every pick is reason-tagged as an interest match.
+    expect(feed.every((i) => (i.reason ?? "").startsWith('Matches "ai"'))).toBe(true);
+  });
+
+  it("without an interest, behavior is unchanged (balance-first, no relevance reordering)", () => {
+    // Same items as above but no interest: the engine should still enforce
+    // political/topic balance rather than relevance ordering.
+    const items = [
+      makeItem({ lean: null, topic: "technology", relevance: 0.95 }),
+      makeItem({ lean: -0.6, topic: "politics", relevance: 0.2 }),
+      makeItem({ lean: 0.6, topic: "politics", relevance: 0.15 }),
+    ];
+    const feed = buildFeed({
+      items,
+      prefs: makePrefs({ interestPrompt: "", dailyQuotaMin: 60 }),
+      progress: emptyProgress(),
+      now: 100000,
+    });
+    // Political content is present (would be excluded if relevance led).
+    expect(feed.some((i) => i.lean !== null)).toBe(true);
+    expect(feed.every((i) => !(i.reason ?? "").startsWith("Matches"))).toBe(true);
+  });
+
   it("attaches a reason to every selected item", () => {
     const items = [makeItem({ lean: -0.5 }), makeItem({ lean: 0.5 })];
     const feed = buildFeed({

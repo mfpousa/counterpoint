@@ -49,10 +49,12 @@ export function FeedCard({
   item,
   done,
   onComplete,
+  onRead,
 }: {
   item: FeedItem;
   done: boolean;
   onComplete: (item: FeedItem) => void;
+  onRead?: (item: FeedItem) => void;
 }) {
   const [imgError, setImgError] = useState(false);
   const open = () => {
@@ -123,7 +125,18 @@ export function FeedCard({
       )}
 
       <View style={styles.footer}>
-        <View style={styles.chips} />
+        {onRead ? (
+          <Pressable
+            onPress={() => onRead(item)}
+            style={styles.readBtn}
+            accessibilityRole="button"
+          >
+            <Ionicons name="sparkles-outline" size={15} color={colors.accent} />
+            <Text style={styles.readText}>Read in app</Text>
+          </Pressable>
+        ) : (
+          <View style={styles.chips} />
+        )}
         <Pressable
           onPress={() => onComplete(item)}
           style={[styles.doneBtn, done && styles.doneBtnActive]}
@@ -207,6 +220,17 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
   },
   chips: { flexDirection: "row", alignItems: "center", gap: spacing.sm, flexShrink: 1 },
+  readBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    borderColor: colors.accent,
+    borderWidth: 1,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+  readText: { color: colors.accent, fontSize: font.small, fontWeight: "600" },
   doneBtn: {
     flexDirection: "row",
     alignItems: "center",
