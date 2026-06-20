@@ -1,7 +1,7 @@
 // A single feed item card.
 
-import React from "react";
-import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
+import React, { useState } from "react";
+import { Image, Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, font, radius, spacing } from "../theme";
 import type { FeedItem } from "../types";
@@ -22,12 +22,28 @@ export function FeedCard({
   done: boolean;
   onComplete: (item: FeedItem) => void;
 }) {
+  const [imgError, setImgError] = useState(false);
   const open = () => {
     void Linking.openURL(item.url);
   };
+  const showThumb = !!item.thumbnail && !imgError;
 
   return (
     <View style={[styles.card, done && styles.cardDone]}>
+      {showThumb && (
+        <Pressable onPress={open} accessibilityRole="link">
+          <Image
+            source={{ uri: item.thumbnail }}
+            style={styles.thumb}
+            resizeMode="cover"
+            onError={() => setImgError(true)}
+          />
+          <View style={styles.thumbKind}>
+            <Ionicons name={KIND_ICON[item.kind]} size={12} color={colors.text} />
+          </View>
+        </Pressable>
+      )}
+
       {(item.reason || item.aiReason) && (
         <View style={styles.reasonRow}>
           <Ionicons name="sparkles-outline" size={12} color={colors.accent} />
@@ -105,6 +121,20 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   cardDone: { opacity: 0.55 },
+  thumb: {
+    width: "100%",
+    height: 156,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceAlt,
+  },
+  thumbKind: {
+    position: "absolute",
+    top: spacing.sm,
+    left: spacing.sm,
+    backgroundColor: "rgba(14,17,22,0.72)",
+    borderRadius: radius.pill,
+    padding: spacing.xs,
+  },
   reasonRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   reason: { color: colors.accent, fontSize: font.tiny, fontWeight: "600", flexShrink: 1 },
   aiNoteRow: { flexDirection: "row", alignItems: "flex-start", gap: spacing.xs },

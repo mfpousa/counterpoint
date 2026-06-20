@@ -1,5 +1,6 @@
-import React, { useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import React from "react";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useApp } from "../../src/store/AppContext";
 import { resetAll } from "../../src/storage/storage";
@@ -26,7 +27,6 @@ const THRESHOLDS = [0.15, 0.25, 0.35];
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const { prefs, updatePrefs, resetToday, refreshFeed } = useApp();
-  const [apiKey, setApiKey] = useState(prefs.llmApiKey ?? "");
 
   const toggleTopic = (t: Topic) => {
     const next = prefs.enabledTopics.includes(t)
@@ -124,34 +124,15 @@ export default function SettingsScreen() {
 
       <View style={styles.card}>
         <View style={styles.rowBetween}>
-          <Text style={styles.h}>AI item-level tagging</Text>
-          <Switch
-            value={prefs.llmTaggingEnabled}
-            onValueChange={(v) => updatePrefs({ llmTaggingEnabled: v })}
-            trackColor={{ true: colors.accentDim, false: colors.surfaceAlt }}
-            thumbColor={prefs.llmTaggingEnabled ? colors.accent : colors.textFaint}
-          />
+          <Text style={styles.h}>How your feed is built</Text>
+          <Ionicons name="sparkles" size={18} color={colors.accent} />
         </View>
         <Text style={styles.sub}>
-          Optional. By default each item inherits its source's lean. Enable this to classify each
-          item individually with an LLM (needs your API key). Note: the model has its own biases —
-          treat AI tags as a second opinion, not ground truth.
+          A local AI model reads each story — and YouTube transcripts — to tag its topic,
+          perspective, and relevance, then ranks for balance and variety. It runs on your own
+          machine; nothing is uploaded. The model has its own biases, so treat its tags as a
+          second opinion, not ground truth.
         </Text>
-        {prefs.llmTaggingEnabled && (
-          <View style={{ gap: spacing.sm }}>
-            <TextInput
-              value={apiKey}
-              onChangeText={setApiKey}
-              onBlur={() => updatePrefs({ llmApiKey: apiKey.trim() || undefined })}
-              placeholder="OpenAI-compatible API key"
-              placeholderTextColor={colors.textFaint}
-              secureTextEntry
-              autoCapitalize="none"
-              style={styles.input}
-            />
-            <Text style={styles.sub}>Stored only on this device.</Text>
-          </View>
-        )}
       </View>
 
       <View style={styles.card}>

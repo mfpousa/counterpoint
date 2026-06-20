@@ -12,6 +12,7 @@ import express from "express";
 import { aiReachable } from "./ai";
 import { config } from "./config";
 import { clearCaches, getFeed } from "./feedService";
+import { runStartupHealthcheck } from "./healthcheck";
 
 const app = express();
 app.use(cors());
@@ -47,9 +48,11 @@ app.post("/api/refresh", async (_req, res) => {
   }
 });
 
-app.listen(config.server.port, () => {
+app.listen(config.server.port, async () => {
   console.log(`[server] Counterpoint API on http://localhost:${config.server.port}`);
   console.log(`[server] AI endpoint: ${config.ai.baseUrl} (model: ${config.ai.model})`);
+  // Verify every dependency up front so problems are obvious, not silent.
+  await runStartupHealthcheck();
   // Warm the cache so the first client request is fast. Failures are non-fatal.
   getFeed().catch((e) => console.warn("[server] initial warm-up failed:", e));
 });

@@ -38,6 +38,20 @@ export function isYouTube(item: FeedItem): boolean {
   return item.kind === "video" && /youtu\.?be/.test(item.url) && !!youTubeVideoId(item.url);
 }
 
+/** Return the installed yt-dlp version string, or null if the binary is missing. */
+export async function ytDlpVersion(): Promise<string | null> {
+  try {
+    // Standalone yt-dlp binaries self-unpack on first run, which can take a
+    // while on a cold/loaded machine — give it room before declaring it missing.
+    const { stdout } = await execFileAsync(config.transcripts.ytDlpPath, ["--version"], {
+      timeout: 25_000,
+    });
+    return stdout.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
 /** Flatten a WebVTT subtitle file into clean, de-duplicated plain text. */
 export function vttToText(vtt: string): string {
   const out: string[] = [];

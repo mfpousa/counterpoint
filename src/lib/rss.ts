@@ -11,6 +11,16 @@ const parser = new XMLParser({
   // Keep CDATA / html-ish content as text.
   textNodeName: "#text",
   trimValues: true,
+  // fast-xml-parser caps total entity expansions at 1000 when processEntities
+  // is `true` (anti billion-laughs). Real feeds (e.g. The Guardian) routinely
+  // exceed that with ordinary &amp;/&#39; entities, which made parsing throw.
+  // Passing the object form keeps entity decoding on (needed for links/&amp;)
+  // while lifting the limits to sane, non-attack levels.
+  processEntities: {
+    enabled: true,
+    maxTotalExpansions: 1_000_000,
+    maxExpandedLength: 50_000_000,
+  },
 });
 
 // On Expo *web* only, direct RSS fetches hit CORS; route through a proxy.
@@ -193,8 +203,14 @@ export async function fetchSource(source: Source, timeoutMs = 12000): Promise<Fe
   for (const url of feedUrls(source.url)) {
     const xml = await fetchXml(url, timeoutMs);
     if (!xml) continue;
-    const items = normalize(source, parseFeedXml(xml));
-    if (items.length > 0) return items;
+    try {
+      const items = normalize(source, parseFeedXml(xml));
+      if (items.length > 0) return items;
+    } catch {
+      // Malformed/oversized XML for this candidate — never let one bad feed
+      // reject the whole batch; try the next proxy/URL, else return [].
+      continue;
+    }
   }
   return [];
 }
