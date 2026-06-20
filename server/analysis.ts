@@ -8,8 +8,53 @@
 //      one-line summary, and topical keywords used later to match interests.
 
 import type { FeedItem, Topic } from "../src/types";
-import { chatJsonArray, clampNum, withConcurrency } from "./ai";
+import { chatJsonArray, clampNum, withConcurrency, type JsonSchema } from "./ai";
 import { config } from "./config";
+
+const TOPIC_VALUES = [
+  "world",
+  "politics",
+  "economics",
+  "science",
+  "technology",
+  "history",
+  "health",
+  "culture",
+] as const;
+
+/** Wrap a per-item schema in the { "items": [...] } envelope (strict needs an object root). */
+function arraySchema(name: string, item: Record<string, unknown>): JsonSchema {
+  return {
+    name,
+    schema: {
+      type: "object",
+      properties: { items: { type: "array", items: item } },
+      required: ["items"],
+      additionalProperties: false,
+    },
+  };
+}
+
+const TRIAGE_SCHEMA = arraySchema("triage", {
+  type: "object",
+  properties: { id: { type: "string" }, junk: { type: "boolean" } },
+  required: ["id", "junk"],
+  additionalProperties: false,
+});
+
+const ANALYZE_SCHEMA = arraySchema("analysis", {
+  type: "object",
+  properties: {
+    id: { type: "string" },
+    topic: { type: "string", enum: [...TOPIC_VALUES] },
+    lean: { type: ["number", "null"] },
+    importance: { type: "number" },
+    summary: { type: "string" },
+    keywords: { type: "array", items: { type: "string" } },
+  },
+  required: ["id", "topic", "lean", "importance", "summary", "keywords"],
+  additionalProperties: false,
+});
 
 /** Interest-INDEPENDENT analysis we compute once per item and persist. */
 export interface ItemAnalysis {
@@ -41,8 +86,8 @@ const TRIAGE_PROMPT =
   '("you won\'t believe", "this one trick"), ragebait, listicles, horoscopes, ' +
   "sponsored/ads, celebrity gossip, and individual accidents/crime-blotter or " +
   "deaths with no wider significance. Substantive reporting and analysis is NOT " +
-  'junk. Output ONLY a JSON array of objects {"id": echo the id, "junk": ' +
-  "true|false}, same order as input. No prose.";
+  'junk. Output ONLY a JSON object {"items": [ {"id": echo the id, "junk": ' +
+  "true|false}, ... ]}, same order as input. No prose.";
 
 const ANALYZE_PROMPT =
   "You are a neutral editor building a high-signal, politically balanced feed. " +
@@ -61,7 +106,8 @@ const ANALYZE_PROMPT =
   '(e.g. ["artificial intelligence","llm","regulation"]). Be substantive — these ' +
   "are used to match reader interests.\n" +
   'Some items include a "transcript" of spoken content — weigh it heavily.\n' +
-  "Respond with ONLY a JSON array, same order as input. No prose.";
+  'Respond with ONLY a JSON object {"items": [ ...one object per article... ]}, ' +
+  "same order as input. No prose.";
 
 function chunk<T>(items: T[], size: number): T[][] {
   const out: T[][] = [];
@@ -82,6 +128,7 @@ async function triageBatch(batch: FeedItem[]): Promise<Set<string>> {
   // run away and overflow the context window.
   const rows = await chatJsonArray(TRIAGE_PROMPT, payload, {
     maxTokens: batch.length * 24 + 64,
+    schema: TRIAGE_SCHEMA,
   });
   const byId = new Map(batch.map((it) => [it.id, it]));
   rows.forEach((row, i) => {
@@ -162,10 +209,11 @@ async function analyzeBatch(
       ...(transcript ? { transcript } : {}),
     };
   });
-  // ~110 tokens/item of JSON (topic/lean/importance/summary/keywords); cap with
-  // headroom so output can't exceed the window, while leaving room for valid JSON.
+  // Constrained decoding guarantees valid, bounded JSON; max_tokens is a generous
+  // safety net (~200 tokens/item: topic/lean/importance/summary/keywords).
   const rows = await chatJsonArray(ANALYZE_PROMPT, payload, {
-    maxTokens: batch.length * 160 + 128,
+    maxTokens: batch.length * 200 + 256,
+    schema: ANALYZE_SCHEMA,
   });
   const byId = new Map(batch.map((it) => [it.id, it]));
   rows.forEach((row, i) => {

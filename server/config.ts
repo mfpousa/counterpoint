@@ -80,6 +80,11 @@ export const config = {
     // model that's actively generating is never cut off. Must comfortably exceed
     // worst-case prompt-ingestion / time-to-first-token on your hardware.
     timeoutMs: num("AI_TIMEOUT_MS", 120_000),
+    // Use constrained decoding (response_format json_schema) so the model emits
+    // valid, complete JSON and STOPS — essential for local models that otherwise
+    // ramble past valid JSON. Disable with AI_STRUCTURED_OUTPUT_OFF=1 if your
+    // runtime rejects response_format.
+    structuredOutput: !bool("AI_STRUCTURED_OUTPUT_OFF"),
   },
   server: {
     port: num("PORT", 8787),

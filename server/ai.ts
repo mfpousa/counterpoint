@@ -22,6 +22,19 @@ export function extractJson(content: string): unknown {
       /* fall through */
     }
   }
+  // Salvage a TRUNCATED array (e.g. the model hit max_tokens mid-object): close
+  // the array after the last COMPLETE object so we keep the items that did land
+  // instead of dropping the whole batch.
+  if (start !== -1) {
+    const lastObj = body.lastIndexOf("}");
+    if (lastObj > start) {
+      try {
+        return JSON.parse(body.slice(start, lastObj + 1) + "]");
+      } catch {
+        /* fall through */
+      }
+    }
+  }
   try {
     return JSON.parse(body);
   } catch {
@@ -55,6 +68,12 @@ export function clampNum(n: unknown, lo: number, hi: number, fallback: number): 
   return Math.max(lo, Math.min(hi, v));
 }
 
+/** A JSON-schema name + schema object for constrained (structured) decoding. */
+export interface JsonSchema {
+  name: string;
+  schema: Record<string, unknown>;
+}
+
 /**
  * One chat round-trip. Returns the raw assistant message ("" on error/timeout).
  *
@@ -69,7 +88,7 @@ export function clampNum(n: unknown, lo: number, hi: number, fallback: number): 
 export async function chatRaw(
   system: string,
   payload: unknown,
-  opts: { maxTokens?: number } = {},
+  opts: { maxTokens?: number; schema?: JsonSchema } = {},
 ): Promise<string> {
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -94,6 +113,17 @@ export async function chatRaw(
         // Bound the reply so a non-stopping model can't blow past the context
         // window (which stalls/crashes the GPU). Sized by the caller per batch.
         ...(opts.maxTokens ? { max_tokens: opts.maxTokens } : {}),
+        // Constrained decoding: force the model to emit JSON matching the schema
+        // and STOP when it's complete. This is what makes a local model that
+        // otherwise rambles past valid JSON produce parseable, bounded output.
+        ...(opts.schema && config.ai.structuredOutput
+          ? {
+              response_format: {
+                type: "json_schema",
+                json_schema: { name: opts.schema.name, strict: true, schema: opts.schema.schema },
+              },
+            }
+          : {}),
         messages: [
           { role: "system", content: system },
           {
@@ -170,7 +200,7 @@ export async function chatRaw(
 export async function chatJsonArray(
   system: string,
   payload: unknown,
-  opts: { maxTokens?: number } = {},
+  opts: { maxTokens?: number; schema?: JsonSchema } = {},
 ): Promise<unknown[]> {
   const parsed = extractJson(await chatRaw(system, payload, opts));
   if (Array.isArray(parsed)) return parsed;
@@ -182,7 +212,7 @@ export async function chatJsonArray(
 export async function chatJsonObject(
   system: string,
   payload: unknown,
-  opts: { maxTokens?: number } = {},
+  opts: { maxTokens?: number; schema?: JsonSchema } = {},
 ): Promise<Record<string, unknown> | null> {
   return extractJsonObject(await chatRaw(system, payload, opts));
 }
