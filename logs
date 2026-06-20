@@ -1,0 +1,34 @@
+[health] Running startup checks…
+[store] loaded 485 analyzed item(s) from .cache/feed-store.json
+[health] ✓ AI online (google/gemma-4-12b-qat)
+[health]   AI says: "Hello, I'm online and ready to curate the feed."
+[health] ✓ yt-dlp present (v2026.06.09)
+[health] ✓ Feed fetch OK (The Guardian — World: 45 items)
+[health] Startup checks complete.
+
+[feed] refresh — fetching 37 sources…
+[feed] fetched 4431; 1 new & recent to triage; 485 in store
+[feed] triage: 1 headline(s) in 1 batch(es)…
+[feed] triage: 1/1 (100%) — done in 1s
+[feed] triage flagged 0/1 as clickbait/junk
+[feed] refresh done in 3566ms
+[feed] fetching transcripts for up to 200 item(s)…
+[feed] fetched 2 transcript(s)
+[feed] deep analysis: 200 of 485 pending in 25 batch(es) (concurrency 2)…
+[feed] analyze: 8/200 (4%) — 22s elapsed, ~532s left (0.4/s)
+[feed] analyze: 24/200 (12%) — 47s elapsed, ~348s left (0.5/s)
+[feed] analyze: 40/200 (20%) — 74s elapsed, ~294s left (0.5/s)
+[feed] analyze: 56/200 (28%) — 97s elapsed, ~250s left (0.6/s)
+[feed] analyze: 72/200 (36%) — 120s elapsed, ~213s left (0.6/s)
+[feed] analyze: 88/200 (44%) — 142s elapsed, ~181s left (0.6/s)
+[feed] analyze: 104/200 (52%) — 165s elapsed, ~152s left (0.6/s)
+[feed] analyze: 120/200 (60%) — 188s elapsed, ~125s left (0.6/s)
+[feed] analyze: 136/200 (68%) — 211s elapsed, ~99s left (0.6/s)
+[feed] analyze: 152/200 (76%) — 233s elapsed, ~74s left (0.7/s)
+[feed] analyze: 168/200 (84%) — 256s elapsed, ~49s left (0.7/s)
+[feed] analyze: 184/200 (92%) — 279s elapsed, ~24s left (0.7/s)
+[feed] analyze: 200/200 (100%) — done in 299s
+[feed] analyzed 0/200; 485 still pending
+[feed] view "" -> 0 items from 0 eligible in 0ms
+[feed] briefing: synthesizing "general" from 0 item(s)…
+[feed] briefing: none in 0s
