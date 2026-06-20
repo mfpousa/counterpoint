@@ -12,12 +12,24 @@ import { fetchKnowledgeInsight } from "../../src/lib/api";
 import { computeProfile, pickCandidates } from "../../src/lib/knowledge";
 import { topicMeta } from "../../src/lib/topics";
 import { GradeFeedback, ScorePill, scoreColor } from "../../src/components/GradeFeedback";
+import { ArticleReader } from "../../src/components/ArticleReader";
+import { SummaryModal } from "../../src/components/SummaryModal";
 import { colors, font, radius, spacing } from "../../src/theme";
-import type { KnowledgeInsight, StoredSummary } from "../../src/types";
+import type { FeedItem, KnowledgeInsight, StoredSummary } from "../../src/types";
 
 export default function LearnScreen() {
   const insets = useSafeAreaInsets();
-  const { summaries, pool } = useApp();
+  const { summaries, pool, gradeAndRecord } = useApp();
+
+  // In-app read -> summarize loop for gap-filling suggestions (the learning chain).
+  const [readingItem, setReadingItem] = useState<FeedItem | null>(null);
+  const [summarizingItem, setSummarizingItem] = useState<FeedItem | null>(null);
+
+  const summaryById = useMemo(() => {
+    const m = new Map<string, StoredSummary>();
+    for (const s of summaries) m.set(s.id, s);
+    return m;
+  }, [summaries]);
 
   const profile = useMemo(() => computeProfile(summaries), [summaries]);
   const candidates = useMemo(
@@ -67,6 +79,7 @@ export default function LearnScreen() {
   }, [pool]);
 
   return (
+    <>
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.bg }}
       contentContainerStyle={{
@@ -173,21 +186,45 @@ export default function LearnScreen() {
                     {insight.suggestions.map((s) => {
                       const it = poolById.get(s.id);
                       if (!it) return null;
+                      const m = topicMeta(it.topic);
+                      const existing = summaryById.get(it.id);
                       return (
-                        <Pressable
-                          key={s.id}
-                          style={styles.suggestion}
-                          onPress={() => void Linking.openURL(it.url)}
-                          accessibilityRole="link"
-                        >
-                          <Ionicons name="arrow-forward-circle-outline" size={16} color={colors.accent} />
-                          <View style={{ flex: 1 }}>
-                            <Text style={styles.suggestTitle} numberOfLines={2}>
-                              {it.title}
-                            </Text>
+                        <View key={s.id} style={styles.suggestion}>
+                          <View style={styles.suggestTopRow}>
+                            <View style={[styles.suggestTopic, { borderColor: m.color }]}>
+                              <Ionicons name={m.icon} size={11} color={m.color} />
+                              <Text style={[styles.suggestTopicText, { color: m.color }]}>{m.label}</Text>
+                            </View>
+                            {existing && <ScorePill score={existing.grade.score} size="sm" />}
+                          </View>
+                          <Text style={styles.suggestTitle} numberOfLines={3}>
+                            {it.title}
+                          </Text>
+                          <View style={styles.suggestReasonRow}>
+                            <Ionicons name="sparkles-outline" size={12} color={colors.accent} />
                             <Text style={styles.suggestReason}>{s.reason}</Text>
                           </View>
-                        </Pressable>
+                          <View style={styles.suggestActions}>
+                            <Pressable
+                              onPress={() => setReadingItem(it)}
+                              style={styles.suggestReadBtn}
+                              accessibilityRole="button"
+                            >
+                              <Ionicons name="book-outline" size={15} color={colors.accent} />
+                              <Text style={styles.suggestReadText}>Read in app</Text>
+                            </Pressable>
+                            <Pressable
+                              onPress={() => setSummarizingItem(it)}
+                              style={styles.suggestSummBtn}
+                              accessibilityRole="button"
+                            >
+                              <Ionicons name="create-outline" size={15} color={colors.bg} />
+                              <Text style={styles.suggestSummText}>
+                                {existing ? "Revise" : "Summarize"}
+                              </Text>
+                            </Pressable>
+                          </View>
+                        </View>
                       );
                     })}
                   </View>
@@ -207,7 +244,17 @@ export default function LearnScreen() {
           ))}
         </>
       )}
-    </ScrollView>
+      </ScrollView>
+
+      {/* Learning chain: read a suggested article, then prove recall — both in app. */}
+      <ArticleReader item={readingItem} onClose={() => setReadingItem(null)} />
+      <SummaryModal
+        item={summarizingItem}
+        existing={summarizingItem ? summaryById.get(summarizingItem.id) : undefined}
+        onGrade={gradeAndRecord}
+        onClose={() => setSummarizingItem(null)}
+      />
+    </>
   );
 }
 
@@ -309,15 +356,50 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
   },
   suggestion: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: spacing.sm,
     backgroundColor: colors.surfaceAlt,
     borderRadius: radius.md,
     padding: spacing.md,
+    gap: spacing.sm,
   },
-  suggestTitle: { color: colors.text, fontSize: font.small, fontWeight: "700", lineHeight: font.small * 1.4 },
-  suggestReason: { color: colors.textDim, fontSize: font.small, lineHeight: font.small * 1.5, marginTop: 2 },
+  suggestTopRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  suggestTopic: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+  },
+  suggestTopicText: { fontSize: font.tiny, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.3 },
+  suggestTitle: { color: colors.text, fontSize: font.body, fontWeight: "700", lineHeight: font.body * 1.3 },
+  suggestReasonRow: { flexDirection: "row", alignItems: "flex-start", gap: spacing.xs },
+  suggestReason: { flex: 1, color: colors.textDim, fontSize: font.small, lineHeight: font.small * 1.5 },
+  suggestActions: { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginTop: spacing.xs },
+  suggestReadBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.xs,
+    borderColor: colors.accent,
+    borderWidth: 1,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+  suggestReadText: { color: colors.accent, fontSize: font.small, fontWeight: "700" },
+  suggestSummBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.xs,
+    backgroundColor: colors.accent,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+  suggestSummText: { color: colors.bg, fontSize: font.small, fontWeight: "800" },
   sectionLabel: { color: colors.text, fontSize: font.h3, fontWeight: "800", marginTop: spacing.sm },
   histHeader: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   histTitle: { color: colors.text, fontSize: font.small, fontWeight: "700", lineHeight: font.small * 1.4 },

@@ -114,16 +114,34 @@ describe("buildFeed", () => {
     expect(feed[0].lean as number).toBeGreaterThan(0);
   });
 
-  it("excludes already-completed items", () => {
+  it("keeps already-completed items visible, after the fresh picks", () => {
     const done = makeItem({ lean: -0.5 });
-    const items = [done, makeItem({ lean: 0.5 })];
+    const fresh = makeItem({ lean: 0.5 });
+    const items = [done, fresh];
     const feed = buildFeed({
       items,
       prefs: makePrefs(),
       progress: emptyProgress({ completedItemIds: [done.id] }),
       now: 100000,
     });
-    expect(feed.find((i) => i.id === done.id)).toBeUndefined();
+    // The read item is still shown so it can be revisited...
+    const completed = feed.find((i) => i.id === done.id);
+    expect(completed).toBeDefined();
+    // ...but it is appended after the freshly-built (unread) picks.
+    expect(feed.findIndex((i) => i.id === fresh.id)).toBeLessThan(
+      feed.findIndex((i) => i.id === done.id),
+    );
+  });
+
+  it("shows completed items even when the daily quota is exhausted", () => {
+    const done = makeItem({ lean: -0.5 });
+    const feed = buildFeed({
+      items: [done, makeItem({ lean: 0.5 })],
+      prefs: makePrefs({ dailyQuotaMin: 30 }),
+      progress: emptyProgress({ completedItemIds: [done.id], consumedMin: 60 }),
+      now: 100000,
+    });
+    expect(feed.map((i) => i.id)).toEqual([done.id]);
   });
 
   it("respects topic and kind filters", () => {

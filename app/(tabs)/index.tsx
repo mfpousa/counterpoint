@@ -104,6 +104,10 @@ export default function FeedScreen() {
       else byTopic.set(it.topic, [it]);
     }
     const byRelevance = (a: FeedItem, b: FeedItem) => {
+      // Already-read items sink to the bottom of their section (still visible).
+      const da = completedSet.has(a.id) ? 1 : 0;
+      const db = completedSet.has(b.id) ? 1 : 0;
+      if (da !== db) return da - db;
       const ra = a.relevance ?? 0;
       const rb = b.relevance ?? 0;
       if (rb !== ra) return rb - ra;
@@ -113,7 +117,12 @@ export default function FeedScreen() {
       topic: t,
       items: (byTopic.get(t) as FeedItem[]).slice().sort(byRelevance),
     }));
-  }, [feed]);
+  }, [feed, completedSet]);
+
+  const unreadCount = useMemo(
+    () => feed.filter((it) => !completedSet.has(it.id)).length,
+    [feed, completedSet],
+  );
 
   const activeSelected = selected !== "all" && sections.some((s) => s.topic === selected)
     ? selected
@@ -179,8 +188,9 @@ export default function FeedScreen() {
             <Text style={styles.title}>Today</Text>
             {feed.length > 0 && (
               <Text style={styles.subtitle}>
-                {feed.length} picks across {sections.length} topic
-                {sections.length === 1 ? "" : "s"}, balanced for you
+                {unreadCount > 0
+                  ? `${unreadCount} pick${unreadCount === 1 ? "" : "s"} across ${sections.length} topic${sections.length === 1 ? "" : "s"}, balanced for you`
+                  : "You're all caught up — revisit anything you've read below"}
               </Text>
             )}
           </View>

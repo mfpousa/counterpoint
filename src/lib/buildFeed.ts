@@ -121,8 +121,21 @@ export function buildFeed(input: BuildFeedInput): FeedItem[] {
     })
     .sort(byRelevanceThenRecency);
 
+  // Already-read (completed) items stay VISIBLE so the reader can revisit them
+  // and their recall summary. They don't re-enter the budget/balance logic above
+  // (they already counted toward today's quota) — we simply append them, tagged,
+  // and the UI renders them greyed-out. Computed from the raw pool so they show
+  // even when the quota is exhausted (the early return below).
+  const completedItems = collectCompletedForDisplay(
+    input.items,
+    completed,
+    enabledTopics,
+    enabledKinds,
+    now,
+  );
+
   const remaining = Math.max(0, prefs.dailyQuotaMin - progress.consumedMin);
-  if (remaining <= 0 || candidates.length === 0) return [];
+  if (remaining <= 0 || candidates.length === 0) return completedItems;
 
   const political = candidates.filter(isPolitical);
   const nonPolitical = candidates.filter((it) => !isPolitical(it));
@@ -204,7 +217,7 @@ export function buildFeed(input: BuildFeedInput): FeedItem[] {
       const matchPct = Math.round(relevanceOf(chosen) * 100);
       take(chosen, pool, `Matches "${label}" — ${matchPct}% relevant`);
     }
-    return result;
+    return [...result, ...completedItems];
   }
 
   while (totalMinutes < remaining) {
@@ -273,7 +286,37 @@ export function buildFeed(input: BuildFeedInput): FeedItem[] {
     break; // nothing else fits the budget
   }
 
-  return result;
+  return [...result, ...completedItems];
+}
+
+/**
+ * Collect already-read (completed) items to keep them VISIBLE in the feed. These
+ * are deduped, pass the same topic/kind/recency filters as fresh items, sorted
+ * relevance-then-recency, and tagged so the card can show the "revisit" affordance.
+ * They are NOT budgeted (already counted toward the daily quota) — callers append
+ * them after the freshly-built feed.
+ */
+function collectCompletedForDisplay(
+  items: FeedItem[],
+  completed: Set<string>,
+  enabledTopics: Set<string>,
+  enabledKinds: Set<string>,
+  now: number,
+): FeedItem[] {
+  if (completed.size === 0) return [];
+  const seen = new Set<string>();
+  return items
+    .filter((it) => {
+      if (!completed.has(it.id) || seen.has(it.id)) return false;
+      seen.add(it.id);
+      if (!enabledTopics.has(it.topic)) return false;
+      if (!enabledKinds.has(it.kind)) return false;
+      if (it.publishedAt > now) return false;
+      if (now - it.publishedAt > MAX_AGE_MS) return false;
+      return true;
+    })
+    .sort(byRelevanceThenRecency)
+    .map((it) => ({ ...it, reason: "Already read — revisit your summary anytime" }));
 }
 
 /** Convenience: minutes of left/right/center political content in a built feed. */
