@@ -1,0 +1,33 @@
+{
+  "expo": {
+    "name": "Counterpoint",
+    "slug": "counterpoint",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "counterpoint",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": false,
+    "splash": {
+      "backgroundColor": "#0E1116"
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0E1116"
+      }
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
