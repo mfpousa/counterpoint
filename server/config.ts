@@ -72,10 +72,10 @@ export const config = {
     // Larger batches for the cheap title-only clickbait triage pass.
     triageBatchSize: num("AI_TRIAGE_BATCH_SIZE", 40),
     concurrency: num("AI_CONCURRENCY", 2),
-    // Max NEW items deeply analyzed per build. 0 = no cap (analyze everything,
-    // across as many batches as needed). Results are persisted, so the cost is
-    // paid once per item and amortized over restarts.
-    maxItems: numOrZero("AI_MAX_ITEMS", 0),
+    // Items deeply analyzed per CHUNK. The first chunk makes the feed usable
+    // fast; the rest of the backlog is drained in the background. 0 = no chunk
+    // cap (one big, blocking pass). Results are persisted either way.
+    maxItems: numOrZero("AI_MAX_ITEMS", 200),
     // INACTIVITY timeout for an LLM call: resets on every streamed chunk, so a
     // model that's actively generating is never cut off. Must comfortably exceed
     // worst-case prompt-ingestion / time-to-first-token on your hardware.
@@ -101,6 +101,12 @@ export const config = {
     retentionMs: num("FEED_RETENTION_MS", 14 * 24 * 60 * 60 * 1000),
     // Hard cap on stored items (oldest pruned first) to bound memory/disk.
     maxStored: num("FEED_MAX_STORED", 8000),
+    // Only items published within this window are eligible for analysis. Keeps
+    // the first run from chewing through a two-week backlog; older items are
+    // simply skipped (the feed is recency-oriented anyway).
+    analyzeMaxAgeMs: num("FEED_ANALYZE_MAX_AGE_MS", 3 * 24 * 60 * 60 * 1000),
+    // Gap between background analysis chunks while draining the backlog.
+    catchUpDelayMs: num("FEED_CATCHUP_DELAY_MS", 1500),
   },
   transcripts: {
     // Fetch YouTube caption transcripts (via yt-dlp) so the model understands a

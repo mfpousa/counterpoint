@@ -27,6 +27,7 @@ import {
   saveStore,
   storeSize,
   upsertStored,
+  type StoredItem,
 } from "./store";
 import { fetchTranscripts } from "./transcripts";
 
@@ -80,84 +81,107 @@ function progressLogger(label: string): (done: number, total: number) => void {
   };
 }
 
+/** Oldest publish time eligible for analysis (keeps the backlog tractable). */
+function analyzeCutoff(now = Date.now()): number {
+  return now - config.feed.analyzeMaxAgeMs;
+}
+
+/** The recency-ordered backlog of items still needing deep analysis. */
+function pendingForAnalysis(): StoredItem[] {
+  const cutoff = analyzeCutoff();
+  return allStored()
+    .filter((s) => !s.clickbait && !s.analyzed && s.item.publishedAt >= cutoff)
+    .sort((a, b) => b.item.publishedAt - a.item.publishedAt);
+}
+
 /**
- * Fetch everything and bring the store up to date: triage + analyze all NEW
- * items, persist, prune. Interest plays no part here.
+ * Network phase: fetch all sources, triage brand-new & recent items, and store
+ * them — junk flagged, survivors marked PENDING (analyzed:false). Deep analysis
+ * is deferred to analyzePending() so the build is chunked, not a multi-hour block.
  */
-async function buildPool(): Promise<void> {
+async function refreshSources(): Promise<void> {
   const started = Date.now();
-  console.log(`[feed] build starting — fetching ${SOURCES.length} sources…`);
+  console.log(`[feed] refresh — fetching ${SOURCES.length} sources…`);
   const raw = await fetchAll(SOURCES);
-  console.log(`[feed] fetched ${raw.length} items from ${SOURCES.length} sources`);
+  const cutoff = analyzeCutoff();
+  // Never-seen items inside the recency window are all that need triage.
+  const untriaged = raw.filter((it) => !hasStored(it.id) && it.publishedAt >= cutoff);
+  console.log(
+    `[feed] fetched ${raw.length}; ${untriaged.length} new & recent to triage; ${storeSize()} in store`,
+  );
 
-  // Only items we've never seen need any model work.
-  const fresh = raw.filter((it) => !hasStored(it.id));
-  console.log(`[feed] ${fresh.length} new item(s); ${storeSize()} already analyzed in store`);
-
-  // Fail fast if the model is down: skip both passes (hundreds of doomed
-  // requests) and keep whatever we already have. Mark the build done so we
-  // don't hammer a missing endpoint on every request; the TTL will retry.
-  if (fresh.length > 0 && !(await aiReachable())) {
-    console.warn("[feed] AI endpoint unreachable — skipping analysis this build.");
-    lastBuildAt = Date.now();
-    return;
-  }
-
-  // 1. Clickbait triage (cheap, title-only) — drop junk before deep analysis.
-  let junk = new Set<string>();
-  if (config.feed.clickbaitFilter && fresh.length > 0) {
-    const triageBatches = Math.ceil(fresh.length / config.ai.triageBatchSize);
-    console.log(
-      `[feed] triage: starting ${fresh.length} headline(s) in ${triageBatches} batch(es)` +
-        ` (concurrency ${config.ai.concurrency})…`,
-    );
-    junk = await detectClickbait(fresh, progressLogger("triage"));
-    console.log(`[feed] triage flagged ${junk.size}/${fresh.length} as clickbait/junk`);
-  }
-  const survivors = fresh.filter((it) => !junk.has(it.id));
-
-  // 2. Deep analysis of survivors (uncapped by default; AI_MAX_ITEMS can cap).
-  const slice = config.ai.maxItems > 0 ? survivors.slice(0, config.ai.maxItems) : survivors;
-  if (slice.length > 0) {
-    console.log(`[feed] fetching transcripts for up to ${slice.length} item(s)…`);
-  }
-  const transcripts = await fetchTranscripts(slice);
-  if (transcripts.size > 0) console.log(`[feed] fetched ${transcripts.size} transcript(s)`);
-  if (slice.length > 0) {
-    const analyzeBatches = Math.ceil(slice.length / config.ai.batchSize);
-    console.log(
-      `[feed] deep analysis: starting ${slice.length} item(s) in ${analyzeBatches} batch(es)` +
-        ` (concurrency ${config.ai.concurrency})…`,
-    );
-  }
-  const analyses = await analyzeItems(slice, transcripts, progressLogger("analyze"));
-  console.log(`[feed] analyzed ${analyses.size}/${slice.length} item(s)`);
-
-  // 3. Persist results. Clickbait items are remembered (so we never re-triage);
-  //    analyzed items carry their analysis. Items neither flagged nor analyzed
-  //    (over the cap or a failed batch) are intentionally left unstored so a
-  //    later build retries them.
-  const now = Date.now();
-  for (const it of fresh) {
-    if (junk.has(it.id)) {
+  if (untriaged.length > 0) {
+    // Fail fast if the model is down: don't store half-processed items; retry later.
+    if (!(await aiReachable())) {
+      console.warn("[feed] AI endpoint unreachable — skipping triage this refresh.");
+      lastBuildAt = Date.now();
+      return;
+    }
+    let junk = new Set<string>();
+    if (config.feed.clickbaitFilter) {
+      const batches = Math.ceil(untriaged.length / config.ai.triageBatchSize);
+      console.log(`[feed] triage: ${untriaged.length} headline(s) in ${batches} batch(es)…`);
+      junk = await detectClickbait(untriaged, progressLogger("triage"));
+      console.log(`[feed] triage flagged ${junk.size}/${untriaged.length} as clickbait/junk`);
+    }
+    for (const it of untriaged) {
       upsertStored({
         item: it,
-        clickbait: true,
-        analyzed: false,
+        clickbait: junk.has(it.id),
+        analyzed: false, // deep analysis pending
         topic: it.topic,
         lean: it.lean,
         importance: 0,
         summary: "",
         keywords: [],
-        analyzedAt: now,
+        analyzedAt: 0,
       });
-      continue;
     }
-    const a = analyses.get(it.id);
-    if (a) {
+  }
+
+  const removed = pruneStore();
+  if (removed > 0) console.log(`[feed] pruned ${removed} stale item(s)`);
+  saveStore();
+  lastBuildAt = Date.now();
+  console.log(`[feed] refresh done in ${lastBuildAt - started}ms`);
+}
+
+// Dedupe concurrent chunk analysis (background catch-up + a user request).
+let analyzeInFlight: Promise<{ remaining: number; progressed: number }> | null = null;
+
+/**
+ * Deep-analyze ONE chunk (config.ai.maxItems) of the pending backlog, newest
+ * first, and persist. Returns the remaining backlog and how many we completed,
+ * so the caller can decide whether to schedule another chunk.
+ */
+function analyzePending(): Promise<{ remaining: number; progressed: number }> {
+  if (analyzeInFlight) return analyzeInFlight;
+  analyzeInFlight = (async () => {
+    const pending = pendingForAnalysis();
+    if (pending.length === 0) return { remaining: 0, progressed: 0 };
+    if (!(await aiReachable())) return { remaining: pending.length, progressed: 0 };
+
+    const slice = config.ai.maxItems > 0 ? pending.slice(0, config.ai.maxItems) : pending;
+    const items = slice.map((s) => s.item);
+
+    console.log(`[feed] fetching transcripts for up to ${items.length} item(s)…`);
+    const transcripts = await fetchTranscripts(items);
+    if (transcripts.size > 0) console.log(`[feed] fetched ${transcripts.size} transcript(s)`);
+
+    const batches = Math.ceil(items.length / config.ai.batchSize);
+    console.log(
+      `[feed] deep analysis: ${items.length} of ${pending.length} pending in ${batches} batch(es)` +
+        ` (concurrency ${config.ai.concurrency})…`,
+    );
+    const analyses = await analyzeItems(items, transcripts, progressLogger("analyze"));
+
+    const now = Date.now();
+    let progressed = 0;
+    for (const s of slice) {
+      const a = analyses.get(s.item.id);
+      if (!a) continue;
       upsertStored({
-        item: it,
-        clickbait: false,
+        ...s,
         analyzed: true,
         topic: a.topic,
         lean: a.lean,
@@ -166,15 +190,55 @@ async function buildPool(): Promise<void> {
         keywords: a.keywords,
         analyzedAt: now,
       });
+      progressed += 1;
     }
+
+    saveStore();
+    // Fresh analyses are now available — invalidate assembled views/briefings.
+    lastBuildAt = Date.now();
+    viewCache.clear();
+    briefingCache.clear();
+
+    const remaining = pendingForAnalysis().length;
+    console.log(`[feed] analyzed ${progressed}/${items.length}; ${remaining} still pending`);
+    return { remaining, progressed };
+  })().finally(() => {
+    analyzeInFlight = null;
+  });
+  return analyzeInFlight;
+}
+
+let catchUpTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Schedule a background chunk to keep chewing through the analysis backlog. */
+function scheduleCatchUp(): void {
+  if (catchUpTimer) return;
+  catchUpTimer = setTimeout(() => {
+    catchUpTimer = null;
+    void (async () => {
+      try {
+        const { remaining, progressed } = await analyzePending();
+        if (remaining > 0 && progressed > 0) scheduleCatchUp();
+        else if (remaining > 0) console.warn(`[feed] catch-up stalled with ${remaining} pending`);
+        else console.log("[feed] analysis backlog cleared");
+      } catch (e) {
+        console.warn("[feed] catch-up failed:", e);
+      }
+    })();
+  }, config.feed.catchUpDelayMs);
+}
+
+/**
+ * Bring the store up to date, then analyze the FIRST chunk so the feed is usable
+ * quickly. Any remaining backlog is drained in the background (non-blocking).
+ */
+async function buildPool(): Promise<void> {
+  await refreshSources();
+  const { remaining, progressed } = await analyzePending();
+  if (remaining > 0 && progressed > 0) {
+    console.log(`[feed] ${remaining} item(s) pending — continuing analysis in background`);
+    scheduleCatchUp();
   }
-
-  const removed = pruneStore(now);
-  if (removed > 0) console.log(`[feed] pruned ${removed} stale item(s)`);
-  saveStore();
-
-  lastBuildAt = Date.now();
-  console.log(`[feed] pool ready: ${storeSize()} stored in ${lastBuildAt - started}ms`);
 }
 
 /** Ensure the pool is fresh (TTL) or forced; concurrent callers share one build. */
