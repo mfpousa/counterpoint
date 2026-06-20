@@ -132,6 +132,16 @@ export const config = {
     maxTokens: num("READER_MAX_TOKENS", 2200),
     // How long a rewritten article is cached in memory (ms). Default 6h.
     cacheTtlMs: num("READER_CACHE_TTL_MS", 6 * 60 * 60 * 1000),
+    // When direct extraction fails (bot-wall / JS-only page), retry via reader
+    // proxies (r.jina.ai renders JS; CORS proxies re-fetch the HTML). This helps
+    // JS-heavy pages and SOME soft paywalls — it does NOT bypass hard paywalls.
+    // Adds a third-party request per fallback; disable with READER_PROXY_OFF=1.
+    proxyEnabled: !bool("READER_PROXY_OFF"),
+    // If even proxies yield no body, synthesize a SHORT brief from the headline +
+    // feed summary instead of failing — clearly labeled in the reader. The model
+    // is instructed to use only the provided text (no fabrication). Disable with
+    // READER_DEGRADED_OFF=1 to show the plain error + "Open original" instead.
+    degradedFallback: !bool("READER_DEGRADED_OFF"),
   },
   transcripts: {
     // Fetch YouTube caption transcripts (via yt-dlp) so the model understands a

@@ -105,14 +105,30 @@ export function ArticleReader({
                 <Text style={styles.dot}>·</Text>
                 <Text style={styles.meta}>{article.estMinutes} min read</Text>
               </View>
+              {article.degraded && (
+                <View style={styles.degradedBanner}>
+                  <Ionicons name="information-circle-outline" size={16} color={colors.warn} />
+                  <Text style={styles.degradedText}>
+                    Full text unavailable (likely a paywall). This is a short summary based on the
+                    headline and feed description.
+                  </Text>
+                </View>
+              )}
               {article.paragraphs.map((p, i) => (
                 <Text key={i} style={styles.paragraph}>
                   {p}
                 </Text>
               ))}
+              {article.degraded && open && (
+                <Pressable onPress={open} style={styles.primaryBtn} accessibilityRole="link">
+                  <Ionicons name="open-outline" size={16} color={colors.bg} />
+                  <Text style={styles.primaryBtnText}>Read the full article</Text>
+                </Pressable>
+              )}
               <Text style={styles.disclaimer}>
-                This is an AI-rewritten version for readability. Check the original for the
-                authoritative text.
+                {article.degraded
+                  ? "AI-written summary from limited information. Open the original for the full, authoritative text."
+                  : "This is an AI-rewritten version for readability. Check the original for the authoritative text."}
               </Text>
             </>
           )}
@@ -189,4 +205,16 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   primaryBtnText: { color: colors.bg, fontSize: font.body, fontWeight: "700" },
+  degradedBanner: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.sm,
+    backgroundColor: colors.warn + "1A",
+    borderColor: colors.warn + "55",
+    borderWidth: 1,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  degradedText: { flex: 1, color: colors.textDim, fontSize: font.small, lineHeight: font.small * 1.4 },
 });

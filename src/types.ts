@@ -78,6 +78,13 @@ export interface FeedItem {
   relevance?: number;
   /** Short AI-written rationale for why this item is worth your time. */
   aiReason?: string;
+  /**
+   * Raw article body HTML captured from the feed's content:encoded/<content>
+   * element, if the publisher ships full text. Used SERVER-SIDE only as a
+   * fallback source for the in-app rewrite when live page extraction fails
+   * (bot-walls, JS-only pages). Stripped before items are sent to the client.
+   */
+  content?: string;
 }
 
 /** One storyline within the daily briefing. */
@@ -123,6 +130,13 @@ export interface RewrittenArticle {
   kind: Kind;
   /** Estimated read time in minutes. */
   estMinutes: number;
+  /**
+   * True when the full article body could not be retrieved (hard paywall /
+   * JS-only page) and this is a SHORT brief synthesized only from the headline
+   * and the feed's summary. The reader surfaces a banner so the distinction is
+   * never hidden.
+   */
+  degraded?: boolean;
 }
 
 /** Live backend build/analysis progress, surfaced from GET /api/status. */

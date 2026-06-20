@@ -19,7 +19,8 @@ import { analyzeItems, detectClickbait } from "./analysis";
 import { generateBriefing } from "./briefing";
 import { config } from "./config";
 import { embedQuery, embedTexts, itemEmbedText } from "./embeddings";
-import { interestTokens, toFeedItem } from "./personalize";
+import { interestTokens, partitionByExclusion, toFeedItem } from "./personalize";
+import { interpretQuery, type ParsedQuery } from "./query";
 import { rankItems } from "./rank";
 import {
   allStored,
@@ -375,24 +376,39 @@ async function ensurePool(force: boolean): Promise<void> {
 
 /**
  * Assemble (and cache) the ranked feed for a given interest from the pool.
- * `queryVec` (the interest's embedding) enables SEMANTIC matching; when absent
- * (no embedding model / empty interest), toFeedItem falls back to keywords.
+ * `parsed` carries the POSITIVE intent (matched semantically/keyword) and the
+ * EXCLUDED terms (hard-filtered out — embeddings can't express negation).
+ * `queryVec` is the embedding of the positive intent; when absent, toFeedItem
+ * falls back to keyword matching.
  */
-function assembleView(interest: string, queryVec?: number[] | null): FeedResult {
+function assembleView(
+  interest: string,
+  parsed: ParsedQuery,
+  queryVec?: number[] | null,
+): FeedResult {
   const key = interestKey(interest);
   const cached = viewCache.get(key);
   if (cached && cached.builtAt === lastBuildAt) return cached.result;
 
   const started = Date.now();
-  const tokens = interestTokens(key);
+  // Keyword/semantic matching keys off the POSITIVE intent only, so negation
+  // words ("not", "israel") never count as things to match ON.
+  const tokens = interestTokens(parsed.positive);
   const hasInterest = tokens.size > 0;
   const now = Date.now();
 
-  const pool = allStored()
-    .filter(
-      (s) => !s.clickbait && s.analyzed && now - s.item.publishedAt <= config.feed.retentionMs,
-    )
-    .map((s) => toFeedItem(s, tokens, hasInterest, queryVec));
+  const eligible = allStored().filter(
+    (s) => !s.clickbait && s.analyzed && now - s.item.publishedAt <= config.feed.retentionMs,
+  );
+  // Apply negation exclusions with a safety valve against over-broad terms.
+  const { kept, removed, skipped, counts } = partitionByExclusion(eligible, parsed.exclude);
+  if (skipped.length > 0) {
+    console.warn(
+      `[query] ignoring over-broad exclude term(s) [${skipped.join(", ")}] — each matched ` +
+        `>${Math.round(0.6 * 100)}% of the feed (would hide too much).`,
+    );
+  }
+  const pool = kept.map((s) => toFeedItem(s, tokens, hasInterest, queryVec));
 
   const ranked = rankItems(pool);
   const result: FeedResult = {
@@ -405,8 +421,14 @@ function assembleView(interest: string, queryVec?: number[] | null): FeedResult 
   };
   viewCache.set(key, { builtAt: lastBuildAt, result });
   const mode = hasInterest ? (queryVec ? "semantic" : "keyword") : "general";
+  const exNote =
+    removed > 0
+      ? `, ${removed}/${eligible.length} excluded {${Object.entries(counts)
+          .map(([t, n]) => `${t}:${n}`)
+          .join(", ")}}`
+      : "";
   console.log(
-    `[feed] view "${key}" (${mode}) -> ${ranked.length} items from ${pool.length} eligible` +
+    `[feed] view "${key}" (${mode}) -> ${ranked.length} items from ${pool.length} eligible${exNote}` +
       ` in ${result.durationMs}ms`,
   );
   return result;
@@ -419,8 +441,11 @@ function assembleView(interest: string, queryVec?: number[] | null): FeedResult 
  */
 export async function getFeed(force = false, interest = config.feed.interest): Promise<FeedResult> {
   await ensurePool(force);
-  const queryVec = await embedQuery(interest);
-  return assembleView(interest, queryVec);
+  const parsed = await interpretQuery(interest);
+  // Embed the POSITIVE intent (not the raw query): embedding "not israel" would
+  // sit right next to Israel coverage, which is the opposite of what's wanted.
+  const queryVec = await embedQuery(parsed.positive);
+  return assembleView(interest, parsed, queryVec);
 }
 
 /**
@@ -445,8 +470,9 @@ export async function getBriefing(
   const p = (async (): Promise<Briefing | null> => {
     // Don't cache failures from an offline model — let a later request retry.
     if (!(await aiReachable())) return null;
-    const queryVec = await embedQuery(key);
-    const view = assembleView(key, queryVec);
+    const parsed = await interpretQuery(key);
+    const queryVec = await embedQuery(parsed.positive);
+    const view = assembleView(key, parsed, queryVec);
     const sample = view.items.slice(0, 40);
     const started = Date.now();
     console.log(`[feed] briefing: synthesizing "${key || "general"}" from ${sample.length} item(s)…`);

@@ -61,6 +61,88 @@ function conceptMatched(token: string, hay: Set<string>): boolean {
   return false;
 }
 
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Compiled word-boundary matcher for one exclude term (null if unusable). */
+function excludeRegex(term: string): RegExp | null {
+  const t = term.trim().toLowerCase();
+  if (t.length < 2) return null;
+  // \b around the whole (possibly multi-word) term; tolerate internal spaces.
+  return new RegExp(`\\b${escapeRegExp(t).replace(/\s+/g, "\\s+")}\\b`, "i");
+}
+
+/** The text we scan for excluded terms: title + summary + keywords + topic. */
+function exclusionHaystack(s: StoredItem): string {
+  return [s.item.title, s.summary, s.keywords.join(" "), s.topic].join(" ").toLowerCase();
+}
+
+/**
+ * True if an item mentions any of the reader's EXCLUDED terms (from a negated
+ * search like "not israel or iran"). Word-boundary matching so "iran" won't hit
+ * "tirana" by accident. Embeddings can't express negation, so we filter on these
+ * terms explicitly.
+ */
+export function excludedByQuery(s: StoredItem, exclude: string[]): boolean {
+  if (exclude.length === 0) return false;
+  const hay = exclusionHaystack(s);
+  for (const term of exclude) {
+    const re = excludeRegex(term);
+    if (re && re.test(hay)) return true;
+  }
+  return false;
+}
+
+export interface ExclusionResult {
+  kept: StoredItem[];
+  /** How many items were removed by exclusion. */
+  removed: number;
+  /** Exclude terms IGNORED for being too broad (matched > maxFraction of pool). */
+  skipped: string[];
+  /** Per active-term removal counts, for visibility/logging. */
+  counts: Record<string, number>;
+}
+
+/**
+ * Partition items into kept vs excluded, with a safety valve: any single exclude
+ * term that matches MORE than `maxFraction` of the pool is treated as too broad
+ * (e.g. an ambiguous "us"/"war", or a term that swallows the whole feed) and is
+ * IGNORED rather than gutting the feed. This stops a negated search from quietly
+ * hiding "a huge amount of news" because of one over-eager term, while still
+ * honoring focused exclusions like "israel"/"iran".
+ */
+export function partitionByExclusion(
+  items: StoredItem[],
+  exclude: string[],
+  maxFraction = 0.6,
+): ExclusionResult {
+  if (exclude.length === 0 || items.length === 0) {
+    return { kept: items, removed: 0, skipped: [], counts: {} };
+  }
+
+  const hays = items.map(exclusionHaystack);
+  const limit = Math.floor(items.length * maxFraction);
+
+  const active: { term: string; re: RegExp }[] = [];
+  const skipped: string[] = [];
+  const counts: Record<string, number> = {};
+  for (const term of exclude) {
+    const re = excludeRegex(term);
+    if (!re) continue;
+    const hits = hays.reduce((n, h) => (re.test(h) ? n + 1 : n), 0);
+    if (hits > limit) {
+      skipped.push(term);
+    } else if (hits > 0) {
+      active.push({ term, re });
+      counts[term] = hits;
+    }
+  }
+
+  const kept = items.filter((_, i) => !active.some((a) => a.re.test(hays[i])));
+  return { kept, removed: items.length - kept.length, skipped, counts };
+}
+
 /** 0..1 — fraction of the reader's interest concepts present in the item. */
 export function interestMatch(tokens: Set<string>, s: StoredItem): number {
   if (tokens.size === 0) return 0;
@@ -117,6 +199,9 @@ export function toFeedItem(
   const relevance = personalizedRelevance(s.importance, match, hasInterest);
   return {
     ...s.item,
+    // Full article HTML is a server-only rewrite fallback; never ship it to
+    // clients (it would bloat every /api/feed response).
+    content: undefined,
     topic: s.topic,
     lean: s.lean,
     leanSource: "llm",

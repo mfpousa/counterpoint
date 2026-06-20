@@ -32,8 +32,10 @@ async function fetchHtml(url: string, timeoutMs = 15000): Promise<string> {
       return "";
     }
     const ct = res.headers.get("content-type") ?? "";
-    if (ct && !ct.includes("html") && !ct.includes("xml")) {
-      console.warn(`[reader] ${url} is not HTML (${ct})`);
+    // Accept HTML/XML and plain text/markdown (reader proxies return the latter);
+    // reject binaries (PDF, images, …) we can't turn into article text.
+    if (ct && !ct.includes("html") && !ct.includes("xml") && !ct.includes("text")) {
+      console.warn(`[reader] ${url} is not text (${ct})`);
       return "";
     }
     return await res.text();
@@ -129,4 +131,57 @@ export async function extractArticle(url: string): Promise<ExtractedArticle | nu
     return null;
   }
   return { title, text: text.slice(0, config.reader.maxChars) };
+}
+
+/** Reduce r.jina.ai markdown output to plain paragraphs. Drops its header block
+ *  ("Title:/URL Source:/Markdown Content:") and light markdown syntax. */
+export function jinaMarkdownToText(md: string): string {
+  const body = md.replace(/^[\s\S]*?Markdown Content:\s*/i, "");
+  const cleaned = body
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, " ") // images
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1") // links -> text
+    .replace(/^#{1,6}\s+/gm, "") // headings
+    .replace(/[*_`>]/g, "") // emphasis/quote markers
+    .replace(/^[ \t]*[-+][ \t]+/gm, ""); // list bullets (don't consume newlines)
+  return cleaned
+    .split(/\n{2,}/)
+    .map((p) => p.replace(/[ \t]+/g, " ").replace(/\s*\n\s*/g, " ").trim())
+    .filter((p) => p.length >= 40)
+    .join("\n\n")
+    .trim();
+}
+
+/** Build the proxy URLs to try, in order. r.jina.ai renders JS and returns
+ *  clean markdown; the CORS proxies just re-fetch the raw HTML from a different
+ *  egress (helps simple bot-walls). */
+function proxyCandidates(url: string): { kind: "markdown" | "html"; proxied: string }[] {
+  return [
+    { kind: "markdown", proxied: `https://r.jina.ai/${url}` },
+    { kind: "html", proxied: `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}` },
+    { kind: "html", proxied: `https://corsproxy.io/?url=${encodeURIComponent(url)}` },
+  ];
+}
+
+/**
+ * Resilient extraction: try the publisher directly, then (if enabled) reader
+ * proxies. Catches JS-only pages and some soft paywalls; does NOT defeat hard
+ * paywalls. Returns null only when no path yields enough usable text.
+ */
+export async function extractReadable(url: string): Promise<ExtractedArticle | null> {
+  const direct = await extractArticle(url);
+  if (direct) return direct;
+  if (!config.reader.proxyEnabled) return null;
+
+  for (const { kind, proxied } of proxyCandidates(url)) {
+    const raw = await fetchHtml(proxied, 20000);
+    if (!raw) continue;
+    const text =
+      kind === "markdown" ? jinaMarkdownToText(raw) : htmlToText(mainRegion(stripBoilerplate(raw)));
+    if (text.length >= config.reader.minChars) {
+      console.log(`[reader] recovered ${text.length} chars via proxy for ${url}`);
+      const title = kind === "html" ? pickTitle(raw) : "";
+      return { title, text: text.slice(0, config.reader.maxChars) };
+    }
+  }
+  return null;
 }

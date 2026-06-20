@@ -1,4 +1,4 @@
-import { htmlToText, pickTitle } from "../server/readability";
+import { htmlToText, jinaMarkdownToText, pickTitle } from "../server/readability";
 
 describe("pickTitle", () => {
   it("prefers og:title, then h1, then <title>", () => {
@@ -27,5 +27,24 @@ describe("htmlToText", () => {
   it("decodes entities and collapses whitespace", () => {
     const out = htmlToText("<p>Markets   rose &amp; fell sharply over the    course of the day.</p>");
     expect(out).toBe("Markets rose & fell sharply over the course of the day.");
+  });
+});
+
+describe("jinaMarkdownToText", () => {
+  it("drops the jina header block and strips markdown syntax", () => {
+    const md =
+      "Title: Some Article\n" +
+      "URL Source: https://example.com/a\n" +
+      "Markdown Content:\n" +
+      "# A Heading That Is Long Enough To Survive The Filter\n\n" +
+      "This is **bold** and a [link](https://x.com) inside a real paragraph of text.\n\n" +
+      "- a short bullet\n\n" +
+      "Another genuine paragraph with enough length to be kept by the extractor here.";
+    const out = jinaMarkdownToText(md);
+    expect(out).toBe(
+      "A Heading That Is Long Enough To Survive The Filter\n\n" +
+        "This is bold and a link inside a real paragraph of text.\n\n" +
+        "Another genuine paragraph with enough length to be kept by the extractor here.",
+    );
   });
 });

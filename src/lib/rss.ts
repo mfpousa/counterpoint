@@ -81,6 +81,10 @@ function hashId(s: string): string {
   return (h >>> 0).toString(36);
 }
 
+/** Cap on raw article HTML kept from a feed's full-content element. Bounds the
+ *  persisted store while leaving plenty for a faithful rewrite. */
+const MAX_CONTENT_CHARS = 40_000;
+
 interface RawEntry {
   title: string;
   link: string;
@@ -88,6 +92,18 @@ interface RawEntry {
   published: number;
   durationRaw?: string | number | null;
   thumbnail?: string;
+  /** Raw full-text body HTML from content:encoded/<content>, if shipped. */
+  content?: string;
+}
+
+/** Keep a feed's full-content HTML only when it's meaningfully richer than the
+ *  one-line summary (i.e. the publisher actually ships article text). */
+function pickContent(rawHtml: string, summary: string): string | undefined {
+  const html = rawHtml.trim();
+  if (!html) return undefined;
+  // content:encoded that merely repeats the summary adds no rewrite value.
+  if (stripHtml(html).length <= summary.length + 80) return undefined;
+  return html.slice(0, MAX_CONTENT_CHARS);
 }
 
 function extractRss(channelItems: Record<string, unknown>[]): RawEntry[] {
@@ -95,10 +111,12 @@ function extractRss(channelItems: Record<string, unknown>[]): RawEntry[] {
     const enclosure = it["enclosure"] as Record<string, unknown> | undefined;
     const media = it["media:content"] as Record<string, unknown> | undefined;
     const thumb = it["media:thumbnail"] as Record<string, unknown> | undefined;
+    const summary = stripHtml(text(it["description"]) || text(it["content:encoded"]));
     return {
       title: stripHtml(text(it["title"])),
       link: text(it["link"]) || (enclosure?.["@_url"] as string) || "",
-      summary: stripHtml(text(it["description"]) || text(it["content:encoded"])),
+      summary,
+      content: pickContent(text(it["content:encoded"]) || text(it["description"]), summary),
       published: parseDate(text(it["pubDate"]) || text(it["dc:date"])),
       durationRaw:
         text(it["itunes:duration"]) ||
@@ -120,10 +138,12 @@ function extractAtom(entries: Record<string, unknown>[]): RawEntry[] {
     const mediaGroup = e["media:group"] as Record<string, unknown> | undefined;
     const mediaThumb = mediaGroup?.["media:thumbnail"] as Record<string, unknown> | undefined;
     const mediaDesc = mediaGroup?.["media:description"];
+    const summary = stripHtml(text(mediaDesc) || text(e["summary"]) || text(e["content"]));
     return {
       title: stripHtml(text(e["title"])),
       link: (alt?.["@_href"] as string) || text(e["id"]),
-      summary: stripHtml(text(mediaDesc) || text(e["summary"]) || text(e["content"])),
+      summary,
+      content: pickContent(text(e["content"]) || text(e["summary"]), summary),
       published: parseDate(text(e["published"]) || text(e["updated"])),
       durationRaw: null,
       thumbnail: (mediaThumb?.["@_url"] as string) || undefined,
@@ -156,6 +176,7 @@ export function normalize(source: Source, raw: RawEntry[]): FeedItem[] {
       summary: r.summary,
       url: r.link,
       thumbnail: r.thumbnail,
+      content: r.content,
       publishedAt: r.published,
       kind: source.kind,
       topic: source.topic,
