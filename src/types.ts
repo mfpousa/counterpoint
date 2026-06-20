@@ -90,6 +90,11 @@ export interface Preferences {
   llmTaggingEnabled: boolean;
   llmApiKey?: string;
   /**
+   * Free-text steering prompt sent to the backend AI to personalize relevance
+   * (e.g. "AI and AI-related scientific progress"). Empty = general importance.
+   */
+  interestPrompt: string;
+  /**
    * Absolute weighted-mean-lean above which the app warns you are drifting
    * (e.g. 0.25). Also drives feed counter-weighting.
    */

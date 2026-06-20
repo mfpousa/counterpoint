@@ -1,5 +1,5 @@
-import React from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import React, { useState } from "react";
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useApp } from "../../src/store/AppContext";
@@ -23,10 +23,23 @@ const KINDS: { id: Kind; label: string }[] = [
   { id: "news", label: "News" },
 ];
 const THRESHOLDS = [0.15, 0.25, 0.35];
+const INTEREST_PRESETS = [
+  "AI and AI-related scientific progress",
+  "Geopolitics, economics, and markets",
+  "Climate, energy, and the environment",
+  "Health, medicine, and longevity",
+];
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const { prefs, updatePrefs, resetToday, refreshFeed } = useApp();
+  const [interestDraft, setInterestDraft] = useState(prefs.interestPrompt);
+  const interestDirty = interestDraft.trim() !== prefs.interestPrompt.trim();
+
+  const saveInterest = (value: string) => {
+    setInterestDraft(value);
+    void updatePrefs({ interestPrompt: value.trim() });
+  };
 
   const toggleTopic = (t: Topic) => {
     const next = prefs.enabledTopics.includes(t)
@@ -124,6 +137,63 @@ export default function SettingsScreen() {
 
       <View style={styles.card}>
         <View style={styles.rowBetween}>
+          <Text style={styles.h}>Steer your feed</Text>
+          <Ionicons name="navigate" size={18} color={colors.accent} />
+        </View>
+        <Text style={styles.sub}>
+          Tell the AI what you care about. It scores every story against this and surfaces the
+          matches first — low-signal filler (accidents, crime-blotter, gossip) is always pushed
+          down. Leave blank to rank on general importance.
+        </Text>
+        <TextInput
+          style={styles.interestInput}
+          value={interestDraft}
+          onChangeText={setInterestDraft}
+          placeholder="e.g. AI and AI-related scientific progress"
+          placeholderTextColor={colors.textFaint}
+          multiline
+          textAlignVertical="top"
+        />
+        <View style={styles.wrap}>
+          {INTEREST_PRESETS.map((p) => (
+            <Pressable key={p} onPress={() => saveInterest(p)} style={styles.presetPill}>
+              <Text style={styles.presetText}>{p}</Text>
+            </Pressable>
+          ))}
+        </View>
+        <View style={styles.rowBetween}>
+          <Pressable
+            onPress={() => saveInterest("")}
+            disabled={interestDraft.trim().length === 0}
+          >
+            <Text
+              style={[
+                styles.clearText,
+                interestDraft.trim().length === 0 && { color: colors.textFaint },
+              ]}
+            >
+              Clear
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => saveInterest(interestDraft)}
+            disabled={!interestDirty}
+            style={[styles.saveBtn, !interestDirty && styles.saveBtnDisabled]}
+          >
+            <Ionicons
+              name="checkmark"
+              size={15}
+              color={interestDirty ? colors.bg : colors.textFaint}
+            />
+            <Text style={[styles.saveText, !interestDirty && { color: colors.textFaint }]}>
+              {interestDirty ? "Save & update feed" : "Saved"}
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+
+      <View style={styles.card}>
+        <View style={styles.rowBetween}>
           <Text style={styles.h}>How your feed is built</Text>
           <Ionicons name="sparkles" size={18} color={colors.accent} />
         </View>
@@ -137,7 +207,7 @@ export default function SettingsScreen() {
 
       <View style={styles.card}>
         <Text style={styles.h}>Data</Text>
-        <Pressable onPress={refreshFeed} style={styles.btn}>
+        <Pressable onPress={() => refreshFeed({ force: true })} style={styles.btn}>
           <Text style={styles.btnText}>Refresh feed now</Text>
         </Pressable>
         <Pressable onPress={resetToday} style={styles.btn}>
@@ -190,7 +260,7 @@ const styles = StyleSheet.create({
   pillActive: { backgroundColor: colors.accentDim, borderColor: colors.accent },
   pillText: { color: colors.textDim, fontSize: font.small, fontWeight: "600", textTransform: "capitalize" },
   pillTextActive: { color: colors.text },
-  input: {
+  interestInput: {
     backgroundColor: colors.surfaceAlt,
     borderRadius: radius.md,
     borderWidth: 1,
@@ -199,7 +269,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     fontSize: font.body,
+    minHeight: 64,
   },
+  presetPill: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+  },
+  presetText: { color: colors.textDim, fontSize: font.small, fontWeight: "600" },
+  clearText: { color: colors.accent, fontSize: font.small, fontWeight: "700" },
+  saveBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.pill,
+    backgroundColor: colors.accent,
+  },
+  saveBtnDisabled: { backgroundColor: colors.surfaceAlt },
+  saveText: { color: colors.bg, fontSize: font.small, fontWeight: "800" },
   btn: {
     backgroundColor: colors.surfaceAlt,
     paddingVertical: spacing.md,

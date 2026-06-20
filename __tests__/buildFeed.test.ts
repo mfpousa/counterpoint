@@ -39,6 +39,7 @@ function makePrefs(over: Partial<Preferences> = {}): Preferences {
     enabledTopics: ALL_TOPICS,
     includeKinds: ["news", "podcast", "video"],
     llmTaggingEnabled: false,
+    interestPrompt: "",
     driftThreshold: 0.25,
     onboarded: true,
     ...over,

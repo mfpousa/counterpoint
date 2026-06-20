@@ -32,6 +32,14 @@ function num(name: string, fallback: number): number {
   return Number.isFinite(v) && v > 0 ? v : fallback;
 }
 
+/** Like num() but allows an explicit 0 (used for "unlimited" sentinels). */
+function numOrZero(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (raw === undefined || raw === "") return fallback;
+  const v = Number(raw);
+  return Number.isFinite(v) && v >= 0 ? v : fallback;
+}
+
 function str(name: string, fallback: string): string {
   const v = process.env[name];
   return v && v.length > 0 ? v : fallback;
@@ -61,13 +69,35 @@ export const config = {
     model: str("AI_MODEL", "local-model"),
     apiKey: str("AI_API_KEY", "not-needed"),
     batchSize: num("AI_BATCH_SIZE", 8),
+    // Larger batches for the cheap title-only clickbait triage pass.
+    triageBatchSize: num("AI_TRIAGE_BATCH_SIZE", 40),
     concurrency: num("AI_CONCURRENCY", 2),
-    maxItems: num("AI_MAX_ITEMS", 80),
+    // Max NEW items deeply analyzed per build. 0 = no cap (analyze everything,
+    // across as many batches as needed). Results are persisted, so the cost is
+    // paid once per item and amortized over restarts.
+    maxItems: numOrZero("AI_MAX_ITEMS", 0),
     timeoutMs: num("AI_TIMEOUT_MS", 60_000),
   },
   server: {
     port: num("PORT", 8787),
     feedTtlMs: num("FEED_TTL_MS", 600_000),
+  },
+  feed: {
+    // Default steering interests used for the startup warm-up and when a client
+    // sends none. Clients normally override this per request (Settings prompt).
+    interest: str("FEED_INTEREST", ""),
+    // Hard cap on the interest text we accept/forward to the model.
+    maxInterestLen: num("FEED_INTEREST_MAX_LEN", 400),
+    // Run a cheap title-only clickbait/quality triage and DROP flagged items
+    // before the (expensive) deep analysis. Disable with CLICKBAIT_FILTER_OFF=1.
+    clickbaitFilter: !bool("CLICKBAIT_FILTER_OFF"),
+    // On-disk store of analyzed items so restarts don't re-pay the model and
+    // interest changes rebuild instantly. Relative paths resolve from cwd.
+    storePath: str("FEED_STORE_PATH", ".cache/feed-store.json"),
+    // Drop analyzed items older than this (also the feed's relevance window).
+    retentionMs: num("FEED_RETENTION_MS", 14 * 24 * 60 * 60 * 1000),
+    // Hard cap on stored items (oldest pruned first) to bound memory/disk.
+    maxStored: num("FEED_MAX_STORED", 8000),
   },
   transcripts: {
     // Fetch YouTube caption transcripts (via yt-dlp) so the model understands a

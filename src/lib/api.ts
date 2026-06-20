@@ -7,12 +7,33 @@
 
 import type { FeedItem } from "../types";
 
-const DEFAULT_API_URL = "http://localhost:8787";
+const DEFAULT_BACKEND_PORT = "8787";
 
-/** Resolve the backend base URL (EXPO_PUBLIC_API_URL is inlined at build time). */
+/**
+ * Resolve the backend base URL.
+ *
+ * Resolution order:
+ *  1. EXPO_PUBLIC_API_URL — explicit override (inlined at build time). Use this
+ *     when the backend lives on a different host/port than the web app.
+ *  2. On web, derive from the page's OWN origin so the app works however it's
+ *     reached — localhost, a LAN IP, or a DNS domain like tfvr.ddns.net:8081.
+ *     The backend is assumed to run on the same host on DEFAULT_BACKEND_PORT
+ *     (override the port with EXPO_PUBLIC_API_PORT). This is what makes remote
+ *     access work: a visitor's browser must call back to the SERVER's host, not
+ *     its own localhost.
+ *  3. Native / no-DOM fallback: localhost.
+ */
 export function apiBaseUrl(): string {
   const env = (process.env.EXPO_PUBLIC_API_URL ?? "").trim();
-  return env.length > 0 ? env.replace(/\/+$/, "") : DEFAULT_API_URL;
+  if (env.length > 0) return env.replace(/\/+$/, "");
+
+  if (typeof window !== "undefined" && window.location?.hostname) {
+    const { protocol, hostname } = window.location;
+    const port = (process.env.EXPO_PUBLIC_API_PORT ?? "").trim() || DEFAULT_BACKEND_PORT;
+    return `${protocol}//${hostname}:${port}`;
+  }
+
+  return `http://localhost:${DEFAULT_BACKEND_PORT}`;
 }
 
 export interface FeedResponse {
@@ -28,10 +49,22 @@ export interface FeedResponse {
  * /api/refresh to rebuild from scratch; otherwise GET /api/feed (TTL-cached).
  * Throws on network/HTTP failure so the caller can surface a clear message.
  */
-export async function fetchRankedFeed(opts: { force?: boolean } = {}): Promise<FeedItem[]> {
+export async function fetchRankedFeed(
+  opts: { force?: boolean; interest?: string } = {},
+): Promise<FeedItem[]> {
   const base = apiBaseUrl();
-  const url = `${base}/api/${opts.force ? "refresh" : "feed"}`;
-  const res = await fetch(url, { method: opts.force ? "POST" : "GET" });
+  const interest = (opts.interest ?? "").trim();
+  let res: Response;
+  if (opts.force) {
+    res = await fetch(`${base}/api/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ interest }),
+    });
+  } else {
+    const qs = interest ? `?interest=${encodeURIComponent(interest)}` : "";
+    res = await fetch(`${base}/api/feed${qs}`, { method: "GET" });
+  }
   if (!res.ok) {
     throw new Error(`Backend returned ${res.status}. Is the server running (npm run server)?`);
   }

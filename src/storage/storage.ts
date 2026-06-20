@@ -24,6 +24,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   enabledTopics: ALL_TOPICS,
   includeKinds: ["video", "podcast", "news"],
   llmTaggingEnabled: false,
+  interestPrompt: "",
   driftThreshold: 0.25,
   onboarded: false,
 };

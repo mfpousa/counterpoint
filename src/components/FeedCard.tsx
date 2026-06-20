@@ -4,14 +4,46 @@ import React, { useState } from "react";
 import { Image, Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, font, radius, spacing } from "../theme";
+import { topicMeta } from "../lib/topics";
 import type { FeedItem } from "../types";
-import { Chip, LeanBadge } from "./ui";
+import { LeanBadge } from "./ui";
 
 const KIND_ICON: Record<FeedItem["kind"], keyof typeof Ionicons.glyphMap> = {
   video: "play-circle",
   podcast: "mic",
   news: "newspaper",
 };
+
+/** Color for a 0..1 relevance score: faint -> warn -> accent -> good. */
+function scoreColor(r: number): string {
+  if (r >= 0.75) return colors.good;
+  if (r >= 0.5) return colors.accent;
+  if (r >= 0.3) return colors.warn;
+  return colors.textFaint;
+}
+
+/** A bold, colored topic pill (icon + label) for at-a-glance scanning. */
+function TopicPill({ topic }: { topic: FeedItem["topic"] }) {
+  const m = topicMeta(topic);
+  return (
+    <View style={[styles.topicPill, { borderColor: m.color, backgroundColor: m.color + "22" }]}>
+      <Ionicons name={m.icon} size={12} color={m.color} />
+      <Text style={[styles.topicPillText, { color: m.color }]}>{m.label}</Text>
+    </View>
+  );
+}
+
+/** A prominent relevance/match score badge (0..100). */
+function ScoreBadge({ relevance }: { relevance: number }) {
+  const pct = Math.round(relevance * 100);
+  const c = scoreColor(relevance);
+  return (
+    <View style={[styles.scoreBadge, { borderColor: c }]}>
+      <Ionicons name="flame" size={11} color={c} />
+      <Text style={[styles.scoreText, { color: c }]}>{pct}</Text>
+    </View>
+  );
+}
 
 export function FeedCard({
   item,
@@ -43,6 +75,13 @@ export function FeedCard({
           </View>
         </Pressable>
       )}
+
+      <View style={styles.tagRow}>
+        <TopicPill topic={item.topic} />
+        {typeof item.relevance === "number" && <ScoreBadge relevance={item.relevance} />}
+        <View style={{ flex: 1 }} />
+        <LeanBadge lean={item.lean} source={item.leanSource} />
+      </View>
 
       {(item.reason || item.aiReason) && (
         <View style={styles.reasonRow}>
@@ -84,13 +123,7 @@ export function FeedCard({
       )}
 
       <View style={styles.footer}>
-        <View style={styles.chips}>
-          <LeanBadge lean={item.lean} source={item.leanSource} />
-          <Chip label={item.topic} />
-          {typeof item.relevance === "number" && (
-            <Chip label={`★ ${Math.round(item.relevance * 100)}`} />
-          )}
-        </View>
+        <View style={styles.chips} />
         <Pressable
           onPress={() => onComplete(item)}
           style={[styles.doneBtn, done && styles.doneBtnActive]}
@@ -135,6 +168,27 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     padding: spacing.xs,
   },
+  tagRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  topicPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+  },
+  topicPillText: { fontSize: font.tiny, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.4 },
+  scoreBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+  },
+  scoreText: { fontSize: font.tiny, fontWeight: "800" },
   reasonRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   reason: { color: colors.accent, fontSize: font.tiny, fontWeight: "600", flexShrink: 1 },
   aiNoteRow: { flexDirection: "row", alignItems: "flex-start", gap: spacing.xs },

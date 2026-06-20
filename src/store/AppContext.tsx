@@ -1,6 +1,14 @@
 // App-wide state: preferences, daily progress, the built feed, and actions.
 
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { fetchRankedFeed } from "../lib/api";
 import { buildFeed } from "../lib/buildFeed";
 import { applyCompletion } from "../lib/lean";
@@ -30,7 +38,7 @@ interface AppState {
   feedError: string | null;
   updatePrefs: (patch: Partial<Preferences>) => Promise<void>;
   completeItem: (item: FeedItem) => Promise<void>;
-  refreshFeed: () => Promise<void>;
+  refreshFeed: (opts?: { force?: boolean }) => Promise<void>;
   resetToday: () => Promise<void>;
 }
 
@@ -56,13 +64,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     })();
   }, []);
 
-  const refreshFeed = useCallback(async () => {
+  // Always read the latest steering interest without re-creating refreshFeed.
+  const interestRef = useRef(prefs.interestPrompt);
+  interestRef.current = prefs.interestPrompt;
+
+  const refreshFeed = useCallback(async (opts: { force?: boolean } = {}) => {
     setLoadingFeed(true);
     setFeedError(null);
     try {
       // The backend fetches every feed server-side and uses the local LLM to
-      // categorize, score, and diversify before we ever see it.
-      const items = await fetchRankedFeed();
+      // categorize, score, and diversify (steered by the interest) before we
+      // ever see it.
+      const items = await fetchRankedFeed({
+        force: opts.force,
+        interest: interestRef.current,
+      });
       if (items.length === 0) {
         setFeedError(
           "The backend returned no items. Make sure the server is running (npm run server) " +
@@ -83,6 +99,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       void refreshFeed();
     }
   }, [ready, prefs.onboarded, pool.length, refreshFeed]);
+
+  // Re-fetch when the committed steering interest changes (skip the first run).
+  const lastInterest = useRef<string | null>(null);
+  useEffect(() => {
+    if (!ready || !prefs.onboarded) return;
+    if (lastInterest.current === null) {
+      lastInterest.current = prefs.interestPrompt;
+      return;
+    }
+    if (lastInterest.current !== prefs.interestPrompt) {
+      lastInterest.current = prefs.interestPrompt;
+      void refreshFeed();
+    }
+  }, [ready, prefs.onboarded, prefs.interestPrompt, refreshFeed]);
 
   const feed = useMemo(
     () => buildFeed({ items: pool, prefs, progress }),

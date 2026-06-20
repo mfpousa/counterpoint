@@ -2,8 +2,8 @@
 //
 // Exposes a tiny JSON API the Expo app consumes:
 //   GET  /api/health   liveness + whether the local LLM is reachable
-//   GET  /api/feed     the AI-ranked, diversified feed (TTL-cached)
-//   POST /api/refresh  force a full rebuild (clears caches)
+//   GET  /api/feed?interest=...   the AI-ranked, diversified feed (TTL-cached per interest)
+//   POST /api/refresh {interest}   force a full rebuild (clears caches)
 //
 // Run: npm run server  (tsx watch)  |  npm run server:start
 
@@ -27,9 +27,15 @@ app.get("/api/health", async (_req, res) => {
   });
 });
 
-app.get("/api/feed", async (_req, res) => {
+/** Pull the steering interest from a query param or JSON body (string, capped). */
+function readInterest(raw: unknown): string {
+  if (typeof raw !== "string") return config.feed.interest;
+  return raw.slice(0, config.feed.maxInterestLen);
+}
+
+app.get("/api/feed", async (req, res) => {
   try {
-    const feed = await getFeed();
+    const feed = await getFeed(false, readInterest(req.query.interest));
     res.json(feed);
   } catch (e) {
     console.error("[api] /api/feed failed:", e);
@@ -37,10 +43,10 @@ app.get("/api/feed", async (_req, res) => {
   }
 });
 
-app.post("/api/refresh", async (_req, res) => {
+app.post("/api/refresh", async (req, res) => {
   try {
     clearCaches();
-    const feed = await getFeed(true);
+    const feed = await getFeed(true, readInterest(req.body?.interest));
     res.json(feed);
   } catch (e) {
     console.error("[api] /api/refresh failed:", e);
