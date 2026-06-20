@@ -64,14 +64,64 @@ interface CacheEntry {
 }
 const cache = new Map<string, CacheEntry>();
 
-/** Parse the model's {title, paragraphs} reply into clean paragraphs. */
-function parseParagraphs(obj: Record<string, unknown>): string[] {
-  return Array.isArray(obj["paragraphs"])
-    ? (obj["paragraphs"] as unknown[])
-        .filter((p): p is string => typeof p === "string")
-        .map((p) => p.trim())
-        .filter(Boolean)
+/** Strip code fences / stray markdown a weak model sometimes wraps text in. */
+function stripFences(s: string): string {
+  return s
+    .replace(/```+\s*json\b/gi, "")
+    .replace(/```+/g, "")
+    .trim();
+}
+
+/**
+ * True when a "paragraph" is actually JSON scaffolding the model leaked into its
+ * own output (lone keys, braces, fences) rather than real prose. Local models
+ * occasionally echo a malformed `{ title ... paragraphs ... }` dump INTO the
+ * paragraphs array even under constrained decoding; this keeps that garbage out
+ * of the reader.
+ */
+function isJsonScaffolding(p: string): boolean {
+  const t = p.trim();
+  if (!t) return true;
+  // Only quotes / commas / colons / brackets — no actual words.
+  if (/^["'\s,:{}\[\]]*$/.test(t)) return true;
+  // A bare schema key, e.g. `title`, `"paragraphs":`, `title:`.
+  if (/^["']?(title|paragraphs|content)["']?\s*:?\s*[{[]?$/i.test(t)) return true;
+  // A leftover fence marker like `json, {`.
+  if (/^json\b[\s,{[]*$/i.test(t)) return true;
+  return false;
+}
+
+/**
+ * Parse the model's {title, paragraphs} reply into clean paragraphs: strip
+ * fences, drop leaked JSON scaffolding, and de-dupe echoed paragraphs. Returns
+ * [] when nothing substantive survives, so the caller fails cleanly (graceful
+ * error + "Open original") instead of rendering corrupted text.
+ */
+export function parseParagraphs(obj: Record<string, unknown>, title = ""): string[] {
+  const raw = Array.isArray(obj["paragraphs"])
+    ? (obj["paragraphs"] as unknown[]).filter((p): p is string => typeof p === "string")
     : [];
+  const titleNorm = title.trim().toLowerCase();
+  const cleaned: string[] = [];
+  for (const p of raw) {
+    const s = stripFences(p);
+    if (!s || isJsonScaffolding(s)) continue;
+    // A leaked title VALUE (e.g. the headline echoed as a paragraph) reads like
+    // prose but isn't body text — drop it when it equals the title.
+    if (titleNorm && s.toLowerCase() === titleNorm) continue;
+    cleaned.push(s);
+  }
+  // Drop consecutive duplicate paragraphs (models sometimes echo themselves).
+  const deduped = cleaned.filter((p, i) => i === 0 || p !== cleaned[i - 1]);
+  // Require at least one real prose paragraph; else treat the reply as garbage.
+  return deduped.some((p) => p.length >= 40 && /\s/.test(p)) ? deduped : [];
+}
+
+/** Clean a model-provided title, falling back when it's missing/scaffolding. */
+export function cleanTitle(raw: unknown, fallback: string): string {
+  if (typeof raw !== "string") return fallback;
+  const t = stripFences(raw).replace(/^["']|["']$/g, "").trim();
+  return t.length > 0 && !isJsonScaffolding(t) ? t : fallback;
 }
 
 /**
@@ -99,10 +149,10 @@ async function degradedBrief(stored: StoredItem): Promise<RewrittenArticle | nul
     schema: REWRITE_SCHEMA,
   });
   if (!obj) return null;
-  const paragraphs = parseParagraphs(obj);
+  const title = cleanTitle(obj["title"], item.title);
+  const paragraphs = parseParagraphs(obj, title);
   if (paragraphs.length === 0) return null;
 
-  const title = (typeof obj["title"] === "string" && obj["title"].trim()) || item.title;
   const article: RewrittenArticle = {
     id: item.id,
     title,
@@ -184,10 +234,12 @@ export async function rewriteArticle(stored: StoredItem): Promise<RewrittenArtic
   });
   if (!obj) return null;
 
-  const title =
-    (typeof obj["title"] === "string" && obj["title"].trim()) || src.fallbackTitle || item.title;
-  const paragraphs = parseParagraphs(obj);
-  if (paragraphs.length === 0) return null;
+  const title = cleanTitle(obj["title"], src.fallbackTitle || item.title);
+  const paragraphs = parseParagraphs(obj, title);
+  if (paragraphs.length === 0) {
+    console.warn(`[reader] discarded unusable/garbled rewrite for ${item.url}`);
+    return null;
+  }
 
   const article: RewrittenArticle = {
     id: item.id,

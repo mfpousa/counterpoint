@@ -109,6 +109,134 @@ const CREATIVE_SOURCES: Source[] = [
 const CURIOUS_TOPICS = new Set(["science", "technology", "history"]);
 const CURIOUS_SOURCES: Source[] = SOURCES.filter((s) => CURIOUS_TOPICS.has(s.topic));
 
+/** Video games — news, reviews and criticism. Free keyless RSS. */
+const GAMES_SOURCES: Source[] = [
+  {
+    id: "eurogamer",
+    title: "Eurogamer",
+    url: "https://www.eurogamer.net/feed",
+    kind: "news",
+    topic: "culture",
+    lean: null,
+    confidence: 0.8,
+    leanRationale: "Non-political: video game news & reviews.",
+  },
+  {
+    id: "polygon-games",
+    title: "Polygon",
+    url: "https://www.polygon.com/rss/index.xml",
+    kind: "news",
+    topic: "culture",
+    lean: null,
+    confidence: 0.8,
+    leanRationale: "Non-political: games & entertainment coverage.",
+  },
+  {
+    id: "rock-paper-shotgun",
+    title: "Rock Paper Shotgun",
+    url: "https://www.rockpapershotgun.com/feed",
+    kind: "news",
+    topic: "culture",
+    lean: null,
+    confidence: 0.8,
+    leanRationale: "Non-political: PC gaming news & features.",
+  },
+  {
+    id: "pcgamer",
+    title: "PC Gamer",
+    url: "https://www.pcgamer.com/rss/",
+    kind: "news",
+    topic: "culture",
+    lean: null,
+    confidence: 0.8,
+    leanRationale: "Non-political: PC gaming news & reviews.",
+  },
+  {
+    id: "gamespot-news",
+    title: "GameSpot — News",
+    url: "https://www.gamespot.com/feeds/news/",
+    kind: "news",
+    topic: "culture",
+    lean: null,
+    confidence: 0.8,
+    leanRationale: "Non-political: video game news.",
+  },
+  {
+    id: "nintendo-life",
+    title: "Nintendo Life",
+    url: "https://www.nintendolife.com/feeds/latest",
+    kind: "news",
+    topic: "culture",
+    lean: null,
+    confidence: 0.75,
+    leanRationale: "Non-political: Nintendo-focused gaming coverage.",
+  },
+];
+
+/** Film — reviews, criticism and industry coverage. Free keyless RSS. */
+const FILM_SOURCES: Source[] = [
+  {
+    id: "indiewire",
+    title: "IndieWire",
+    url: "https://www.indiewire.com/feed/",
+    kind: "news",
+    topic: "culture",
+    lean: null,
+    confidence: 0.8,
+    leanRationale: "Non-political: film news & criticism.",
+  },
+  {
+    id: "the-film-stage",
+    title: "The Film Stage",
+    url: "https://thefilmstage.com/feed/",
+    kind: "news",
+    topic: "culture",
+    lean: null,
+    confidence: 0.8,
+    leanRationale: "Non-political: film reviews & festival coverage.",
+  },
+  {
+    id: "slashfilm",
+    title: "/Film",
+    url: "https://www.slashfilm.com/feed/",
+    kind: "news",
+    topic: "culture",
+    lean: null,
+    confidence: 0.8,
+    leanRationale: "Non-political: movie news & features.",
+  },
+  {
+    id: "roger-ebert",
+    title: "RogerEbert.com",
+    url: "https://www.rogerebert.com/feed",
+    kind: "news",
+    topic: "culture",
+    lean: null,
+    confidence: 0.85,
+    leanRationale: "Non-political: film criticism & reviews.",
+  },
+  {
+    id: "collider",
+    title: "Collider",
+    url: "https://collider.com/feed/",
+    kind: "news",
+    topic: "culture",
+    lean: null,
+    confidence: 0.75,
+    leanRationale: "Non-political: film & TV news.",
+  },
+  {
+    id: "nofilmschool",
+    title: "No Film School",
+    url: "https://nofilmschool.com/rss.xml",
+    kind: "news",
+    topic: "culture",
+    lean: null,
+    confidence: 0.8,
+    leanRationale: "Non-political: filmmaking craft & industry.",
+  },
+];
+
 export const WORLDS: World[] = [
   {
     id: "frontpage",
@@ -130,6 +258,20 @@ export const WORLDS: World[] = [
     description: "Deep science, technology and history — things worth slowing down for.",
     icon: "planet",
     sources: CURIOUS_SOURCES,
+  },
+  {
+    id: "games",
+    title: "Videogames",
+    description: "Game news, reviews and criticism across PC and console.",
+    icon: "game-controller",
+    sources: GAMES_SOURCES,
+  },
+  {
+    id: "films",
+    title: "Films",
+    description: "Movie reviews, criticism and the stories behind the screen.",
+    icon: "film",
+    sources: FILM_SOURCES,
   },
 ];
 
