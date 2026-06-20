@@ -76,7 +76,10 @@ export const config = {
     // across as many batches as needed). Results are persisted, so the cost is
     // paid once per item and amortized over restarts.
     maxItems: numOrZero("AI_MAX_ITEMS", 0),
-    timeoutMs: num("AI_TIMEOUT_MS", 60_000),
+    // INACTIVITY timeout for an LLM call: resets on every streamed chunk, so a
+    // model that's actively generating is never cut off. Must comfortably exceed
+    // worst-case prompt-ingestion / time-to-first-token on your hardware.
+    timeoutMs: num("AI_TIMEOUT_MS", 120_000),
   },
   server: {
     port: num("PORT", 8787),

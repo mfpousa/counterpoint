@@ -16,6 +16,7 @@ import { useApp } from "../../src/store/AppContext";
 import { assessDrift } from "../../src/lib/lean";
 import { topicMeta, TOPIC_ORDER } from "../../src/lib/topics";
 import { FeedCard } from "../../src/components/FeedCard";
+import { BriefingCard } from "../../src/components/BriefingCard";
 import { LeanDial, QuotaMeter } from "../../src/components/meters";
 import { colors, font, radius, spacing } from "../../src/theme";
 import type { FeedItem, Topic } from "../../src/types";
@@ -33,8 +34,18 @@ function columnsFor(contentWidth: number): number {
 export default function FeedScreen() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const { feed, progress, prefs, loadingFeed, feedError, completeItem, refreshFeed, updatePrefs } =
-    useApp();
+  const {
+    feed,
+    progress,
+    prefs,
+    loadingFeed,
+    feedError,
+    briefing,
+    loadingBriefing,
+    completeItem,
+    refreshFeed,
+    updatePrefs,
+  } = useApp();
   const [selected, setSelected] = useState<Topic | "all">("all");
 
   // Search box bound to the steering interest. Submitting updates the saved
@@ -166,6 +177,8 @@ export default function FeedScreen() {
             </Text>
           </Pressable>
         </View>
+
+        <BriefingCard briefing={briefing} loading={loadingBriefing} />
 
         <QuotaMeter consumed={progress.consumedMin} target={prefs.dailyQuotaMin} />
         <LeanDial drift={todayDrift} threshold={prefs.driftThreshold} compact />

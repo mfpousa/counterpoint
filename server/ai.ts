@@ -29,6 +29,25 @@ export function extractJson(content: string): unknown {
   }
 }
 
+/** Pull the first JSON object out of a model response (handles ``` fences). */
+export function extractJsonObject(content: string): Record<string, unknown> | null {
+  const fenced = content.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const body = (fenced ? fenced[1] : content).trim();
+  const start = body.indexOf("{");
+  const end = body.lastIndexOf("}");
+  if (start !== -1 && end > start) {
+    try {
+      const obj = JSON.parse(body.slice(start, end + 1));
+      if (obj && typeof obj === "object" && !Array.isArray(obj)) {
+        return obj as Record<string, unknown>;
+      }
+    } catch {
+      /* fall through */
+    }
+  }
+  return null;
+}
+
 /** Clamp a model-provided number into [lo,hi], falling back when unparseable. */
 export function clampNum(n: unknown, lo: number, hi: number, fallback: number): number {
   const v = Number(n);
@@ -37,12 +56,25 @@ export function clampNum(n: unknown, lo: number, hi: number, fallback: number): 
 }
 
 /**
- * One chat round-trip expecting a JSON array reply. Returns the parsed array
- * (also unwraps a { "items": [...] } envelope), or [] on any error/timeout.
+ * One chat round-trip. Returns the raw assistant message ("" on error/timeout).
+ *
+ * We STREAM the completion and use an INACTIVITY timeout (config.ai.timeoutMs):
+ * the timer resets on every received chunk, so a model that is actively
+ * generating — even a long reply or a slow local GPU — is never aborted
+ * mid-prompt. We only give up if the endpoint goes silent for the whole window
+ * (which also covers a stuck connection or very slow prompt ingestion before
+ * the first token). Falls back to non-streaming parsing if the server ignores
+ * `stream: true`.
  */
-export async function chatJsonArray(system: string, payload: unknown): Promise<unknown[]> {
+export async function chatRaw(system: string, payload: unknown): Promise<string> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), config.ai.timeoutMs);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const arm = () => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => controller.abort(), config.ai.timeoutMs);
+  };
+  arm();
+
   try {
     const res = await fetch(`${config.ai.baseUrl}/chat/completions`, {
       method: "POST",
@@ -54,6 +86,7 @@ export async function chatJsonArray(system: string, payload: unknown): Promise<u
       body: JSON.stringify({
         model: config.ai.model,
         temperature: 0,
+        stream: true,
         messages: [
           { role: "system", content: system },
           {
@@ -63,23 +96,83 @@ export async function chatJsonArray(system: string, payload: unknown): Promise<u
         ],
       }),
     });
-    if (!res.ok) {
+    if (!res.ok || !res.body) {
       console.warn(`[ai] request failed: HTTP ${res.status}`);
-      return [];
+      return "";
     }
-    const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
-    const content = data.choices?.[0]?.message?.content ?? "";
-    const parsed = extractJson(content);
-    if (Array.isArray(parsed)) return parsed;
-    const items = (parsed as Record<string, unknown>)?.["items"];
-    return Array.isArray(items) ? items : [];
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = ""; // unparsed SSE text (may hold a partial line)
+    let raw = ""; // full decoded body, for the non-streaming fallback
+    let content = "";
+
+    const drainLine = (line: string) => {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith("data:")) return;
+      const data = trimmed.slice(5).trim();
+      if (data === "[DONE]") return;
+      try {
+        const json = JSON.parse(data) as {
+          choices?: { delta?: { content?: string } }[];
+        };
+        const delta = json.choices?.[0]?.delta?.content;
+        if (typeof delta === "string") content += delta;
+      } catch {
+        /* keepalive / partial frame — ignore */
+      }
+    };
+
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      arm(); // tokens flowing — reset the inactivity timer
+      const chunk = decoder.decode(value, { stream: true });
+      raw += chunk;
+      buffer += chunk;
+      let nl: number;
+      while ((nl = buffer.indexOf("\n")) !== -1) {
+        drainLine(buffer.slice(0, nl));
+        buffer = buffer.slice(nl + 1);
+      }
+    }
+    if (buffer) drainLine(buffer); // flush any trailing frame without a newline
+
+    // Fallback: server ignored `stream: true` and returned one JSON object.
+    if (!content && raw) {
+      const obj = extractJsonObject(raw) as
+        | { choices?: { message?: { content?: string } }[] }
+        | null;
+      content = obj?.choices?.[0]?.message?.content ?? "";
+    }
+
+    return content;
   } catch (e) {
-    const why = e instanceof Error && e.name === "AbortError" ? "timeout" : String(e);
+    const why = e instanceof Error && e.name === "AbortError" ? "idle timeout" : String(e);
     console.warn(`[ai] request error: ${why}`);
-    return [];
+    return "";
   } finally {
-    clearTimeout(timer);
+    if (timer) clearTimeout(timer);
   }
+}
+
+/**
+ * One chat round-trip expecting a JSON array reply. Returns the parsed array
+ * (also unwraps a { "items": [...] } envelope), or [] on any error/timeout.
+ */
+export async function chatJsonArray(system: string, payload: unknown): Promise<unknown[]> {
+  const parsed = extractJson(await chatRaw(system, payload));
+  if (Array.isArray(parsed)) return parsed;
+  const items = (parsed as Record<string, unknown>)?.["items"];
+  return Array.isArray(items) ? items : [];
+}
+
+/** One chat round-trip expecting a JSON object reply. Returns it, or null. */
+export async function chatJsonObject(
+  system: string,
+  payload: unknown,
+): Promise<Record<string, unknown> | null> {
+  return extractJsonObject(await chatRaw(system, payload));
 }
 
 /** Run async tasks with a bounded number in flight (order-preserving results). */

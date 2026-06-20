@@ -5,7 +5,7 @@
 // and returns a ranked, diversified pool. The app just renders it and applies
 // the personal layer (daily quota + lean counter-weighting) in buildFeed.
 
-import type { FeedItem } from "../types";
+import type { Briefing, FeedItem } from "../types";
 
 const DEFAULT_BACKEND_PORT = "8787";
 
@@ -70,4 +70,27 @@ export async function fetchRankedFeed(
   }
   const data = (await res.json()) as FeedResponse;
   return Array.isArray(data.items) ? data.items : [];
+}
+
+/**
+ * Fetch the AI briefing (what's happening / where it's headed) for an interest.
+ * Returns null if the backend has none (e.g. the local model is offline). Never
+ * throws — the briefing is a nice-to-have, not load-bearing.
+ */
+export async function fetchBriefing(
+  opts: { interest?: string; force?: boolean } = {},
+): Promise<Briefing | null> {
+  const interest = (opts.interest ?? "").trim();
+  const params = new URLSearchParams();
+  if (interest) params.set("interest", interest);
+  if (opts.force) params.set("force", "1");
+  const qs = params.toString();
+  try {
+    const res = await fetch(`${apiBaseUrl()}/api/briefing${qs ? `?${qs}` : ""}`, { method: "GET" });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { briefing?: Briefing | null };
+    return data.briefing ?? null;
+  } catch {
+    return null;
+  }
 }

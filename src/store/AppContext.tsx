@@ -9,7 +9,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { fetchRankedFeed } from "../lib/api";
+import { fetchBriefing, fetchRankedFeed } from "../lib/api";
 import { buildFeed } from "../lib/buildFeed";
 import { applyCompletion } from "../lib/lean";
 import {
@@ -23,7 +23,13 @@ import {
   saveProgress,
   trailingWindow,
 } from "../storage/storage";
-import type { DailyProgress, FeedItem, LeanHistoryPoint, Preferences } from "../types";
+import type {
+  Briefing,
+  DailyProgress,
+  FeedItem,
+  LeanHistoryPoint,
+  Preferences,
+} from "../types";
 
 interface AppState {
   ready: boolean;
@@ -36,6 +42,9 @@ interface AppState {
   feed: FeedItem[];
   loadingFeed: boolean;
   feedError: string | null;
+  /** AI digest of what's happening / where it's headed (null if unavailable). */
+  briefing: Briefing | null;
+  loadingBriefing: boolean;
   updatePrefs: (patch: Partial<Preferences>) => Promise<void>;
   completeItem: (item: FeedItem) => Promise<void>;
   refreshFeed: (opts?: { force?: boolean }) => Promise<void>;
@@ -52,6 +61,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [pool, setPool] = useState<FeedItem[]>([]);
   const [loadingFeed, setLoadingFeed] = useState(false);
   const [feedError, setFeedError] = useState<string | null>(null);
+  const [briefing, setBriefing] = useState<Briefing | null>(null);
+  const [loadingBriefing, setLoadingBriefing] = useState(false);
 
   // Initial load of persisted state.
   useEffect(() => {
@@ -67,6 +78,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Always read the latest steering interest without re-creating refreshFeed.
   const interestRef = useRef(prefs.interestPrompt);
   interestRef.current = prefs.interestPrompt;
+
+  // Best-effort, non-blocking. The pool is already fresh after a feed load, so
+  // we never force here (avoids a second rebuild). Steered by the same interest.
+  const loadBriefing = useCallback(async () => {
+    setLoadingBriefing(true);
+    try {
+      setBriefing(await fetchBriefing({ interest: interestRef.current }));
+    } finally {
+      setLoadingBriefing(false);
+    }
+  }, []);
 
   const refreshFeed = useCallback(async (opts: { force?: boolean } = {}) => {
     setLoadingFeed(true);
@@ -86,12 +108,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         );
       }
       setPool(items);
+      void loadBriefing();
     } catch (e) {
       setFeedError(e instanceof Error ? e.message : "Failed to load the feed.");
     } finally {
       setLoadingFeed(false);
     }
-  }, []);
+  }, [loadBriefing]);
 
   // Fetch once we're ready & onboarded.
   useEffect(() => {
@@ -153,6 +176,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     feed,
     loadingFeed,
     feedError,
+    briefing,
+    loadingBriefing,
     updatePrefs,
     completeItem,
     refreshFeed,

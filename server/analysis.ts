@@ -94,13 +94,25 @@ async function triageBatch(batch: FeedItem[]): Promise<Set<string>> {
   return junk;
 }
 
+/** Reports cumulative items processed out of the total for a phase. */
+export type ProgressFn = (done: number, total: number) => void;
+
 /** Return the set of item ids judged clickbait/junk (title-only, cheap). */
-export async function detectClickbait(items: FeedItem[]): Promise<Set<string>> {
+export async function detectClickbait(
+  items: FeedItem[],
+  onProgress?: ProgressFn,
+): Promise<Set<string>> {
   const junk = new Set<string>();
   if (items.length === 0) return junk;
   const batches = chunk(items, config.ai.triageBatchSize);
+  let done = 0;
   const sets = await withConcurrency(
-    batches.map((b) => () => triageBatch(b)),
+    batches.map((b) => async () => {
+      const s = await triageBatch(b);
+      done += b.length;
+      onProgress?.(done, items.length);
+      return s;
+    }),
     config.ai.concurrency,
   );
   for (const s of sets) for (const id of s) junk.add(id);
@@ -165,12 +177,19 @@ async function analyzeBatch(
 export async function analyzeItems(
   items: FeedItem[],
   transcripts: Map<string, string> = new Map(),
+  onProgress?: ProgressFn,
 ): Promise<Map<string, ItemAnalysis>> {
   const out = new Map<string, ItemAnalysis>();
   if (items.length === 0) return out;
   const batches = chunk(items, config.ai.batchSize);
+  let done = 0;
   const maps = await withConcurrency(
-    batches.map((b) => () => analyzeBatch(b, transcripts)),
+    batches.map((b) => async () => {
+      const m = await analyzeBatch(b, transcripts);
+      done += b.length;
+      onProgress?.(done, items.length);
+      return m;
+    }),
     config.ai.concurrency,
   );
   for (const m of maps) for (const [id, a] of m) out.set(id, a);

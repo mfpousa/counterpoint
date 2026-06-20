@@ -80,6 +80,32 @@ export interface FeedItem {
   aiReason?: string;
 }
 
+/** One storyline within the daily briefing. */
+export interface BriefingThread {
+  /** Short label for the storyline (a few words). */
+  title: string;
+  /** One sentence on what's happening and why it matters. */
+  detail: string;
+}
+
+/**
+ * An AI-synthesized digest of what's happening now and where things are headed,
+ * generated from the analyzed feed pool and steered by the reader's interest.
+ */
+export interface Briefing {
+  generatedAt: number;
+  /** The interest this briefing was tuned to ("" = general). */
+  interest: string;
+  /** One sentence capturing the overall vibe / direction right now. */
+  mood: string;
+  /** 3-5 key storylines. */
+  threads: BriefingThread[];
+  /** One sentence on where things appear to be headed next. */
+  outlook: string;
+  /** How many items the briefing was synthesized from. */
+  basedOn: number;
+}
+
 /** User preferences, persisted locally. */
 export interface Preferences {
   /** Daily learning quota in minutes. */
