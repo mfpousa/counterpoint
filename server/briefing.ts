@@ -4,8 +4,33 @@
 // with nothing usable.
 
 import type { Briefing, BriefingThread, FeedItem } from "../src/types";
-import { chatJsonObject } from "./ai";
+import { chatJsonObject, type JsonSchema } from "./ai";
 import { config } from "./config";
+
+// Constrained-decoding schema so the local model emits a valid, complete briefing
+// object and STOPS — without this, a non-stopping model rambles/truncates and the
+// reply fails to parse (no briefing).
+const BRIEFING_SCHEMA: JsonSchema = {
+  name: "briefing",
+  schema: {
+    type: "object",
+    properties: {
+      mood: { type: "string" },
+      threads: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: { title: { type: "string" }, detail: { type: "string" } },
+          required: ["title", "detail"],
+          additionalProperties: false,
+        },
+      },
+      outlook: { type: "string" },
+    },
+    required: ["mood", "threads", "outlook"],
+    additionalProperties: false,
+  },
+};
 
 const BASE_RULES =
   "You are a sharp, neutral news editor writing a brief daily digest for a reader. " +
@@ -66,7 +91,10 @@ export async function generateBriefing(
     age: relativeAge(it.publishedAt, now),
   }));
 
-  const obj = await chatJsonObject(BASE_RULES + steer(interest), payload, { maxTokens: 700 });
+  const obj = await chatJsonObject(BASE_RULES + steer(interest), payload, {
+    maxTokens: 900,
+    schema: BRIEFING_SCHEMA,
+  });
   if (!obj) return null;
 
   const mood = typeof obj["mood"] === "string" ? obj["mood"].trim() : "";
