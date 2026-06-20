@@ -2,13 +2,15 @@
 // and prints a clear pass/fail report so problems surface immediately rather
 // than as silent empty feeds later. Checks:
 //   1. The local LLM (OpenAI-compatible) — and asks it to greet us live.
-//   2. yt-dlp presence (YouTube transcripts).
-//   3. Feed connectivity (a sample source fetch — also exercises TLS).
+//   2. The embedding model (semantic search) — non-fatal, keyword fallback.
+//   3. yt-dlp presence (YouTube transcripts).
+//   4. Feed connectivity (a sample source fetch — also exercises TLS).
 
 import SOURCES from "../src/data/sources";
 import { fetchSource } from "../src/lib/rss";
 import { aiReachable } from "./ai";
 import { config } from "./config";
+import { embedTexts } from "./embeddings";
 import { ytDlpVersion } from "./transcripts";
 
 const OK = "\u2713"; // ✓
@@ -76,7 +78,22 @@ export async function runStartupHealthcheck(): Promise<void> {
     }
   }
 
-  // 2. yt-dlp (YouTube transcripts).
+  // 2. Embeddings (semantic search). Non-fatal: falls back to keyword matching.
+  if (!config.ai.embeddingsEnabled) {
+    console.log(`[health] • Semantic search disabled (AI_EMBEDDINGS_OFF) — keyword matching.`);
+  } else {
+    const [vec] = await embedTexts(["counterpoint embedding healthcheck"]);
+    if (vec && vec.length > 0) {
+      console.log(`[health] ${OK} Embeddings online (${config.ai.embedModel}, dim ${vec.length})`);
+    } else {
+      console.warn(
+        `[health] ${WARN} Embedding model '${config.ai.embedModel}' unavailable — ` +
+          `search will use keyword matching. Load an embedding model or set AI_EMBEDDINGS_OFF=1.`,
+      );
+    }
+  }
+
+  // 3. yt-dlp (YouTube transcripts).
   if (!config.transcripts.enabled) {
     console.log(`[health] • Transcripts disabled (TRANSCRIPTS_OFF).`);
   } else {
@@ -91,7 +108,7 @@ export async function runStartupHealthcheck(): Promise<void> {
     }
   }
 
-  // 3. Feed connectivity (sample fetch — also exercises TLS).
+  // 4. Feed connectivity (sample fetch — also exercises TLS).
   try {
     const sample = SOURCES[0];
     const items = await fetchSource(sample);

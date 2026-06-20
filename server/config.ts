@@ -85,6 +85,14 @@ export const config = {
     // ramble past valid JSON. Disable with AI_STRUCTURED_OUTPUT_OFF=1 if your
     // runtime rejects response_format.
     structuredOutput: !bool("AI_STRUCTURED_OUTPUT_OFF"),
+    // Semantic interest matching via embeddings (POST /v1/embeddings). Each item
+    // is embedded once; a search is matched by cosine similarity (meaning, not
+    // keywords). Requires an embedding model loaded in your runtime. Falls back
+    // to keyword matching automatically if unavailable. Disable with
+    // AI_EMBEDDINGS_OFF=1. Set AI_EMBED_MODEL to your loaded embedding model id.
+    embeddingsEnabled: !bool("AI_EMBEDDINGS_OFF"),
+    embedModel: str("AI_EMBED_MODEL", "text-embedding-nomic-embed-text-v1.5"),
+    embedBatchSize: num("AI_EMBED_BATCH_SIZE", 32),
   },
   server: {
     port: num("PORT", 8787),

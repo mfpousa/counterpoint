@@ -18,6 +18,7 @@ import { aiReachable } from "./ai";
 import { analyzeItems, detectClickbait } from "./analysis";
 import { generateBriefing } from "./briefing";
 import { config } from "./config";
+import { embedQuery, embedTexts, itemEmbedText } from "./embeddings";
 import { interestTokens, toFeedItem } from "./personalize";
 import { rankItems } from "./rank";
 import {
@@ -260,21 +261,80 @@ function analyzePending(): Promise<{ remaining: number; progressed: number }> {
   return analyzeInFlight;
 }
 
+/** Analyzed items (in window) still lacking a semantic embedding, newest first. */
+function pendingForEmbedding(): StoredItem[] {
+  if (!config.ai.embeddingsEnabled) return [];
+  const cutoff = analyzeCutoff();
+  return allStored()
+    .filter((s) => !s.clickbait && s.analyzed && !s.embedding && s.item.publishedAt >= cutoff)
+    .sort((a, b) => b.item.publishedAt - a.item.publishedAt);
+}
+
+let embedInFlight: Promise<{ remaining: number; progressed: number }> | null = null;
+
+/**
+ * Embed ONE chunk of analyzed-but-unembedded items (newest first) and persist.
+ * Best-effort: if embeddings are unavailable (no model loaded), every vector
+ * comes back null, we make no progress, and report nothing remaining so the
+ * background loop stops instead of spinning.
+ */
+function embedPending(): Promise<{ remaining: number; progressed: number }> {
+  if (embedInFlight) return embedInFlight;
+  embedInFlight = (async () => {
+    const pending = pendingForEmbedding();
+    if (pending.length === 0) return { remaining: 0, progressed: 0 };
+
+    // Reuse the analysis chunk size for the embedding chunk.
+    const slice = config.ai.maxItems > 0 ? pending.slice(0, config.ai.maxItems) : pending;
+    const texts = slice.map((s) => itemEmbedText(s.item.title, s.summary, s.keywords));
+    console.log(`[feed] embedding ${slice.length} of ${pending.length} item(s)…`);
+    const vecs = await embedTexts(texts);
+
+    let progressed = 0;
+    slice.forEach((s, i) => {
+      const v = vecs[i];
+      if (v && v.length > 0) {
+        upsertStored({ ...s, embedding: v });
+        progressed += 1;
+      }
+    });
+
+    if (progressed > 0) {
+      saveStore();
+      // New embeddings change interest matching — invalidate assembled views.
+      lastBuildAt = Date.now();
+      viewCache.clear();
+      briefingCache.clear();
+    }
+    // If nothing embedded, embeddings are unavailable: stop the loop.
+    const remaining = progressed > 0 ? pendingForEmbedding().length : 0;
+    console.log(`[feed] embedded ${progressed}/${slice.length}; ${remaining} still need embeddings`);
+    return { remaining, progressed };
+  })().finally(() => {
+    embedInFlight = null;
+  });
+  return embedInFlight;
+}
+
 let catchUpTimer: ReturnType<typeof setTimeout> | null = null;
 
-/** Schedule a background chunk to keep chewing through the analysis backlog. */
+/** Schedule a background chunk to keep chewing through analysis + embedding backlogs. */
 function scheduleCatchUp(): void {
   if (catchUpTimer) return;
   catchUpTimer = setTimeout(() => {
     catchUpTimer = null;
     void (async () => {
       try {
-        const { remaining, progressed } = await analyzePending();
-        if (remaining > 0 && progressed > 0) scheduleCatchUp();
-        else if (remaining > 0) console.warn(`[feed] catch-up stalled with ${remaining} pending`);
-        else console.log("[feed] analysis backlog cleared");
-      } catch (e) {
-        console.warn("[feed] catch-up failed:", e);
+        const a = await analyzePending();
+        // Only embed once a chunk's analysis is in (embedding needs the summary).
+        const e = await embedPending();
+        const moreWork =
+          (a.remaining > 0 && a.progressed > 0) || (e.remaining > 0 && e.progressed > 0);
+        if (moreWork) scheduleCatchUp();
+        else if (a.remaining > 0) console.warn(`[feed] catch-up stalled with ${a.remaining} pending`);
+        else console.log("[feed] analysis + embedding backlog cleared");
+      } catch (err) {
+        console.warn("[feed] catch-up failed:", err);
       }
     })();
   }, config.feed.catchUpDelayMs);
@@ -286,9 +346,13 @@ function scheduleCatchUp(): void {
  */
 async function buildPool(): Promise<void> {
   await refreshSources();
-  const { remaining, progressed } = await analyzePending();
-  if (remaining > 0 && progressed > 0) {
-    console.log(`[feed] ${remaining} item(s) pending — continuing analysis in background`);
+  const a = await analyzePending();
+  const e = await embedPending();
+  const moreWork = (a.remaining > 0 && a.progressed > 0) || (e.remaining > 0 && e.progressed > 0);
+  if (moreWork) {
+    console.log(
+      `[feed] backlog — ${a.remaining} to analyze, ${e.remaining} to embed; continuing in background`,
+    );
     scheduleCatchUp();
   }
 }
@@ -309,8 +373,12 @@ async function ensurePool(force: boolean): Promise<void> {
   await buildInFlight;
 }
 
-/** Assemble (and cache) the ranked feed for a given interest from the pool. */
-function assembleView(interest: string): FeedResult {
+/**
+ * Assemble (and cache) the ranked feed for a given interest from the pool.
+ * `queryVec` (the interest's embedding) enables SEMANTIC matching; when absent
+ * (no embedding model / empty interest), toFeedItem falls back to keywords.
+ */
+function assembleView(interest: string, queryVec?: number[] | null): FeedResult {
   const key = interestKey(interest);
   const cached = viewCache.get(key);
   if (cached && cached.builtAt === lastBuildAt) return cached.result;
@@ -324,7 +392,7 @@ function assembleView(interest: string): FeedResult {
     .filter(
       (s) => !s.clickbait && s.analyzed && now - s.item.publishedAt <= config.feed.retentionMs,
     )
-    .map((s) => toFeedItem(s, tokens, hasInterest));
+    .map((s) => toFeedItem(s, tokens, hasInterest, queryVec));
 
   const ranked = rankItems(pool);
   const result: FeedResult = {
@@ -336,8 +404,9 @@ function assembleView(interest: string): FeedResult {
     interest: key,
   };
   viewCache.set(key, { builtAt: lastBuildAt, result });
+  const mode = hasInterest ? (queryVec ? "semantic" : "keyword") : "general";
   console.log(
-    `[feed] view "${key}" -> ${ranked.length} items from ${pool.length} eligible` +
+    `[feed] view "${key}" (${mode}) -> ${ranked.length} items from ${pool.length} eligible` +
       ` in ${result.durationMs}ms`,
   );
   return result;
@@ -345,11 +414,13 @@ function assembleView(interest: string): FeedResult {
 
 /**
  * Get the ranked feed for an interest. Builds/refreshes the analyzed pool as
- * needed (TTL-cached), then personalizes + ranks it for the interest.
+ * needed (TTL-cached), then personalizes + ranks it for the interest. The
+ * interest is embedded once (cached) for semantic matching.
  */
 export async function getFeed(force = false, interest = config.feed.interest): Promise<FeedResult> {
   await ensurePool(force);
-  return assembleView(interest);
+  const queryVec = await embedQuery(interest);
+  return assembleView(interest, queryVec);
 }
 
 /**
@@ -374,7 +445,8 @@ export async function getBriefing(
   const p = (async (): Promise<Briefing | null> => {
     // Don't cache failures from an offline model — let a later request retry.
     if (!(await aiReachable())) return null;
-    const view = assembleView(key);
+    const queryVec = await embedQuery(key);
+    const view = assembleView(key, queryVec);
     const sample = view.items.slice(0, 40);
     const started = Date.now();
     console.log(`[feed] briefing: synthesizing "${key || "general"}" from ${sample.length} item(s)…`);

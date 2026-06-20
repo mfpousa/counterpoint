@@ -28,6 +28,9 @@ export interface StoredItem {
   keywords: string[];
   /** When this item was analyzed (epoch ms). */
   analyzedAt: number;
+  /** Semantic embedding of the item (for meaning-based interest matching).
+   *  Absent until backfilled, or when no embedding model is available. */
+  embedding?: number[];
 }
 
 interface StoreFile {

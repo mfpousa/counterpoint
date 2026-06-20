@@ -8,6 +8,7 @@
 // also matches "machine learning" / "LLM".
 
 import type { FeedItem } from "../src/types";
+import { cosineSim } from "./embeddings";
 import type { StoredItem } from "./store";
 
 const STOPWORDS = new Set([
@@ -88,9 +89,31 @@ export function personalizedRelevance(
   return Math.max(0, Math.min(1, 0.6 * match + 0.4 * importance));
 }
 
-/** Materialize a ranked-feed FeedItem from a stored analysis + reader interest. */
-export function toFeedItem(s: StoredItem, tokens: Set<string>, hasInterest: boolean): FeedItem {
-  const match = interestMatch(tokens, s);
+/**
+ * Map a cosine similarity (typically ~0.2..0.85 for sentence embeddings) onto a
+ * 0..1 match score, stretching the useful band so relevant items separate
+ * clearly from background noise.
+ */
+export function semanticMatch(queryVec: number[], itemVec: number[]): number {
+  const sim = cosineSim(queryVec, itemVec);
+  return Math.max(0, Math.min(1, (sim - 0.2) / 0.6));
+}
+
+/**
+ * Materialize a ranked-feed FeedItem from a stored analysis + reader interest.
+ * When a query embedding AND the item's embedding are present, relevance is
+ * SEMANTIC (cosine similarity). Otherwise it falls back to keyword matching.
+ */
+export function toFeedItem(
+  s: StoredItem,
+  tokens: Set<string>,
+  hasInterest: boolean,
+  queryVec?: number[] | null,
+): FeedItem {
+  const match =
+    hasInterest && queryVec && s.embedding
+      ? semanticMatch(queryVec, s.embedding)
+      : interestMatch(tokens, s);
   const relevance = personalizedRelevance(s.importance, match, hasInterest);
   return {
     ...s.item,

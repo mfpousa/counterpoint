@@ -83,7 +83,9 @@ export default function FeedScreen() {
     [progress.completedItemIds],
   );
 
-  // Group the balanced feed into per-topic sections for discoverability.
+  // Group the balanced feed into per-topic sections for discoverability, and
+  // order each section's cards by relevance (highest first; recency breaks ties)
+  // so the most relevant news in a topic surfaces at the top of its section.
   const sections = useMemo(() => {
     const byTopic = new Map<Topic, FeedItem[]>();
     for (const it of feed) {
@@ -91,9 +93,15 @@ export default function FeedScreen() {
       if (arr) arr.push(it);
       else byTopic.set(it.topic, [it]);
     }
+    const byRelevance = (a: FeedItem, b: FeedItem) => {
+      const ra = a.relevance ?? 0;
+      const rb = b.relevance ?? 0;
+      if (rb !== ra) return rb - ra;
+      return b.publishedAt - a.publishedAt;
+    };
     return TOPIC_ORDER.filter((t) => byTopic.has(t)).map((t) => ({
       topic: t,
-      items: byTopic.get(t) as FeedItem[],
+      items: (byTopic.get(t) as FeedItem[]).slice().sort(byRelevance),
     }));
   }, [feed]);
 
