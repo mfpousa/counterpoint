@@ -9,7 +9,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { fetchBriefing, fetchRankedFeed } from "../lib/api";
+import { fetchBriefing, fetchRankedFeed, fetchStatus } from "../lib/api";
 import { buildFeed } from "../lib/buildFeed";
 import { applyCompletion } from "../lib/lean";
 import {
@@ -24,6 +24,7 @@ import {
   trailingWindow,
 } from "../storage/storage";
 import type {
+  AnalysisStatus,
   Briefing,
   DailyProgress,
   FeedItem,
@@ -45,6 +46,8 @@ interface AppState {
   /** AI digest of what's happening / where it's headed (null if unavailable). */
   briefing: Briefing | null;
   loadingBriefing: boolean;
+  /** Live backend analysis progress (null until first poll). */
+  status: AnalysisStatus | null;
   updatePrefs: (patch: Partial<Preferences>) => Promise<void>;
   completeItem: (item: FeedItem) => Promise<void>;
   refreshFeed: (opts?: { force?: boolean }) => Promise<void>;
@@ -63,6 +66,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [feedError, setFeedError] = useState<string | null>(null);
   const [briefing, setBriefing] = useState<Briefing | null>(null);
   const [loadingBriefing, setLoadingBriefing] = useState(false);
+  const [status, setStatus] = useState<AnalysisStatus | null>(null);
 
   // Initial load of persisted state.
   useEffect(() => {
@@ -137,6 +141,47 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [ready, prefs.onboarded, prefs.interestPrompt, refreshFeed]);
 
+  // Keep a ref of loadingFeed so the status poller can avoid overlapping loads.
+  const loadingFeedRef = useRef(loadingFeed);
+  loadingFeedRef.current = loadingFeed;
+
+  // Silently pull newly-analyzed items into the pool (no loading banner), used
+  // when the backend finishes an analysis chunk in the background.
+  const reloadPool = useCallback(async () => {
+    try {
+      const items = await fetchRankedFeed({ interest: interestRef.current });
+      if (items.length > 0) setPool(items);
+    } catch {
+      /* best-effort live refresh; ignore */
+    }
+  }, []);
+
+  // Poll backend analysis progress. While the build advances, surface it via
+  // `status`; when the analyzed count grows (a chunk finished), refresh the feed
+  // so new items appear live without a manual reload.
+  const prevAnalyzed = useRef(0);
+  useEffect(() => {
+    if (!ready || !prefs.onboarded) return;
+    let cancelled = false;
+    const tick = async () => {
+      const s = await fetchStatus();
+      if (cancelled || !s) return;
+      setStatus(s);
+      if (prevAnalyzed.current === 0) {
+        prevAnalyzed.current = s.analyzed;
+      } else if (s.analyzed > prevAnalyzed.current) {
+        prevAnalyzed.current = s.analyzed;
+        if (!loadingFeedRef.current) void reloadPool();
+      }
+    };
+    void tick();
+    const id = setInterval(tick, 3000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [ready, prefs.onboarded, reloadPool]);
+
   const feed = useMemo(
     () => buildFeed({ items: pool, prefs, progress }),
     [pool, prefs, progress],
@@ -178,6 +223,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     feedError,
     briefing,
     loadingBriefing,
+    status,
     updatePrefs,
     completeItem,
     refreshFeed,

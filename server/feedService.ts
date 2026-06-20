@@ -52,6 +52,47 @@ const viewCache = new Map<string, { builtAt: number; result: FeedResult }>();
 const briefingCache = new Map<string, { builtAt: number; briefing: Briefing | null }>();
 const briefingInFlight = new Map<string, Promise<Briefing | null>>();
 
+// Live build progress, surfaced to the UI via /api/status so users can watch
+// the (potentially long) analysis advance instead of staring at a spinner.
+type BuildPhase = "idle" | "fetching" | "triage" | "transcripts" | "analyzing";
+let buildStatus: { phase: BuildPhase; done: number; total: number } = {
+  phase: "idle",
+  done: 0,
+  total: 0,
+};
+function setPhase(phase: BuildPhase, done = 0, total = 0): void {
+  buildStatus = { phase, done, total };
+}
+
+export interface AnalysisStatus {
+  /** Current build phase ("idle" when nothing is running). */
+  phase: BuildPhase;
+  /** Whether a build/analysis is currently active. */
+  active: boolean;
+  /** Items completed in the current pass. */
+  done: number;
+  /** Items in the current pass. */
+  total: number;
+  /** Items still awaiting deep analysis (within the recency window). */
+  pending: number;
+  /** Items analyzed and eligible for the feed (within the recency window). */
+  analyzed: number;
+}
+
+/** Snapshot of build/analysis progress for the UI. */
+export function getStatus(): AnalysisStatus {
+  const cutoff = analyzeCutoff();
+  let pending = 0;
+  let analyzed = 0;
+  for (const s of allStored()) {
+    if (s.clickbait || s.item.publishedAt < cutoff) continue;
+    if (s.analyzed) analyzed += 1;
+    else pending += 1;
+  }
+  const active = buildStatus.phase !== "idle" || buildInFlight !== null || analyzeInFlight !== null;
+  return { phase: buildStatus.phase, active, done: buildStatus.done, total: buildStatus.total, pending, analyzed };
+}
+
 /** Normalize interest text into a stable key (trim/lower/collapse ws). */
 function interestKey(interest: string): string {
   return interest.trim().toLowerCase().replace(/\s+/g, " ").slice(0, config.feed.maxInterestLen);
@@ -66,6 +107,7 @@ function progressLogger(label: string): (done: number, total: number) => void {
   const start = Date.now();
   let lastLog = 0;
   return (done, total) => {
+    setPhase(label === "triage" ? "triage" : "analyzing", done, total);
     const now = Date.now();
     const finished = done >= total;
     if (!finished && now - lastLog < 2500) return;
@@ -101,6 +143,7 @@ function pendingForAnalysis(): StoredItem[] {
  */
 async function refreshSources(): Promise<void> {
   const started = Date.now();
+  setPhase("fetching");
   console.log(`[feed] refresh — fetching ${SOURCES.length} sources…`);
   const raw = await fetchAll(SOURCES);
   const cutoff = analyzeCutoff();
@@ -115,6 +158,7 @@ async function refreshSources(): Promise<void> {
     if (!(await aiReachable())) {
       console.warn("[feed] AI endpoint unreachable — skipping triage this refresh.");
       lastBuildAt = Date.now();
+      setPhase("idle");
       return;
     }
     let junk = new Set<string>();
@@ -158,12 +202,19 @@ function analyzePending(): Promise<{ remaining: number; progressed: number }> {
   if (analyzeInFlight) return analyzeInFlight;
   analyzeInFlight = (async () => {
     const pending = pendingForAnalysis();
-    if (pending.length === 0) return { remaining: 0, progressed: 0 };
-    if (!(await aiReachable())) return { remaining: pending.length, progressed: 0 };
+    if (pending.length === 0) {
+      setPhase("idle");
+      return { remaining: 0, progressed: 0 };
+    }
+    if (!(await aiReachable())) {
+      setPhase("idle");
+      return { remaining: pending.length, progressed: 0 };
+    }
 
     const slice = config.ai.maxItems > 0 ? pending.slice(0, config.ai.maxItems) : pending;
     const items = slice.map((s) => s.item);
 
+    setPhase("transcripts", 0, items.length);
     console.log(`[feed] fetching transcripts for up to ${items.length} item(s)…`);
     const transcripts = await fetchTranscripts(items);
     if (transcripts.size > 0) console.log(`[feed] fetched ${transcripts.size} transcript(s)`);
@@ -200,6 +251,7 @@ function analyzePending(): Promise<{ remaining: number; progressed: number }> {
     briefingCache.clear();
 
     const remaining = pendingForAnalysis().length;
+    if (remaining === 0) setPhase("idle");
     console.log(`[feed] analyzed ${progressed}/${items.length}; ${remaining} still pending`);
     return { remaining, progressed };
   })().finally(() => {

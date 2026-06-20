@@ -17,6 +17,7 @@ import { assessDrift } from "../../src/lib/lean";
 import { topicMeta, TOPIC_ORDER } from "../../src/lib/topics";
 import { FeedCard } from "../../src/components/FeedCard";
 import { BriefingCard } from "../../src/components/BriefingCard";
+import { AnalysisProgress } from "../../src/components/AnalysisProgress";
 import { LeanDial, QuotaMeter } from "../../src/components/meters";
 import { colors, font, radius, spacing } from "../../src/theme";
 import type { FeedItem, Topic } from "../../src/types";
@@ -42,6 +43,7 @@ export default function FeedScreen() {
     feedError,
     briefing,
     loadingBriefing,
+    status,
     completeItem,
     refreshFeed,
     updatePrefs,
@@ -177,6 +179,8 @@ export default function FeedScreen() {
             </Text>
           </Pressable>
         </View>
+
+        <AnalysisProgress status={status} />
 
         <BriefingCard briefing={briefing} loading={loadingBriefing} />
 

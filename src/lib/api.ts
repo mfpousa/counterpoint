@@ -5,7 +5,7 @@
 // and returns a ranked, diversified pool. The app just renders it and applies
 // the personal layer (daily quota + lean counter-weighting) in buildFeed.
 
-import type { Briefing, FeedItem } from "../types";
+import type { AnalysisStatus, Briefing, FeedItem } from "../types";
 
 const DEFAULT_BACKEND_PORT = "8787";
 
@@ -70,6 +70,20 @@ export async function fetchRankedFeed(
   }
   const data = (await res.json()) as FeedResponse;
   return Array.isArray(data.items) ? data.items : [];
+}
+
+/**
+ * Fetch live backend build/analysis progress. Returns null on any failure (the
+ * status poll is best-effort and must never disrupt the UI).
+ */
+export async function fetchStatus(): Promise<AnalysisStatus | null> {
+  try {
+    const res = await fetch(`${apiBaseUrl()}/api/status`, { method: "GET" });
+    if (!res.ok) return null;
+    return (await res.json()) as AnalysisStatus;
+  } catch {
+    return null;
+  }
 }
 
 /**

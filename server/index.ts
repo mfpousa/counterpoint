@@ -11,7 +11,7 @@ import cors from "cors";
 import express from "express";
 import { aiReachable } from "./ai";
 import { config } from "./config";
-import { clearCaches, getBriefing, getFeed } from "./feedService";
+import { clearCaches, getBriefing, getFeed, getStatus } from "./feedService";
 import { runStartupHealthcheck } from "./healthcheck";
 
 const app = express();
@@ -32,6 +32,10 @@ function readInterest(raw: unknown): string {
   if (typeof raw !== "string") return config.feed.interest;
   return raw.slice(0, config.feed.maxInterestLen);
 }
+
+app.get("/api/status", (_req, res) => {
+  res.json(getStatus());
+});
 
 app.get("/api/feed", async (req, res) => {
   try {
