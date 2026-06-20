@@ -66,7 +66,11 @@ export function clampNum(n: unknown, lo: number, hi: number, fallback: number): 
  * the first token). Falls back to non-streaming parsing if the server ignores
  * `stream: true`.
  */
-export async function chatRaw(system: string, payload: unknown): Promise<string> {
+export async function chatRaw(
+  system: string,
+  payload: unknown,
+  opts: { maxTokens?: number } = {},
+): Promise<string> {
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
   const arm = () => {
@@ -87,6 +91,9 @@ export async function chatRaw(system: string, payload: unknown): Promise<string>
         model: config.ai.model,
         temperature: 0,
         stream: true,
+        // Bound the reply so a non-stopping model can't blow past the context
+        // window (which stalls/crashes the GPU). Sized by the caller per batch.
+        ...(opts.maxTokens ? { max_tokens: opts.maxTokens } : {}),
         messages: [
           { role: "system", content: system },
           {
@@ -160,8 +167,12 @@ export async function chatRaw(system: string, payload: unknown): Promise<string>
  * One chat round-trip expecting a JSON array reply. Returns the parsed array
  * (also unwraps a { "items": [...] } envelope), or [] on any error/timeout.
  */
-export async function chatJsonArray(system: string, payload: unknown): Promise<unknown[]> {
-  const parsed = extractJson(await chatRaw(system, payload));
+export async function chatJsonArray(
+  system: string,
+  payload: unknown,
+  opts: { maxTokens?: number } = {},
+): Promise<unknown[]> {
+  const parsed = extractJson(await chatRaw(system, payload, opts));
   if (Array.isArray(parsed)) return parsed;
   const items = (parsed as Record<string, unknown>)?.["items"];
   return Array.isArray(items) ? items : [];
@@ -171,8 +182,9 @@ export async function chatJsonArray(system: string, payload: unknown): Promise<u
 export async function chatJsonObject(
   system: string,
   payload: unknown,
+  opts: { maxTokens?: number } = {},
 ): Promise<Record<string, unknown> | null> {
-  return extractJsonObject(await chatRaw(system, payload));
+  return extractJsonObject(await chatRaw(system, payload, opts));
 }
 
 /** Run async tasks with a bounded number in flight (order-preserving results). */

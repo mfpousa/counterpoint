@@ -78,7 +78,11 @@ function asRecord(row: unknown): Record<string, unknown> | null {
 async function triageBatch(batch: FeedItem[]): Promise<Set<string>> {
   const junk = new Set<string>();
   const payload = batch.map((it) => ({ id: it.id, source: it.sourceTitle, title: it.title }));
-  const rows = await chatJsonArray(TRIAGE_PROMPT, payload);
+  // Each verdict is tiny ({id, junk}); cap output so a non-stopping model can't
+  // run away and overflow the context window.
+  const rows = await chatJsonArray(TRIAGE_PROMPT, payload, {
+    maxTokens: batch.length * 24 + 64,
+  });
   const byId = new Map(batch.map((it) => [it.id, it]));
   rows.forEach((row, i) => {
     const r = asRecord(row);
@@ -158,7 +162,11 @@ async function analyzeBatch(
       ...(transcript ? { transcript } : {}),
     };
   });
-  const rows = await chatJsonArray(ANALYZE_PROMPT, payload);
+  // ~110 tokens/item of JSON (topic/lean/importance/summary/keywords); cap with
+  // headroom so output can't exceed the window, while leaving room for valid JSON.
+  const rows = await chatJsonArray(ANALYZE_PROMPT, payload, {
+    maxTokens: batch.length * 160 + 128,
+  });
   const byId = new Map(batch.map((it) => [it.id, it]));
   rows.forEach((row, i) => {
     const r = asRecord(row);

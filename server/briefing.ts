@@ -66,7 +66,7 @@ export async function generateBriefing(
     age: relativeAge(it.publishedAt, now),
   }));
 
-  const obj = await chatJsonObject(BASE_RULES + steer(interest), payload);
+  const obj = await chatJsonObject(BASE_RULES + steer(interest), payload, { maxTokens: 700 });
   if (!obj) return null;
 
   const mood = typeof obj["mood"] === "string" ? obj["mood"].trim() : "";
