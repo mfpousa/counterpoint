@@ -40,11 +40,16 @@ export default function LearnScreen() {
   const [insight, setInsight] = useState<KnowledgeInsight | null>(null);
   const [loadingInsight, setLoadingInsight] = useState(false);
 
-  // A signature that changes only when the graded set meaningfully changes, so
-  // we don't re-call the model on every render.
+  // A signature that changes when the graded set OR the candidate pool changes,
+  // so we don't re-call the model on every render — but DO re-fetch once the feed
+  // pool loads (candidates were empty at first mount → no suggestions otherwise).
+  const candidateKey = useMemo(
+    () => candidates.map((c) => c.id).sort().join(","),
+    [candidates],
+  );
   const signature = useMemo(
-    () => `${profile.totalGraded}:${profile.avgScore}:${profile.weakTopics.join(",")}`,
-    [profile],
+    () => `${profile.totalGraded}:${profile.avgScore}:${profile.weakTopics.join(",")}:${candidateKey}`,
+    [profile, candidateKey],
   );
 
   useEffect(() => {

@@ -55,6 +55,10 @@ interface AppState {
   status: AnalysisStatus | null;
   /** Graded recall summaries (newest first), persisted locally. */
   summaries: StoredSummary[];
+  /** The active world id (set of sources). */
+  worldId: string;
+  /** If a DIFFERENT world is currently refreshing (only one at a time), its id. */
+  busyWorld: string | null;
   updatePrefs: (patch: Partial<Preferences>) => Promise<void>;
   completeItem: (item: FeedItem) => Promise<void>;
   /**
@@ -64,6 +68,8 @@ interface AppState {
    */
   gradeAndRecord: (item: FeedItem, summaryText: string) => Promise<SummaryGrade>;
   refreshFeed: (opts?: { force?: boolean }) => Promise<void>;
+  /** Switch the active world (persists, clears the current pool, re-fetches). */
+  setWorld: (worldId: string) => Promise<void>;
   resetToday: () => Promise<void>;
 }
 
@@ -81,6 +87,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [loadingBriefing, setLoadingBriefing] = useState(false);
   const [status, setStatus] = useState<AnalysisStatus | null>(null);
   const [summaries, setSummaries] = useState<StoredSummary[]>([]);
+  const [busyWorld, setBusyWorld] = useState<string | null>(null);
 
   // Initial load of persisted state.
   useEffect(() => {
@@ -99,44 +106,55 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     })();
   }, []);
 
-  // Always read the latest steering interest without re-creating refreshFeed.
+  // Always read the latest steering interest + active world without re-creating
+  // the fetch callbacks.
   const interestRef = useRef(prefs.interestPrompt);
   interestRef.current = prefs.interestPrompt;
+  const worldRef = useRef(prefs.worldId);
+  worldRef.current = prefs.worldId;
 
   // Best-effort, non-blocking. The pool is already fresh after a feed load, so
   // we never force here (avoids a second rebuild). Steered by the same interest.
   const loadBriefing = useCallback(async () => {
     setLoadingBriefing(true);
     try {
-      setBriefing(await fetchBriefing({ interest: interestRef.current }));
+      setBriefing(await fetchBriefing({ interest: interestRef.current, world: worldRef.current }));
     } finally {
       setLoadingBriefing(false);
     }
   }, []);
 
+  // Coalesce overlapping non-forced refreshes (e.g. the world-change effect and
+  // the pool-empty effect both firing on a switch) into a single fetch.
+  const fetchingRef = useRef(false);
   const refreshFeed = useCallback(async (opts: { force?: boolean } = {}) => {
+    if (fetchingRef.current && !opts.force) return;
+    fetchingRef.current = true;
     setLoadingFeed(true);
     setFeedError(null);
     try {
       // The backend fetches every feed server-side and uses the local LLM to
       // categorize, score, and diversify (steered by the interest) before we
       // ever see it.
-      const items = await fetchRankedFeed({
+      const res = await fetchRankedFeed({
         force: opts.force,
         interest: interestRef.current,
+        world: worldRef.current,
       });
-      if (items.length === 0) {
+      setBusyWorld(res.busyWith ?? null);
+      if (res.items.length === 0 && !res.busyWith) {
         setFeedError(
           "The backend returned no items. Make sure the server is running (npm run server) " +
             "and your local model is loaded.",
         );
       }
-      setPool(items);
+      setPool(res.items);
       void loadBriefing();
     } catch (e) {
       setFeedError(e instanceof Error ? e.message : "Failed to load the feed.");
     } finally {
       setLoadingFeed(false);
+      fetchingRef.current = false;
     }
   }, [loadBriefing]);
 
@@ -161,6 +179,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [ready, prefs.onboarded, prefs.interestPrompt, refreshFeed]);
 
+  // Re-fetch when the active WORLD changes (skip the first run). The pool was
+  // already cleared by setWorld, so this assembles the newly-selected world.
+  const lastWorld = useRef<string | null>(null);
+  useEffect(() => {
+    if (!ready || !prefs.onboarded) return;
+    if (lastWorld.current === null) {
+      lastWorld.current = prefs.worldId;
+      return;
+    }
+    if (lastWorld.current !== prefs.worldId) {
+      lastWorld.current = prefs.worldId;
+      void refreshFeed();
+    }
+  }, [ready, prefs.onboarded, prefs.worldId, refreshFeed]);
+
   // Keep a ref of loadingFeed so the status poller can avoid overlapping loads.
   const loadingFeedRef = useRef(loadingFeed);
   loadingFeedRef.current = loadingFeed;
@@ -169,8 +202,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // when the backend finishes an analysis chunk in the background.
   const reloadPool = useCallback(async () => {
     try {
-      const items = await fetchRankedFeed({ interest: interestRef.current });
-      if (items.length > 0) setPool(items);
+      const res = await fetchRankedFeed({ interest: interestRef.current, world: worldRef.current });
+      setBusyWorld(res.busyWith ?? null);
+      if (res.items.length > 0) setPool(res.items);
     } catch {
       /* best-effort live refresh; ignore */
     }
@@ -184,9 +218,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (!ready || !prefs.onboarded) return;
     let cancelled = false;
     const tick = async () => {
-      const s = await fetchStatus();
+      const s = await fetchStatus(worldRef.current);
       if (cancelled || !s) return;
       setStatus(s);
+      setBusyWorld(s.busyWith ?? null);
       if (prevAnalyzed.current === 0) {
         prevAnalyzed.current = s.analyzed;
       } else if (s.analyzed > prevAnalyzed.current) {
@@ -231,7 +266,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const gradeAndRecord = useCallback(
     async (item: FeedItem, summaryText: string): Promise<SummaryGrade> => {
-      const grade = await gradeSummary(item.id, summaryText);
+      const grade = await gradeSummary(item.id, summaryText, worldRef.current);
       const passed = grade.score >= PASS_SCORE;
       const record: StoredSummary = {
         id: item.id,
@@ -251,6 +286,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return grade;
     },
     [completeItem],
+  );
+
+  const setWorld = useCallback(
+    async (worldId: string) => {
+      if (worldId === worldRef.current) return;
+      // Clear the current world's view immediately; the worldId-change effect
+      // (and the pool-empty effect) will assemble the newly-selected world.
+      setPool([]);
+      setBriefing(null);
+      setFeedError(null);
+      setBusyWorld(null);
+      const next = { ...prefs, worldId };
+      setPrefs(next);
+      await savePreferences(next);
+    },
+    [prefs],
   );
 
   const resetToday = useCallback(async () => {
@@ -273,10 +324,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     loadingBriefing,
     status,
     summaries,
+    worldId: prefs.worldId,
+    busyWorld,
     updatePrefs,
     completeItem,
     gradeAndRecord,
     refreshFeed,
+    setWorld,
     resetToday,
   };
 

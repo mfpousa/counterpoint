@@ -137,6 +137,10 @@ export const config = {
     // JS-heavy pages and SOME soft paywalls — it does NOT bypass hard paywalls.
     // Adds a third-party request per fallback; disable with READER_PROXY_OFF=1.
     proxyEnabled: !bool("READER_PROXY_OFF"),
+    // r.jina.ai API key. The free tier now rate-limits/captcha-gates anonymous
+    // traffic (HTTP 403); an authenticated request (Authorization: Bearer <key>)
+    // restores reliable access and higher limits. Get one at https://jina.ai/reader.
+    jinaApiKey: str("READER_JINA_API_KEY", ""),
     // If even proxies yield no body, synthesize a SHORT brief from the headline +
     // feed summary instead of failing — clearly labeled in the reader. The model
     // is instructed to use only the provided text (no fabrication). Disable with

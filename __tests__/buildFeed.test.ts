@@ -42,6 +42,7 @@ function makePrefs(over: Partial<Preferences> = {}): Preferences {
     interestPrompt: "",
     driftThreshold: 0.25,
     onboarded: true,
+    worldId: "frontpage",
     ...over,
   };
 }

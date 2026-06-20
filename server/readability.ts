@@ -10,6 +10,55 @@ const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 " +
   "(KHTML, like Gecko) Chrome/124.0 Safari/537.36";
 
+/**
+ * Full set of headers a real Chrome sends for a top-level navigation. Many
+ * publishers 403 requests that have a UA but lack the rest (no Accept-Language,
+ * no Sec-Fetch-* / Sec-CH-UA hints), since that signature screams "script". This
+ * makes the DIRECT fetch succeed for soft-paywall pages whose full text is in the
+ * served HTML — avoiding the now-captcha-gated public proxies entirely.
+ */
+const BROWSER_HEADERS: Record<string, string> = {
+  "User-Agent": UA,
+  Accept:
+    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+  "Accept-Language": "en-US,en;q=0.9",
+  "Cache-Control": "no-cache",
+  Pragma: "no-cache",
+  "Upgrade-Insecure-Requests": "1",
+  "Sec-Fetch-Dest": "document",
+  "Sec-Fetch-Mode": "navigate",
+  "Sec-Fetch-Site": "none",
+  "Sec-Fetch-User": "?1",
+  "Sec-CH-UA": '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+  "Sec-CH-UA-Mobile": "?0",
+  "Sec-CH-UA-Platform": '"macOS"',
+};
+
+/** Phrases that mark a bot-challenge / captcha / interstitial rather than article
+ *  text (Cloudflare, PerimeterX, generic captchas). If we see these we treat the
+ *  fetch as a failure so the next fallback tier runs. */
+const CHALLENGE_MARKERS = [
+  "just a moment",
+  "attention required! | cloudflare",
+  "cf-browser-verification",
+  "cf-challenge",
+  "/cdn-cgi/challenge-platform",
+  "g-recaptcha",
+  "h-captcha",
+  "px-captcha",
+  "enable javascript and cookies to continue",
+  "verifying you are human",
+  "request unsuccessful. incapsula",
+];
+
+function looksLikeChallenge(html: string): boolean {
+  // Only inspect the head: real challenge pages are tiny and put the marker up
+  // top, while a genuine article that merely mentions "captcha" won't match the
+  // specific platform strings above.
+  const head = html.slice(0, 4000).toLowerCase();
+  return CHALLENGE_MARKERS.some((m) => head.includes(m));
+}
+
 export interface ExtractedArticle {
   /** <title>/<h1>/og:title if found. */
   title: string;
@@ -17,15 +66,34 @@ export interface ExtractedArticle {
   text: string;
 }
 
-/** Download the raw HTML for a URL, or "" on any failure/timeout. */
-async function fetchHtml(url: string, timeoutMs = 15000): Promise<string> {
+interface FetchOpts {
+  timeoutMs?: number;
+  /** Extra/override request headers (e.g. proxy Authorization). */
+  headers?: Record<string, string>;
+  /** Send a plausible same-origin Referer (helps sites that gate cold hits). */
+  referer?: boolean;
+}
+
+/** Download the raw HTML for a URL, or "" on any failure/timeout/challenge. */
+async function fetchHtml(url: string, opts: FetchOpts = {}): Promise<string> {
+  const { timeoutMs = 15000, headers = {}, referer = false } = opts;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
+    const reqHeaders: Record<string, string> = { ...BROWSER_HEADERS, ...headers };
+    // A same-origin referer makes the hit look like an in-site click, not a
+    // cold, script-driven request.
+    if (referer) {
+      try {
+        reqHeaders.Referer = new URL(url).origin + "/";
+      } catch {
+        /* malformed URL — skip the referer */
+      }
+    }
     const res = await fetch(url, {
       signal: controller.signal,
       redirect: "follow",
-      headers: { "User-Agent": UA, Accept: "text/html,application/xhtml+xml" },
+      headers: reqHeaders,
     });
     if (!res.ok) {
       console.warn(`[reader] fetch ${url} -> HTTP ${res.status}`);
@@ -38,7 +106,12 @@ async function fetchHtml(url: string, timeoutMs = 15000): Promise<string> {
       console.warn(`[reader] ${url} is not text (${ct})`);
       return "";
     }
-    return await res.text();
+    const body = await res.text();
+    if (looksLikeChallenge(body)) {
+      console.warn(`[reader] ${url} returned a bot-challenge/captcha page — skipping`);
+      return "";
+    }
+    return body;
   } catch (e) {
     console.warn(`[reader] fetch error for ${url}: ${e instanceof Error ? e.message : e}`);
     return "";
@@ -121,7 +194,9 @@ export function htmlToText(fragment: string): string {
  * too little usable text (paywall, JS-only page, etc.).
  */
 export async function extractArticle(url: string): Promise<ExtractedArticle | null> {
-  const html = await fetchHtml(url);
+  // Send a same-origin referer + full browser headers so soft-paywall pages
+  // (whose complete text is in the served HTML) return it to us directly.
+  const html = await fetchHtml(url, { referer: true });
   if (!html) return null;
 
   const title = pickTitle(html);
@@ -151,12 +226,23 @@ export function jinaMarkdownToText(md: string): string {
     .trim();
 }
 
+interface ProxyCandidate {
+  kind: "markdown" | "html";
+  proxied: string;
+  /** Extra request headers (e.g. r.jina.ai Authorization). */
+  headers?: Record<string, string>;
+}
+
 /** Build the proxy URLs to try, in order. r.jina.ai renders JS and returns
  *  clean markdown; the CORS proxies just re-fetch the raw HTML from a different
- *  egress (helps simple bot-walls). */
-function proxyCandidates(url: string): { kind: "markdown" | "html"; proxied: string }[] {
+ *  egress (helps simple bot-walls). When a Jina API key is configured we send it
+ *  (the anonymous tier now 403s/captchas), and jina goes first. */
+function proxyCandidates(url: string): ProxyCandidate[] {
+  const jinaHeaders = config.reader.jinaApiKey
+    ? { Authorization: `Bearer ${config.reader.jinaApiKey}` }
+    : undefined;
   return [
-    { kind: "markdown", proxied: `https://r.jina.ai/${url}` },
+    { kind: "markdown", proxied: `https://r.jina.ai/${url}`, headers: jinaHeaders },
     { kind: "html", proxied: `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}` },
     { kind: "html", proxied: `https://corsproxy.io/?url=${encodeURIComponent(url)}` },
   ];
@@ -172,8 +258,8 @@ export async function extractReadable(url: string): Promise<ExtractedArticle | n
   if (direct) return direct;
   if (!config.reader.proxyEnabled) return null;
 
-  for (const { kind, proxied } of proxyCandidates(url)) {
-    const raw = await fetchHtml(proxied, 20000);
+  for (const { kind, proxied, headers } of proxyCandidates(url)) {
+    const raw = await fetchHtml(proxied, { timeoutMs: 20000, headers });
     if (!raw) continue;
     const text =
       kind === "markdown" ? jinaMarkdownToText(raw) : htmlToText(mainRegion(stripBoilerplate(raw)));

@@ -20,6 +20,8 @@ import { BriefingCard } from "../../src/components/BriefingCard";
 import { AnalysisProgress } from "../../src/components/AnalysisProgress";
 import { ArticleReader } from "../../src/components/ArticleReader";
 import { SummaryModal } from "../../src/components/SummaryModal";
+import { WorldSwitcher } from "../../src/components/WorldSwitcher";
+import { worldById } from "../../src/data/worlds";
 import { LeanDial, QuotaMeter } from "../../src/components/meters";
 import { colors, font, radius, spacing } from "../../src/theme";
 import type { FeedItem, Topic } from "../../src/types";
@@ -47,8 +49,11 @@ export default function FeedScreen() {
     loadingBriefing,
     status,
     summaries,
+    worldId,
+    busyWorld,
     gradeAndRecord,
     refreshFeed,
+    setWorld,
     updatePrefs,
   } = useApp();
   const [selected, setSelected] = useState<Topic | "all">("all");
@@ -157,6 +162,21 @@ export default function FeedScreen() {
       }
     >
       <View style={{ width: contentW, gap: spacing.md }}>
+        {/* World switcher: pick which news universe to browse. */}
+        <WorldSwitcher worldId={worldId} busyWorld={busyWorld} onSelect={setWorld} />
+
+        {/* Only one world refreshes at a time. Surface this only when the
+            selected world has nothing to show because another is hogging the lock. */}
+        {busyWorld && busyWorld !== worldId && feed.length === 0 && (
+          <View style={styles.busyBanner}>
+            <ActivityIndicator size="small" color={colors.warn} />
+            <Text style={styles.busyText}>
+              “{worldById(busyWorld).title}” is still refreshing. Only one world refreshes at a
+              time — this one will update once it’s free.
+            </Text>
+          </View>
+        )}
+
         {/* Search / steering bar */}
         <View style={styles.searchBar}>
           <Pressable onPress={submitSearch} hitSlop={8}>
@@ -401,6 +421,17 @@ const styles = StyleSheet.create({
   },
   errorText: { color: colors.textDim, fontSize: font.small, flex: 1, lineHeight: 18 },
   retry: { color: colors.accent, fontSize: font.small, fontWeight: "700" },
+  busyBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.warn + "55",
+    backgroundColor: colors.warn + "14",
+  },
+  busyText: { color: colors.textDim, fontSize: font.small, flex: 1, lineHeight: 18 },
   filterRow: { gap: spacing.sm, paddingVertical: spacing.xs, paddingRight: spacing.lg },
   filterChip: {
     flexDirection: "row",

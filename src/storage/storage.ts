@@ -2,6 +2,7 @@
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { DailyProgress, LeanHistoryPoint, Preferences, StoredSummary, Topic } from "../types";
+import { DEFAULT_WORLD_ID } from "../data/worlds";
 
 const KEYS = {
   prefs: "cp:prefs:v1",
@@ -31,6 +32,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   interestPrompt: "",
   driftThreshold: 0.25,
   onboarded: false,
+  worldId: DEFAULT_WORLD_ID,
 };
 
 /** Local YYYY-MM-DD for "today". */

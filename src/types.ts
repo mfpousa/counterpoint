@@ -50,6 +50,23 @@ export interface Source {
   weight?: number;
 }
 
+/**
+ * A "world": a self-contained news universe with its OWN curated source set and
+ * its OWN analyzed pool. The default world is the broad front page; niche worlds
+ * surface coverage the mainstream feed crowds out (creative, deep science, ...).
+ * Because deep analysis is expensive, only one world refreshes at a time.
+ */
+export interface World {
+  id: string;
+  title: string;
+  /** One-line description shown in the world switcher. */
+  description: string;
+  /** Ionicons glyph name for the switcher chip. */
+  icon: string;
+  /** The RSS/Atom sources that make up this world. */
+  sources: Source[];
+}
+
 /** A single normalized piece of content drawn from a source's feed. */
 export interface FeedItem {
   id: string;
@@ -153,6 +170,11 @@ export interface AnalysisStatus {
   pending: number;
   /** Items analyzed and eligible for the feed (within the recency window). */
   analyzed: number;
+  /** The world this status is for. */
+  world?: string;
+  /** If a DIFFERENT world is currently refreshing (only one runs at a time),
+   *  its id; else null. The UI uses this to show a 'busy' banner. */
+  busyWith?: string | null;
 }
 
 /** User preferences, persisted locally. */
@@ -176,6 +198,8 @@ export interface Preferences {
   driftThreshold: number;
   /** Set true once the user has completed onboarding. */
   onboarded: boolean;
+  /** The active news world (set of sources). Defaults to the front page. */
+  worldId: string;
 }
 
 /** Today's consumption progress, persisted locally and reset per day. */

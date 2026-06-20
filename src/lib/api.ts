@@ -50,6 +50,10 @@ export interface FeedResponse {
   fetched: number;
   enriched: number;
   durationMs?: number;
+  /** The world this feed was assembled for. */
+  world?: string;
+  /** If a DIFFERENT world is currently refreshing, its id; else null. */
+  busyWith?: string | null;
 }
 
 /**
@@ -58,26 +62,37 @@ export interface FeedResponse {
  * Throws on network/HTTP failure so the caller can surface a clear message.
  */
 export async function fetchRankedFeed(
-  opts: { force?: boolean; interest?: string } = {},
-): Promise<FeedItem[]> {
+  opts: { force?: boolean; interest?: string; world?: string } = {},
+): Promise<FeedResponse> {
   const base = apiBaseUrl();
   const interest = (opts.interest ?? "").trim();
+  const world = (opts.world ?? "").trim();
   let res: Response;
   if (opts.force) {
     res = await fetch(`${base}/api/refresh`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ interest }),
+      body: JSON.stringify({ interest, world }),
     });
   } else {
-    const qs = interest ? `?interest=${encodeURIComponent(interest)}` : "";
-    res = await fetch(`${base}/api/feed${qs}`, { method: "GET" });
+    const params = new URLSearchParams();
+    if (interest) params.set("interest", interest);
+    if (world) params.set("world", world);
+    const qs = params.toString();
+    res = await fetch(`${base}/api/feed${qs ? `?${qs}` : ""}`, { method: "GET" });
   }
   if (!res.ok) {
     throw new Error(`Backend returned ${res.status}. Is the server running (npm run server)?`);
   }
   const data = (await res.json()) as FeedResponse;
-  return Array.isArray(data.items) ? data.items : [];
+  return {
+    items: Array.isArray(data.items) ? data.items : [],
+    builtAt: data.builtAt,
+    fetched: data.fetched,
+    enriched: data.enriched,
+    busyWith: data.busyWith ?? null,
+    world: data.world,
+  };
 }
 
 /**
@@ -103,11 +118,15 @@ export async function fetchRewrite(id: string): Promise<RewrittenArticle> {
  * a clear message on failure so the summary UI can surface it (model offline,
  * item aged out, summary too short, ...).
  */
-export async function gradeSummary(id: string, summary: string): Promise<SummaryGrade> {
+export async function gradeSummary(
+  id: string,
+  summary: string,
+  world?: string,
+): Promise<SummaryGrade> {
   const res = await fetch(`${apiBaseUrl()}/api/grade`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ id, summary }),
+    body: JSON.stringify({ id, summary, world }),
   });
   const data = (await res.json().catch(() => null)) as
     | { grade?: SummaryGrade; error?: string }
@@ -145,9 +164,10 @@ export async function fetchKnowledgeInsight(
  * Fetch live backend build/analysis progress. Returns null on any failure (the
  * status poll is best-effort and must never disrupt the UI).
  */
-export async function fetchStatus(): Promise<AnalysisStatus | null> {
+export async function fetchStatus(world?: string): Promise<AnalysisStatus | null> {
   try {
-    const res = await fetch(`${apiBaseUrl()}/api/status`, { method: "GET" });
+    const qs = world ? `?world=${encodeURIComponent(world)}` : "";
+    const res = await fetch(`${apiBaseUrl()}/api/status${qs}`, { method: "GET" });
     if (!res.ok) return null;
     return (await res.json()) as AnalysisStatus;
   } catch {
@@ -161,11 +181,13 @@ export async function fetchStatus(): Promise<AnalysisStatus | null> {
  * throws — the briefing is a nice-to-have, not load-bearing.
  */
 export async function fetchBriefing(
-  opts: { interest?: string; force?: boolean } = {},
+  opts: { interest?: string; force?: boolean; world?: string } = {},
 ): Promise<Briefing | null> {
   const interest = (opts.interest ?? "").trim();
+  const world = (opts.world ?? "").trim();
   const params = new URLSearchParams();
   if (interest) params.set("interest", interest);
+  if (world) params.set("world", world);
   if (opts.force) params.set("force", "1");
   const qs = params.toString();
   try {

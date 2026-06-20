@@ -16,7 +16,8 @@ import { gradeSummary } from "./grade";
 import { runStartupHealthcheck } from "./healthcheck";
 import { generateKnowledgeInsight, type KnowledgeCandidate } from "./knowledge";
 import { rewriteArticle } from "./rewrite";
-import { getStored } from "./store";
+import { getStoredAnyWorld } from "./store";
+import { DEFAULT_WORLD_ID, WORLDS, isWorldId } from "../src/data/worlds";
 import type { KnowledgeProfile } from "../src/types";
 
 const app = express();
@@ -38,13 +39,31 @@ function readInterest(raw: unknown): string {
   return raw.slice(0, config.feed.maxInterestLen);
 }
 
-app.get("/api/status", (_req, res) => {
-  res.json(getStatus());
+/** Resolve a world id from a query param / body, defaulting to the front page. */
+function readWorld(raw: unknown): string {
+  return typeof raw === "string" && isWorldId(raw) ? raw : DEFAULT_WORLD_ID;
+}
+
+/** The catalogue of worlds (metadata only) the client renders in its switcher. */
+app.get("/api/worlds", (_req, res) => {
+  res.json({
+    worlds: WORLDS.map((w) => ({
+      id: w.id,
+      title: w.title,
+      description: w.description,
+      icon: w.icon,
+      sources: w.sources.length,
+    })),
+  });
+});
+
+app.get("/api/status", (req, res) => {
+  res.json(getStatus(readWorld(req.query.world)));
 });
 
 app.get("/api/feed", async (req, res) => {
   try {
-    const feed = await getFeed(false, readInterest(req.query.interest));
+    const feed = await getFeed(readWorld(req.query.world), false, readInterest(req.query.interest));
     res.json(feed);
   } catch (e) {
     console.error("[api] /api/feed failed:", e);
@@ -55,7 +74,11 @@ app.get("/api/feed", async (req, res) => {
 app.get("/api/briefing", async (req, res) => {
   try {
     const force = req.query.force === "1" || req.query.force === "true";
-    const briefing = await getBriefing(force, readInterest(req.query.interest));
+    const briefing = await getBriefing(
+      readWorld(req.query.world),
+      force,
+      readInterest(req.query.interest),
+    );
     res.json({ briefing });
   } catch (e) {
     console.error("[api] /api/briefing failed:", e);
@@ -69,7 +92,7 @@ app.get("/api/rewrite", async (req, res) => {
     res.status(400).json({ error: "missing item id" });
     return;
   }
-  const stored = getStored(id);
+  const stored = getStoredAnyWorld(id, readWorld(req.query.world));
   if (!stored) {
     res.status(404).json({ error: "item not found (it may have aged out of the feed)" });
     return;
@@ -97,7 +120,7 @@ app.post("/api/grade", async (req, res) => {
     res.status(400).json({ error: "Provide an item id and a summary of at least 10 characters." });
     return;
   }
-  const stored = getStored(id);
+  const stored = getStoredAnyWorld(id, readWorld(req.body?.world));
   if (!stored) {
     res.status(404).json({ error: "item not found (it may have aged out of the feed)" });
     return;
@@ -137,8 +160,9 @@ app.post("/api/knowledge", async (req, res) => {
 
 app.post("/api/refresh", async (req, res) => {
   try {
-    clearCaches();
-    const feed = await getFeed(true, readInterest(req.body?.interest));
+    const world = readWorld(req.body?.world);
+    clearCaches(world);
+    const feed = await getFeed(world, true, readInterest(req.body?.interest));
     res.json(feed);
   } catch (e) {
     console.error("[api] /api/refresh failed:", e);

@@ -11,9 +11,9 @@
 //  - changing the reader's interest re-ranks the cached pool instantly, with
 //    no new model calls.
 
-import SOURCES from "../src/data/sources";
 import { fetchAll } from "../src/lib/rss";
-import type { Briefing, FeedItem } from "../src/types";
+import type { AnalysisStatus, Briefing, FeedItem } from "../src/types";
+import { DEFAULT_WORLD_ID, worldSources } from "../src/data/worlds";
 import { aiReachable } from "./ai";
 import { analyzeItems, detectClickbait } from "./analysis";
 import { generateBriefing } from "./briefing";
@@ -22,15 +22,7 @@ import { embedQuery, embedTexts, itemEmbedText } from "./embeddings";
 import { interestTokens, partitionByExclusion, toFeedItem } from "./personalize";
 import { interpretQuery, type ParsedQuery } from "./query";
 import { rankItems } from "./rank";
-import {
-  allStored,
-  hasStored,
-  pruneStore,
-  saveStore,
-  storeSize,
-  upsertStored,
-  type StoredItem,
-} from "./store";
+import { getStore, type StoredItem } from "./store";
 import { fetchTranscripts } from "./transcripts";
 
 export interface FeedResult {
@@ -42,57 +34,93 @@ export interface FeedResult {
   enriched: number;
   durationMs: number;
   interest: string;
+  /** The world this feed was assembled for. */
+  world: string;
+  /** If a DIFFERENT world is refreshing (only one at a time), its id; this world
+   *  then served whatever it already had (possibly stale/empty). */
+  busyWith?: string | null;
 }
-
-// Timestamp of the last interest-independent pool build, the in-flight build,
-// and a small cache of assembled per-interest views (valid while builtAt matches).
-let lastBuildAt = 0;
-let buildInFlight: Promise<void> | null = null;
-const viewCache = new Map<string, { builtAt: number; result: FeedResult }>();
-
-// Per-interest briefing cache (valid while builtAt matches) + in-flight dedupe.
-const briefingCache = new Map<string, { builtAt: number; briefing: Briefing | null }>();
-const briefingInFlight = new Map<string, Promise<Briefing | null>>();
 
 // Live build progress, surfaced to the UI via /api/status so users can watch
 // the (potentially long) analysis advance instead of staring at a spinner.
 type BuildPhase = "idle" | "fetching" | "triage" | "transcripts" | "analyzing";
-let buildStatus: { phase: BuildPhase; done: number; total: number } = {
-  phase: "idle",
-  done: 0,
-  total: 0,
-};
-function setPhase(phase: BuildPhase, done = 0, total = 0): void {
-  buildStatus = { phase, done, total };
+
+/** All mutable build/cache state for ONE world. */
+interface WorldState {
+  worldId: string;
+  /** Timestamp of this world's last pool build (for TTL + cache validity). */
+  lastBuildAt: number;
+  status: { phase: BuildPhase; done: number; total: number };
+  /** Assembled per-interest views (valid while builtAt matches lastBuildAt). */
+  viewCache: Map<string, { builtAt: number; result: FeedResult }>;
+  briefingCache: Map<string, { builtAt: number; briefing: Briefing | null }>;
+  briefingInFlight: Map<string, Promise<Briefing | null>>;
+  buildInFlight: Promise<void> | null;
+  analyzeInFlight: Promise<{ remaining: number; progressed: number }> | null;
+  embedInFlight: Promise<{ remaining: number; progressed: number }> | null;
+  catchUpTimer: ReturnType<typeof setTimeout> | null;
 }
 
-export interface AnalysisStatus {
-  /** Current build phase ("idle" when nothing is running). */
-  phase: BuildPhase;
-  /** Whether a build/analysis is currently active. */
-  active: boolean;
-  /** Items completed in the current pass. */
-  done: number;
-  /** Items in the current pass. */
-  total: number;
-  /** Items still awaiting deep analysis (within the recency window). */
-  pending: number;
-  /** Items analyzed and eligible for the feed (within the recency window). */
-  analyzed: number;
+const worldStates = new Map<string, WorldState>();
+
+function ws(worldId: string): WorldState {
+  let s = worldStates.get(worldId);
+  if (!s) {
+    s = {
+      worldId,
+      lastBuildAt: 0,
+      status: { phase: "idle", done: 0, total: 0 },
+      viewCache: new Map(),
+      briefingCache: new Map(),
+      briefingInFlight: new Map(),
+      buildInFlight: null,
+      analyzeInFlight: null,
+      embedInFlight: null,
+      catchUpTimer: null,
+    };
+    worldStates.set(worldId, s);
+  }
+  return s;
 }
 
-/** Snapshot of build/analysis progress for the UI. */
-export function getStatus(): AnalysisStatus {
+// GLOBAL single-build lock: deep analysis is expensive, so only ONE world may be
+// building (foreground OR draining its backlog) at any moment. While held,
+// requests for a DIFFERENT world serve that world's existing pool and report
+// `busyWith` instead of starting a competing build.
+let buildingWorld: string | null = null;
+
+function setPhase(state: WorldState, phase: BuildPhase, done = 0, total = 0): void {
+  state.status = { phase, done, total };
+}
+
+/** Snapshot of build/analysis progress for a world, for the UI. */
+export function getStatus(worldId: string = DEFAULT_WORLD_ID): AnalysisStatus {
+  const state = ws(worldId);
+  const st = getStore(worldId);
   const cutoff = analyzeCutoff();
   let pending = 0;
   let analyzed = 0;
-  for (const s of allStored()) {
+  for (const s of st.all()) {
     if (s.clickbait || s.item.publishedAt < cutoff) continue;
     if (s.analyzed) analyzed += 1;
     else pending += 1;
   }
-  const active = buildStatus.phase !== "idle" || buildInFlight !== null || analyzeInFlight !== null;
-  return { phase: buildStatus.phase, active, done: buildStatus.done, total: buildStatus.total, pending, analyzed };
+  const active =
+    state.status.phase !== "idle" ||
+    state.buildInFlight !== null ||
+    state.analyzeInFlight !== null ||
+    buildingWorld === worldId;
+  const busyWith = buildingWorld && buildingWorld !== worldId ? buildingWorld : null;
+  return {
+    phase: state.status.phase,
+    active,
+    done: state.status.done,
+    total: state.status.total,
+    pending,
+    analyzed,
+    world: worldId,
+    busyWith,
+  };
 }
 
 /** Normalize interest text into a stable key (trim/lower/collapse ws). */
@@ -105,11 +133,11 @@ function interestKey(interest: string): string {
  * (plus the final 100%), with elapsed time, throughput, and a rough ETA, so a
  * multi-minute analysis pass shows steady progress instead of going silent.
  */
-function progressLogger(label: string): (done: number, total: number) => void {
+function progressLogger(state: WorldState, label: string): (done: number, total: number) => void {
   const start = Date.now();
   let lastLog = 0;
   return (done, total) => {
-    setPhase(label === "triage" ? "triage" : "analyzing", done, total);
+    setPhase(state, label === "triage" ? "triage" : "analyzing", done, total);
     const now = Date.now();
     const finished = done >= total;
     if (!finished && now - lastLog < 2500) return;
@@ -121,7 +149,7 @@ function progressLogger(label: string): (done: number, total: number) => void {
       ? `done in ${elapsed.toFixed(0)}s`
       : `${elapsed.toFixed(0)}s elapsed, ~${Math.round((total - done) / Math.max(rate, 0.001))}s left` +
         ` (${rate.toFixed(1)}/s)`;
-    console.log(`[feed] ${label}: ${done}/${total} (${pct}%) — ${tail}`);
+    console.log(`[feed:${state.worldId}] ${label}: ${done}/${total} (${pct}%) — ${tail}`);
   };
 }
 
@@ -131,9 +159,10 @@ function analyzeCutoff(now = Date.now()): number {
 }
 
 /** The recency-ordered backlog of items still needing deep analysis. */
-function pendingForAnalysis(): StoredItem[] {
+function pendingForAnalysis(worldId: string): StoredItem[] {
   const cutoff = analyzeCutoff();
-  return allStored()
+  return getStore(worldId)
+    .all()
     .filter((s) => !s.clickbait && !s.analyzed && s.item.publishedAt >= cutoff)
     .sort((a, b) => b.item.publishedAt - a.item.publishedAt);
 }
@@ -143,35 +172,38 @@ function pendingForAnalysis(): StoredItem[] {
  * them — junk flagged, survivors marked PENDING (analyzed:false). Deep analysis
  * is deferred to analyzePending() so the build is chunked, not a multi-hour block.
  */
-async function refreshSources(): Promise<void> {
+async function refreshSources(worldId: string): Promise<void> {
+  const state = ws(worldId);
+  const st = getStore(worldId);
+  const sources = worldSources(worldId);
   const started = Date.now();
-  setPhase("fetching");
-  console.log(`[feed] refresh — fetching ${SOURCES.length} sources…`);
-  const raw = await fetchAll(SOURCES);
+  setPhase(state, "fetching");
+  console.log(`[feed:${worldId}] refresh — fetching ${sources.length} sources…`);
+  const raw = await fetchAll(sources);
   const cutoff = analyzeCutoff();
   // Never-seen items inside the recency window are all that need triage.
-  const untriaged = raw.filter((it) => !hasStored(it.id) && it.publishedAt >= cutoff);
+  const untriaged = raw.filter((it) => !st.has(it.id) && it.publishedAt >= cutoff);
   console.log(
-    `[feed] fetched ${raw.length}; ${untriaged.length} new & recent to triage; ${storeSize()} in store`,
+    `[feed:${worldId}] fetched ${raw.length}; ${untriaged.length} new & recent to triage; ${st.size()} in store`,
   );
 
   if (untriaged.length > 0) {
     // Fail fast if the model is down: don't store half-processed items; retry later.
     if (!(await aiReachable())) {
-      console.warn("[feed] AI endpoint unreachable — skipping triage this refresh.");
-      lastBuildAt = Date.now();
-      setPhase("idle");
+      console.warn(`[feed:${worldId}] AI endpoint unreachable — skipping triage this refresh.`);
+      state.lastBuildAt = Date.now();
+      setPhase(state, "idle");
       return;
     }
     let junk = new Set<string>();
     if (config.feed.clickbaitFilter) {
       const batches = Math.ceil(untriaged.length / config.ai.triageBatchSize);
-      console.log(`[feed] triage: ${untriaged.length} headline(s) in ${batches} batch(es)…`);
-      junk = await detectClickbait(untriaged, progressLogger("triage"));
-      console.log(`[feed] triage flagged ${junk.size}/${untriaged.length} as clickbait/junk`);
+      console.log(`[feed:${worldId}] triage: ${untriaged.length} headline(s) in ${batches} batch(es)…`);
+      junk = await detectClickbait(untriaged, progressLogger(state, "triage"));
+      console.log(`[feed:${worldId}] triage flagged ${junk.size}/${untriaged.length} as clickbait/junk`);
     }
     for (const it of untriaged) {
-      upsertStored({
+      st.upsert({
         item: it,
         clickbait: junk.has(it.id),
         analyzed: false, // deep analysis pending
@@ -185,55 +217,54 @@ async function refreshSources(): Promise<void> {
     }
   }
 
-  const removed = pruneStore();
-  if (removed > 0) console.log(`[feed] pruned ${removed} stale item(s)`);
-  saveStore();
-  lastBuildAt = Date.now();
-  console.log(`[feed] refresh done in ${lastBuildAt - started}ms`);
+  const removed = st.prune();
+  if (removed > 0) console.log(`[feed:${worldId}] pruned ${removed} stale item(s)`);
+  st.save();
+  state.lastBuildAt = Date.now();
+  console.log(`[feed:${worldId}] refresh done in ${state.lastBuildAt - started}ms`);
 }
 
-// Dedupe concurrent chunk analysis (background catch-up + a user request).
-let analyzeInFlight: Promise<{ remaining: number; progressed: number }> | null = null;
-
 /**
- * Deep-analyze ONE chunk (config.ai.maxItems) of the pending backlog, newest
- * first, and persist. Returns the remaining backlog and how many we completed,
- * so the caller can decide whether to schedule another chunk.
+ * Deep-analyze ONE chunk (config.ai.maxItems) of a world's pending backlog,
+ * newest first, and persist. Returns the remaining backlog and how many we
+ * completed, so the caller can decide whether to schedule another chunk.
  */
-function analyzePending(): Promise<{ remaining: number; progressed: number }> {
-  if (analyzeInFlight) return analyzeInFlight;
-  analyzeInFlight = (async () => {
-    const pending = pendingForAnalysis();
+function analyzePending(worldId: string): Promise<{ remaining: number; progressed: number }> {
+  const state = ws(worldId);
+  if (state.analyzeInFlight) return state.analyzeInFlight;
+  const st = getStore(worldId);
+  state.analyzeInFlight = (async () => {
+    const pending = pendingForAnalysis(worldId);
     if (pending.length === 0) {
-      setPhase("idle");
+      setPhase(state, "idle");
       return { remaining: 0, progressed: 0 };
     }
     if (!(await aiReachable())) {
-      setPhase("idle");
+      setPhase(state, "idle");
       return { remaining: pending.length, progressed: 0 };
     }
 
     const slice = config.ai.maxItems > 0 ? pending.slice(0, config.ai.maxItems) : pending;
     const items = slice.map((s) => s.item);
 
-    setPhase("transcripts", 0, items.length);
-    console.log(`[feed] fetching transcripts for up to ${items.length} item(s)…`);
+    setPhase(state, "transcripts", 0, items.length);
+    console.log(`[feed:${worldId}] fetching transcripts for up to ${items.length} item(s)…`);
     const transcripts = await fetchTranscripts(items);
-    if (transcripts.size > 0) console.log(`[feed] fetched ${transcripts.size} transcript(s)`);
+    if (transcripts.size > 0) console.log(`[feed:${worldId}] fetched ${transcripts.size} transcript(s)`);
 
     const batches = Math.ceil(items.length / config.ai.batchSize);
     console.log(
-      `[feed] deep analysis: ${items.length} of ${pending.length} pending in ${batches} batch(es)` +
+      `[feed:${worldId}] deep analysis: ${items.length} of ${pending.length} pending in ${batches} batch(es)` +
         ` (concurrency ${config.ai.concurrency})…`,
     );
-    const analyses = await analyzeItems(items, transcripts, progressLogger("analyze"));
+    const analyses = await analyzeItems(items, transcripts, progressLogger(state, "analyze"));
 
     const now = Date.now();
     let progressed = 0;
     for (const s of slice) {
       const a = analyses.get(s.item.id);
       if (!a) continue;
-      upsertStored({
+      st.upsert({
         ...s,
         analyzed: true,
         topic: a.topic,
@@ -246,132 +277,163 @@ function analyzePending(): Promise<{ remaining: number; progressed: number }> {
       progressed += 1;
     }
 
-    saveStore();
+    st.save();
     // Fresh analyses are now available — invalidate assembled views/briefings.
-    lastBuildAt = Date.now();
-    viewCache.clear();
-    briefingCache.clear();
+    state.lastBuildAt = Date.now();
+    state.viewCache.clear();
+    state.briefingCache.clear();
 
-    const remaining = pendingForAnalysis().length;
-    if (remaining === 0) setPhase("idle");
-    console.log(`[feed] analyzed ${progressed}/${items.length}; ${remaining} still pending`);
+    const remaining = pendingForAnalysis(worldId).length;
+    if (remaining === 0) setPhase(state, "idle");
+    console.log(`[feed:${worldId}] analyzed ${progressed}/${items.length}; ${remaining} still pending`);
     return { remaining, progressed };
   })().finally(() => {
-    analyzeInFlight = null;
+    state.analyzeInFlight = null;
   });
-  return analyzeInFlight;
+  return state.analyzeInFlight;
 }
 
 /** Analyzed items (in window) still lacking a semantic embedding, newest first. */
-function pendingForEmbedding(): StoredItem[] {
+function pendingForEmbedding(worldId: string): StoredItem[] {
   if (!config.ai.embeddingsEnabled) return [];
   const cutoff = analyzeCutoff();
-  return allStored()
+  return getStore(worldId)
+    .all()
     .filter((s) => !s.clickbait && s.analyzed && !s.embedding && s.item.publishedAt >= cutoff)
     .sort((a, b) => b.item.publishedAt - a.item.publishedAt);
 }
 
-let embedInFlight: Promise<{ remaining: number; progressed: number }> | null = null;
-
 /**
- * Embed ONE chunk of analyzed-but-unembedded items (newest first) and persist.
- * Best-effort: if embeddings are unavailable (no model loaded), every vector
- * comes back null, we make no progress, and report nothing remaining so the
- * background loop stops instead of spinning.
+ * Embed ONE chunk of a world's analyzed-but-unembedded items (newest first) and
+ * persist. Best-effort: if embeddings are unavailable (no model loaded), every
+ * vector comes back null, we make no progress, and report nothing remaining so
+ * the background loop stops instead of spinning.
  */
-function embedPending(): Promise<{ remaining: number; progressed: number }> {
-  if (embedInFlight) return embedInFlight;
-  embedInFlight = (async () => {
-    const pending = pendingForEmbedding();
+function embedPending(worldId: string): Promise<{ remaining: number; progressed: number }> {
+  const state = ws(worldId);
+  if (state.embedInFlight) return state.embedInFlight;
+  const st = getStore(worldId);
+  state.embedInFlight = (async () => {
+    const pending = pendingForEmbedding(worldId);
     if (pending.length === 0) return { remaining: 0, progressed: 0 };
 
     // Reuse the analysis chunk size for the embedding chunk.
     const slice = config.ai.maxItems > 0 ? pending.slice(0, config.ai.maxItems) : pending;
     const texts = slice.map((s) => itemEmbedText(s.item.title, s.summary, s.keywords));
-    console.log(`[feed] embedding ${slice.length} of ${pending.length} item(s)…`);
+    console.log(`[feed:${worldId}] embedding ${slice.length} of ${pending.length} item(s)…`);
     const vecs = await embedTexts(texts);
 
     let progressed = 0;
     slice.forEach((s, i) => {
       const v = vecs[i];
       if (v && v.length > 0) {
-        upsertStored({ ...s, embedding: v });
+        st.upsert({ ...s, embedding: v });
         progressed += 1;
       }
     });
 
     if (progressed > 0) {
-      saveStore();
+      st.save();
       // New embeddings change interest matching — invalidate assembled views.
-      lastBuildAt = Date.now();
-      viewCache.clear();
-      briefingCache.clear();
+      state.lastBuildAt = Date.now();
+      state.viewCache.clear();
+      state.briefingCache.clear();
     }
     // If nothing embedded, embeddings are unavailable: stop the loop.
-    const remaining = progressed > 0 ? pendingForEmbedding().length : 0;
-    console.log(`[feed] embedded ${progressed}/${slice.length}; ${remaining} still need embeddings`);
+    const remaining = progressed > 0 ? pendingForEmbedding(worldId).length : 0;
+    console.log(`[feed:${worldId}] embedded ${progressed}/${slice.length}; ${remaining} still need embeddings`);
     return { remaining, progressed };
   })().finally(() => {
-    embedInFlight = null;
+    state.embedInFlight = null;
   });
-  return embedInFlight;
+  return state.embedInFlight;
 }
 
-let catchUpTimer: ReturnType<typeof setTimeout> | null = null;
-
-/** Schedule a background chunk to keep chewing through analysis + embedding backlogs. */
-function scheduleCatchUp(): void {
-  if (catchUpTimer) return;
-  catchUpTimer = setTimeout(() => {
-    catchUpTimer = null;
+/** Schedule a background chunk to keep chewing through a world's analysis +
+ *  embedding backlogs. Holds the GLOBAL build lock until the backlog clears. */
+function scheduleCatchUp(worldId: string): void {
+  const state = ws(worldId);
+  if (state.catchUpTimer) return;
+  state.catchUpTimer = setTimeout(() => {
+    state.catchUpTimer = null;
     void (async () => {
       try {
-        const a = await analyzePending();
+        const a = await analyzePending(worldId);
         // Only embed once a chunk's analysis is in (embedding needs the summary).
-        const e = await embedPending();
+        const e = await embedPending(worldId);
         const moreWork =
           (a.remaining > 0 && a.progressed > 0) || (e.remaining > 0 && e.progressed > 0);
-        if (moreWork) scheduleCatchUp();
-        else if (a.remaining > 0) console.warn(`[feed] catch-up stalled with ${a.remaining} pending`);
-        else console.log("[feed] analysis + embedding backlog cleared");
+        if (moreWork) {
+          scheduleCatchUp(worldId);
+        } else {
+          if (a.remaining > 0) console.warn(`[feed:${worldId}] catch-up stalled with ${a.remaining} pending`);
+          else console.log(`[feed:${worldId}] analysis + embedding backlog cleared`);
+          // Backlog drained (or stalled) — release the global build lock so
+          // another world may refresh.
+          if (buildingWorld === worldId) buildingWorld = null;
+        }
       } catch (err) {
-        console.warn("[feed] catch-up failed:", err);
+        console.warn(`[feed:${worldId}] catch-up failed:`, err);
+        if (buildingWorld === worldId) buildingWorld = null;
       }
     })();
   }, config.feed.catchUpDelayMs);
 }
 
 /**
- * Bring the store up to date, then analyze the FIRST chunk so the feed is usable
- * quickly. Any remaining backlog is drained in the background (non-blocking).
+ * Bring a world's store up to date, then analyze the FIRST chunk so the feed is
+ * usable quickly. Any remaining backlog is drained in the background (which keeps
+ * the global build lock held until it clears).
  */
-async function buildPool(): Promise<void> {
-  await refreshSources();
-  const a = await analyzePending();
-  const e = await embedPending();
+async function buildPool(worldId: string): Promise<void> {
+  await refreshSources(worldId);
+  const a = await analyzePending(worldId);
+  const e = await embedPending(worldId);
   const moreWork = (a.remaining > 0 && a.progressed > 0) || (e.remaining > 0 && e.progressed > 0);
   if (moreWork) {
     console.log(
-      `[feed] backlog — ${a.remaining} to analyze, ${e.remaining} to embed; continuing in background`,
+      `[feed:${worldId}] backlog — ${a.remaining} to analyze, ${e.remaining} to embed; continuing in background`,
     );
-    scheduleCatchUp();
+    scheduleCatchUp(worldId);
+  } else if (buildingWorld === worldId) {
+    // No background work scheduled — release the lock now.
+    buildingWorld = null;
   }
 }
 
-/** Ensure the pool is fresh (TTL) or forced; concurrent callers share one build. */
-async function ensurePool(force: boolean): Promise<void> {
+/**
+ * Ensure a world's pool is fresh (TTL) or forced, honoring the GLOBAL single-build
+ * lock. Returns which OTHER world (if any) is currently busy — in which case THIS
+ * world was NOT rebuilt and serves whatever it already has.
+ */
+async function ensurePool(worldId: string, force: boolean): Promise<{ busyWith: string | null }> {
+  const state = ws(worldId);
+  const st = getStore(worldId);
   const fresh =
     !force &&
-    lastBuildAt > 0 &&
-    storeSize() > 0 &&
-    Date.now() - lastBuildAt < config.server.feedTtlMs;
-  if (fresh) return;
-  if (!buildInFlight) {
-    buildInFlight = buildPool().finally(() => {
-      buildInFlight = null;
-    });
+    state.lastBuildAt > 0 &&
+    st.size() > 0 &&
+    Date.now() - state.lastBuildAt < config.server.feedTtlMs;
+  if (fresh) return { busyWith: null };
+
+  // A foreground build for THIS world is already running — share it.
+  if (state.buildInFlight) {
+    await state.buildInFlight;
+    return { busyWith: null };
   }
-  await buildInFlight;
+  // This world already holds the lock (its backlog is draining in the
+  // background) — don't start a duplicate build; serve what it has.
+  if (buildingWorld === worldId) return { busyWith: null };
+  // A DIFFERENT world is refreshing — block (only one world at a time).
+  if (buildingWorld && buildingWorld !== worldId) return { busyWith: buildingWorld };
+
+  // Acquire the global lock and build.
+  buildingWorld = worldId;
+  state.buildInFlight = buildPool(worldId).finally(() => {
+    state.buildInFlight = null;
+  });
+  await state.buildInFlight;
+  return { busyWith: null };
 }
 
 /**
@@ -382,13 +444,16 @@ async function ensurePool(force: boolean): Promise<void> {
  * falls back to keyword matching.
  */
 function assembleView(
+  worldId: string,
   interest: string,
   parsed: ParsedQuery,
   queryVec?: number[] | null,
 ): FeedResult {
+  const state = ws(worldId);
+  const st = getStore(worldId);
   const key = interestKey(interest);
-  const cached = viewCache.get(key);
-  if (cached && cached.builtAt === lastBuildAt) return cached.result;
+  const cached = state.viewCache.get(key);
+  if (cached && cached.builtAt === state.lastBuildAt) return cached.result;
 
   const started = Date.now();
   // Keyword/semantic matching keys off the POSITIVE intent only, so negation
@@ -397,9 +462,9 @@ function assembleView(
   const hasInterest = tokens.size > 0;
   const now = Date.now();
 
-  const eligible = allStored().filter(
-    (s) => !s.clickbait && s.analyzed && now - s.item.publishedAt <= config.feed.retentionMs,
-  );
+  const eligible = st
+    .all()
+    .filter((s) => !s.clickbait && s.analyzed && now - s.item.publishedAt <= config.feed.retentionMs);
   // Apply negation exclusions with a safety valve against over-broad terms.
   const { kept, removed, skipped, counts } = partitionByExclusion(eligible, parsed.exclude);
   if (skipped.length > 0) {
@@ -413,13 +478,14 @@ function assembleView(
   const ranked = rankItems(pool);
   const result: FeedResult = {
     items: ranked,
-    builtAt: lastBuildAt,
-    fetched: storeSize(),
+    builtAt: state.lastBuildAt,
+    fetched: st.size(),
     enriched: pool.length,
     durationMs: Date.now() - started,
     interest: key,
+    world: worldId,
   };
-  viewCache.set(key, { builtAt: lastBuildAt, result });
+  state.viewCache.set(key, { builtAt: state.lastBuildAt, result });
   const mode = hasInterest ? (queryVec ? "semantic" : "keyword") : "general";
   const exNote =
     removed > 0
@@ -428,7 +494,7 @@ function assembleView(
           .join(", ")}}`
       : "";
   console.log(
-    `[feed] view "${key}" (${mode}) -> ${ranked.length} items from ${pool.length} eligible${exNote}` +
+    `[feed:${worldId}] view "${key}" (${mode}) -> ${ranked.length} items from ${pool.length} eligible${exNote}` +
       ` in ${result.durationMs}ms`,
   );
   return result;
@@ -439,13 +505,18 @@ function assembleView(
  * needed (TTL-cached), then personalizes + ranks it for the interest. The
  * interest is embedded once (cached) for semantic matching.
  */
-export async function getFeed(force = false, interest = config.feed.interest): Promise<FeedResult> {
-  await ensurePool(force);
+export async function getFeed(
+  worldId: string = DEFAULT_WORLD_ID,
+  force = false,
+  interest = config.feed.interest,
+): Promise<FeedResult> {
+  const { busyWith } = await ensurePool(worldId, force);
   const parsed = await interpretQuery(interest);
   // Embed the POSITIVE intent (not the raw query): embedding "not israel" would
   // sit right next to Israel coverage, which is the opposite of what's wanted.
   const queryVec = await embedQuery(parsed.positive);
-  return assembleView(interest, parsed, queryVec);
+  const result = assembleView(worldId, interest, parsed, queryVec);
+  return { ...result, busyWith };
 }
 
 /**
@@ -454,38 +525,40 @@ export async function getFeed(force = false, interest = config.feed.interest): P
  * needed. Returns null when the model is unreachable or has nothing usable.
  */
 export async function getBriefing(
+  worldId: string = DEFAULT_WORLD_ID,
   force = false,
   interest = config.feed.interest,
 ): Promise<Briefing | null> {
-  await ensurePool(force);
+  await ensurePool(worldId, force);
+  const state = ws(worldId);
   const key = interestKey(interest);
 
-  const cached = briefingCache.get(key);
-  if (cached && cached.builtAt === lastBuildAt) return cached.briefing;
+  const cached = state.briefingCache.get(key);
+  if (cached && cached.builtAt === state.lastBuildAt) return cached.briefing;
 
-  const existing = briefingInFlight.get(key);
+  const existing = state.briefingInFlight.get(key);
   if (existing) return existing;
 
-  const builtAtSnapshot = lastBuildAt;
+  const builtAtSnapshot = state.lastBuildAt;
   const p = (async (): Promise<Briefing | null> => {
     // Don't cache failures from an offline model — let a later request retry.
     if (!(await aiReachable())) return null;
     const parsed = await interpretQuery(key);
     const queryVec = await embedQuery(parsed.positive);
-    const view = assembleView(key, parsed, queryVec);
+    const view = assembleView(worldId, key, parsed, queryVec);
     const sample = view.items.slice(0, 40);
     const started = Date.now();
-    console.log(`[feed] briefing: synthesizing "${key || "general"}" from ${sample.length} item(s)…`);
+    console.log(`[feed:${worldId}] briefing: synthesizing "${key || "general"}" from ${sample.length} item(s)…`);
     const briefing = await generateBriefing(key, sample);
-    briefingCache.set(key, { builtAt: builtAtSnapshot, briefing });
+    state.briefingCache.set(key, { builtAt: builtAtSnapshot, briefing });
     console.log(
-      `[feed] briefing: ${briefing ? `${briefing.threads.length} thread(s)` : "none"}` +
+      `[feed:${worldId}] briefing: ${briefing ? `${briefing.threads.length} thread(s)` : "none"}` +
         ` in ${((Date.now() - started) / 1000).toFixed(0)}s`,
     );
     return briefing;
-  })().finally(() => briefingInFlight.delete(key));
+  })().finally(() => state.briefingInFlight.delete(key));
 
-  briefingInFlight.set(key, p);
+  state.briefingInFlight.set(key, p);
   return p;
 }
 
@@ -494,8 +567,9 @@ export async function getBriefing(
  * items). The persisted analysis store is intentionally KEPT so we don't re-pay
  * the model for items we've already analyzed.
  */
-export function clearCaches(): void {
-  lastBuildAt = 0;
-  viewCache.clear();
-  briefingCache.clear();
+export function clearCaches(worldId: string = DEFAULT_WORLD_ID): void {
+  const state = ws(worldId);
+  state.lastBuildAt = 0;
+  state.viewCache.clear();
+  state.briefingCache.clear();
 }
