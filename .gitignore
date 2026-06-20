@@ -28,3 +28,6 @@ yarn-error.*
 
 # Local env
 .env*.local
+
+# Machine-local npm config (corporate registry/proxy; not for deployment)
+.npmrc
