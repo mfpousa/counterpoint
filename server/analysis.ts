@@ -42,17 +42,30 @@ const TRIAGE_SCHEMA = arraySchema("triage", {
   additionalProperties: false,
 });
 
+// Item-level lean refinement (judge THIS item's framing + explain it) is opt-out.
+// When enabled we add a `leanRationale` field to the analysis schema/prompt.
+const LEAN_REFINE = config.ai.leanRefine;
+
 const ANALYZE_SCHEMA = arraySchema("analysis", {
   type: "object",
   properties: {
     id: { type: "string" },
     topic: { type: "string", enum: [...TOPIC_VALUES] },
     lean: { type: ["number", "null"] },
+    ...(LEAN_REFINE ? { leanRationale: { type: "string" } } : {}),
     importance: { type: "number" },
     summary: { type: "string" },
     keywords: { type: "array", items: { type: "string" } },
   },
-  required: ["id", "topic", "lean", "importance", "summary", "keywords"],
+  required: [
+    "id",
+    "topic",
+    "lean",
+    ...(LEAN_REFINE ? ["leanRationale"] : []),
+    "importance",
+    "summary",
+    "keywords",
+  ],
   additionalProperties: false,
 });
 
@@ -61,6 +74,11 @@ export interface ItemAnalysis {
   topic: Topic;
   /** Political lean -1..1, or null for non-political content. */
   lean: number | null;
+  /** True when the MODEL assigned a usable numeric lean for THIS item (vs the
+   *  analysis falling back to the item's source-level prior). Drives provenance. */
+  leanRefined: boolean;
+  /** Model's one-line justification for the lean (when refined). May be empty. */
+  leanRationale: string;
   /** 0..1 general newsworthiness/substance (NOT personalized). */
   importance: number;
   /** One concrete sentence naming the subject and why it matters. */
@@ -95,7 +113,14 @@ const ANALYZE_PROMPT =
   '- "id": echo the article id exactly.\n' +
   '- "topic": one of world|politics|economics|science|technology|history|health|culture.\n' +
   '- "lean": political lean of THIS item from -1.0 (strongly left) to +1.0 ' +
-  "(strongly right), 0 centrist; null if non-political.\n" +
+  "(strongly right), 0 centrist; null if non-political. Judge the framing/word " +
+  "choice of THIS item, not the outlet's reputation.\n" +
+  (LEAN_REFINE
+    ? '- "leanRationale": ONE short clause (<= 16 words) explaining the lean ' +
+      "judgment for THIS item, citing its framing/word choice/sourcing " +
+      "(e.g. 'frames tax cuts as growth-boosting, downplays deficit'). Empty " +
+      "string if non-political.\n"
+    : "") +
   '- "importance": 0.0..1.0 general newsworthiness/substance for an informed, ' +
   "curious reader who wants to understand the world and where it is heading. " +
   "Reward consequential, forward-looking, explanatory journalism; penalize thin filler.\n" +
@@ -172,14 +197,22 @@ export async function detectClickbait(
 
 // --- Pass 2: deep analysis ---------------------------------------------------
 
-function coerceAnalysis(raw: Record<string, unknown>, fallback: FeedItem): ItemAnalysis {
+export function coerceAnalysis(raw: Record<string, unknown>, fallback: FeedItem): ItemAnalysis {
   const topicRaw = String(raw["topic"] ?? "").toLowerCase();
   const topic = (VALID_TOPICS.has(topicRaw) ? topicRaw : fallback.topic) as Topic;
 
   let lean: number | null;
+  let leanRefined = false;
   const lv = raw["lean"];
-  if (lv === null || lv === undefined || lv === "null") lean = fallback.lean;
-  else lean = clampNum(lv, -1, 1, fallback.lean ?? 0);
+  if (lv === null || lv === undefined || lv === "null") {
+    lean = fallback.lean;
+  } else {
+    lean = clampNum(lv, -1, 1, fallback.lean ?? 0);
+    // The model gave a usable numeric lean for this item (not a null fallback).
+    leanRefined = !Number.isNaN(Number(lv));
+  }
+  const leanRationale =
+    typeof raw["leanRationale"] === "string" ? (raw["leanRationale"] as string).trim() : "";
 
   const importance = clampNum(raw["importance"], 0, 1, 0.5);
   const summary = typeof raw["summary"] === "string" ? (raw["summary"] as string).trim() : "";
@@ -191,7 +224,7 @@ function coerceAnalysis(raw: Record<string, unknown>, fallback: FeedItem): ItemA
         .slice(0, 10)
     : [];
 
-  return { topic, lean, importance, summary, keywords };
+  return { topic, lean, leanRefined, leanRationale, importance, summary, keywords };
 }
 
 async function analyzeBatch(

@@ -7,7 +7,7 @@ import { colors, font, radius, spacing } from "../theme";
 import { topicMeta } from "../lib/topics";
 import type { FeedItem, StoredSummary } from "../types";
 import { ScorePill } from "./GradeFeedback";
-import { LeanBadge } from "./ui";
+import { LeanBadge, leanColor } from "./ui";
 
 const KIND_ICON: Record<FeedItem["kind"], keyof typeof Ionicons.glyphMap> = {
   video: "play-circle",
@@ -89,6 +89,15 @@ export function FeedCard({
         <View style={{ flex: 1 }} />
         <LeanBadge lean={item.lean} source={item.leanSource} />
       </View>
+
+      {!!item.leanRationale && item.lean !== null && (
+        <View style={styles.leanWhyRow}>
+          <Ionicons name="git-compare-outline" size={12} color={leanColor(item.lean)} />
+          <Text style={styles.leanWhy} numberOfLines={2}>
+            {item.leanRationale}
+          </Text>
+        </View>
+      )}
 
       {(item.reason || item.aiReason) && (
         <View style={styles.reasonRow}>
@@ -213,6 +222,14 @@ const styles = StyleSheet.create({
   scoreText: { fontSize: font.tiny, fontWeight: "800" },
   reasonRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   reason: { color: colors.accent, fontSize: font.tiny, fontWeight: "600", flexShrink: 1 },
+  leanWhyRow: { flexDirection: "row", alignItems: "flex-start", gap: spacing.xs },
+  leanWhy: {
+    color: colors.textDim,
+    fontSize: font.tiny,
+    fontStyle: "italic",
+    lineHeight: 16,
+    flexShrink: 1,
+  },
   aiNoteRow: { flexDirection: "row", alignItems: "flex-start", gap: spacing.xs },
   aiNote: { color: colors.textDim, fontSize: font.small, lineHeight: 18, flexShrink: 1 },
   metaRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },

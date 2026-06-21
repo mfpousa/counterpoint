@@ -84,6 +84,14 @@ export interface FeedItem {
   confidence: number;
   /** Provenance of the effective lean. */
   leanSource: LeanSource;
+  /**
+   * Short, human-readable justification for the lean tag, shown in the UI so the
+   * reader can audit WHY an item was placed left/right. For `leanSource: "llm"`
+   * it's the model's per-item rationale (judging this item's framing); for
+   * `"source"` it's the curated source-level rationale. Absent for non-political
+   * items.
+   */
+  leanRationale?: string;
   /** Estimated time-to-consume in minutes. */
   estMinutes: number;
   /** Populated by buildFeed: why this item was chosen. */

@@ -204,7 +204,11 @@ export function toFeedItem(
     content: undefined,
     topic: s.topic,
     lean: s.lean,
-    leanSource: "llm",
+    // Honest provenance: "llm" only when the model actually refined this item's
+    // lean; otherwise it kept the curated source prior. Older stored items
+    // (pre-refinement) have no leanSource — treat those as "source".
+    leanSource: s.leanSource ?? "source",
+    leanRationale: s.leanRationale,
     relevance,
     aiReason: s.summary || undefined,
   };

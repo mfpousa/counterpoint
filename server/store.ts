@@ -7,7 +7,7 @@
 
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { basename, dirname, extname, isAbsolute, resolve } from "node:path";
-import type { FeedItem, Topic } from "../src/types";
+import type { FeedItem, LeanSource, Topic } from "../src/types";
 import { DEFAULT_WORLD_ID, WORLDS } from "../src/data/worlds";
 import { config } from "./config";
 
@@ -21,6 +21,13 @@ export interface StoredItem {
   analyzed: boolean;
   topic: Topic;
   lean: number | null;
+  /** Provenance of the effective lean: "llm" when the model refined this item's
+   *  lean, "source" when it kept the curated source prior. Absent on pre-existing
+   *  (older) stored items until they're re-analyzed. */
+  leanSource?: LeanSource;
+  /** Human-readable justification for the lean (model's when refined, else the
+   *  source's). Shown in the UI; absent for non-political items. */
+  leanRationale?: string;
   /** 0..1 general newsworthiness (NOT personalized). */
   importance: number;
   /** One-line AI summary of the subject. */

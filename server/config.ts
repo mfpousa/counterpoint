@@ -85,6 +85,12 @@ export const config = {
     // ramble past valid JSON. Disable with AI_STRUCTURED_OUTPUT_OFF=1 if your
     // runtime rejects response_format.
     structuredOutput: !bool("AI_STRUCTURED_OUTPUT_OFF"),
+    // Item-level political-lean refinement. When ON (default), the deep-analysis
+    // model judges THIS item's framing to assign its lean (overriding the curated
+    // source-level prior) and supplies a short rationale shown in the UI; such
+    // items are marked `leanSource: "llm"`. When OFF (AI_LEAN_REFINE_OFF=1), items
+    // keep their source's curated lean + rationale and are marked `"source"`.
+    leanRefine: !bool("AI_LEAN_REFINE_OFF"),
     // Semantic interest matching via embeddings (POST /v1/embeddings). Each item
     // is embedded once; a search is matched by cosine similarity (meaning, not
     // keywords). Requires an embedding model loaded in your runtime. Falls back

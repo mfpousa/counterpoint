@@ -37,6 +37,7 @@ function makeStored(over: {
     analyzed: true,
     topic,
     lean: null,
+    leanSource: "llm",
     importance: over.importance ?? 0.8,
     summary: over.summary ?? "",
     keywords: over.keywords ?? [],

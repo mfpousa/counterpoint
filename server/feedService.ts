@@ -259,16 +259,31 @@ function analyzePending(worldId: string): Promise<{ remaining: number; progresse
     );
     const analyses = await analyzeItems(items, transcripts, progressLogger(state, "analyze"));
 
+    // Source-level lean rationales (the curated prior) for the "source" provenance
+    // path and as a fallback when the model omits its own rationale.
+    const srcById = new Map(worldSources(worldId).map((src) => [src.id, src]));
+
     const now = Date.now();
     let progressed = 0;
     for (const s of slice) {
       const a = analyses.get(s.item.id);
       if (!a) continue;
+      // Refine only when enabled AND the model actually produced a usable lean.
+      // Otherwise keep the curated source prior (honest provenance, not "llm").
+      const refined = config.ai.leanRefine && a.leanRefined && a.lean !== null;
+      const lean = refined ? a.lean : s.item.lean;
+      const leanSource = refined ? "llm" : "source";
+      const srcRationale = srcById.get(s.item.sourceId)?.leanRationale;
+      // Only political items carry a rationale (non-political lean is null).
+      const leanRationale =
+        lean === null ? undefined : refined ? a.leanRationale || srcRationale : srcRationale;
       st.upsert({
         ...s,
         analyzed: true,
         topic: a.topic,
-        lean: a.lean,
+        lean,
+        leanSource,
+        leanRationale,
         importance: a.importance,
         summary: a.summary,
         keywords: a.keywords,
