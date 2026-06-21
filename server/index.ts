@@ -21,6 +21,7 @@ import {
   getStory,
 } from "./feedService";
 import { gradeSummary } from "./grade";
+import { readLang } from "./lang";
 import { runStartupHealthcheck } from "./healthcheck";
 import { generateKnowledgeInsight, type KnowledgeCandidate } from "./knowledge";
 import { rewriteArticle, rewriteArticleStream } from "./rewrite";
@@ -86,6 +87,7 @@ app.get("/api/briefing", async (req, res) => {
       readWorld(req.query.world),
       force,
       readInterest(req.query.interest),
+      readLang(req.query.lang),
     );
     res.json({ briefing });
   } catch (e) {
@@ -97,7 +99,11 @@ app.get("/api/briefing", async (req, res) => {
 app.get("/api/stories", async (req, res) => {
   try {
     const force = req.query.force === "1" || req.query.force === "true";
-    const { stories, busyWith } = await getStories(readWorld(req.query.world), force);
+    const { stories, busyWith } = await getStories(
+      readWorld(req.query.world),
+      force,
+      readLang(req.query.lang),
+    );
     res.json({ stories, busyWith });
   } catch (e) {
     console.error("[api] /api/stories failed:", e);
@@ -112,7 +118,7 @@ app.get("/api/story", async (req, res) => {
     return;
   }
   try {
-    const story = await getStory(readWorld(req.query.world), id);
+    const story = await getStory(readWorld(req.query.world), id, readLang(req.query.lang));
     if (!story) {
       res.status(404).json({ error: "story not found (it may have aged out)" });
       return;
@@ -177,6 +183,7 @@ app.get("/api/rewrite/stream", async (req, res) => {
       stored,
       (delta) => send("delta", delta),
       (reasoning) => send("reasoning", reasoning),
+      readLang(req.query.lang),
     );
     if (!article) send("error", "The article couldn't be rewritten (paywall or model offline).");
     else send("done", article);
@@ -200,7 +207,7 @@ app.get("/api/rewrite", async (req, res) => {
     return;
   }
   try {
-    const article = await rewriteArticle(stored);
+    const article = await rewriteArticle(stored, readLang(req.query.lang));
     if (!article) {
       res.status(502).json({
         error:
@@ -228,7 +235,7 @@ app.post("/api/grade", async (req, res) => {
     return;
   }
   try {
-    const grade = await gradeSummary(stored, summary);
+    const grade = await gradeSummary(stored, summary, readLang(req.body?.lang));
     if (!grade) {
       res.status(502).json({
         error: "Couldn't grade your summary (the model may be offline or the article unavailable).",

@@ -7,6 +7,7 @@
 // stitches the source summaries together when the model is offline or unusable.
 
 import type {
+  Lang,
   Lean,
   Story,
   StoryAngle,
@@ -18,6 +19,7 @@ import type {
 import { chatJsonObject, type JsonSchema } from "./ai";
 import { sanitizeModelText } from "./analysis";
 import { config } from "./config";
+import { langDirective } from "./lang";
 import { decodeEntities } from "../src/lib/rss";
 import type { StoredItem } from "./store";
 
@@ -212,7 +214,7 @@ function fallbackStory(members: StoredItem[]): Story {
  * returns a degraded (summary-stitched) story if the model is unreachable or
  * replies with nothing usable. `relatedIds` is filled in later by the service.
  */
-export async function buildStory(members: StoredItem[]): Promise<Story> {
+export async function buildStory(members: StoredItem[], lang: Lang = "en"): Promise<Story> {
   if (members.length === 0) throw new Error("buildStory: empty cluster");
 
   // Feed the most newsworthy outlets (capped), preferring lean diversity by
@@ -226,7 +228,7 @@ export async function buildStory(members: StoredItem[]): Promise<Story> {
     summary: (m.summary || m.item.summary || "").slice(0, 300),
   }));
 
-  const obj = await chatJsonObject(SYNTH_RULES, payload, {
+  const obj = await chatJsonObject(SYNTH_RULES + langDirective(lang), payload, {
     maxTokens: config.stories.maxTokens,
     schema: SYNTH_SCHEMA,
   });
@@ -396,7 +398,10 @@ function fallbackDevelopingStory(events: StoredItem[][]): Story {
  * same-event articles). Never throws: degrades to a stitched timeline when the
  * model is unreachable or unusable. `relatedIds` is filled in by the service.
  */
-export async function buildDevelopingStory(events: StoredItem[][]): Promise<Story> {
+export async function buildDevelopingStory(
+  events: StoredItem[][],
+  lang: Lang = "en",
+): Promise<Story> {
   const clean = events.filter((e) => e.length > 0);
   if (clean.length === 0) throw new Error("buildDevelopingStory: no events");
 
@@ -420,7 +425,7 @@ export async function buildDevelopingStory(events: StoredItem[][]): Promise<Stor
   });
   const orderedEvents = ordered.map((e) => e.event);
 
-  const obj = await chatJsonObject(DEVELOPING_RULES, payload, {
+  const obj = await chatJsonObject(DEVELOPING_RULES + langDirective(lang), payload, {
     maxTokens: config.stories.issueMaxTokens,
     schema: DEVELOPING_SCHEMA,
   });

@@ -139,10 +139,11 @@ export const config = {
     // How long a rewritten article is cached in memory (ms). Default 6h.
     cacheTtlMs: num("READER_CACHE_TTL_MS", 6 * 60 * 60 * 1000),
     // When direct extraction fails (bot-wall / JS-only page), retry via reader
-    // proxies (r.jina.ai renders JS; CORS proxies re-fetch the HTML). This helps
-    // JS-heavy pages and SOME soft paywalls — it does NOT bypass hard paywalls.
-    // Adds a third-party request per fallback; disable with READER_PROXY_OFF=1.
-    proxyEnabled: !bool("READER_PROXY_OFF"),
+    // proxies (r.jina.ai renders JS; CORS proxies re-fetch the HTML). In practice
+    // the free proxies are captcha-gated/flaky and don't beat hard paywalls, while
+    // adding up to ~60s of futile fetches per article — so they're OPT-IN now
+    // (fail fast by default). Re-enable with READER_PROXY_ON=1.
+    proxyEnabled: bool("READER_PROXY_ON"),
     // r.jina.ai API key. The free tier now rate-limits/captcha-gates anonymous
     // traffic (HTTP 403); an authenticated request (Authorization: Bearer <key>)
     // restores reliable access and higher limits. Get one at https://jina.ai/reader.
@@ -152,6 +153,16 @@ export const config = {
     // is instructed to use only the provided text (no fabrication). Disable with
     // READER_DEGRADED_OFF=1 to show the plain error + "Open original" instead.
     degradedFallback: !bool("READER_DEGRADED_OFF"),
+    // Known HARD-paywall domains: skip live extraction entirely (no wasted fetch)
+    // and go straight to the feed body / degraded brief. Comma-separated override
+    // via READER_PAYWALL_DOMAINS (matches the host and any subdomain).
+    paywallDomains: str(
+      "READER_PAYWALL_DOMAINS",
+      "nytimes.com,wsj.com,ft.com,economist.com,bloomberg.com,washingtonpost.com,newyorker.com,theatlantic.com,wired.com,businessinsider.com,thetimes.co.uk,telegraph.co.uk,theinformation.com,foreignpolicy.com,seekingalpha.com",
+    )
+      .split(",")
+      .map((d) => d.trim().toLowerCase())
+      .filter(Boolean),
   },
   stories: {
     // Synthesized cross-source "Stories": cluster same-event articles across

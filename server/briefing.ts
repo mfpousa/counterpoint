@@ -3,9 +3,10 @@
 // degrades gracefully (returns null) if the model is unreachable or replies
 // with nothing usable.
 
-import type { Briefing, BriefingThread, FeedItem } from "../src/types";
+import type { Briefing, BriefingThread, FeedItem, Lang } from "../src/types";
 import { chatJsonObject, type JsonSchema } from "./ai";
 import { config } from "./config";
+import { langDirective } from "./lang";
 
 // Constrained-decoding schema so the local model emits a valid, complete briefing
 // object and STOPS — without this, a non-stopping model rambles/truncates and the
@@ -80,6 +81,7 @@ function coerceThreads(raw: unknown): BriefingThread[] {
 export async function generateBriefing(
   interest: string,
   items: FeedItem[],
+  lang: Lang = "en",
 ): Promise<Briefing | null> {
   if (items.length === 0) return null;
 
@@ -91,7 +93,7 @@ export async function generateBriefing(
     age: relativeAge(it.publishedAt, now),
   }));
 
-  const obj = await chatJsonObject(BASE_RULES + steer(interest), payload, {
+  const obj = await chatJsonObject(BASE_RULES + steer(interest) + langDirective(lang), payload, {
     maxTokens: 900,
     schema: BRIEFING_SCHEMA,
   });

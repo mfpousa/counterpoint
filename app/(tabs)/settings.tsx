@@ -2,7 +2,8 @@ import React, { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useApp } from "../../src/store/AppContext";
+import { useApp, useT } from "../../src/store/AppContext";
+import { LANGUAGES } from "../../src/lib/i18n";
 import { resetAll } from "../../src/storage/storage";
 import { colors, font, radius, spacing } from "../../src/theme";
 import type { Kind, Topic } from "../../src/types";
@@ -17,11 +18,7 @@ const TOPICS: Topic[] = [
   "history",
   "culture",
 ];
-const KINDS: { id: Kind; label: string }[] = [
-  { id: "video", label: "Videos" },
-  { id: "podcast", label: "Podcasts" },
-  { id: "news", label: "News" },
-];
+const KINDS: Kind[] = ["video", "podcast", "news"];
 const THRESHOLDS = [0.15, 0.25, 0.35];
 const INTEREST_PRESETS = [
   "AI and AI-related scientific progress",
@@ -33,6 +30,7 @@ const INTEREST_PRESETS = [
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const { prefs, updatePrefs, resetToday, refreshFeed } = useApp();
+  const t = useT();
   const [interestDraft, setInterestDraft] = useState(prefs.interestPrompt);
   const interestDirty = interestDraft.trim() !== prefs.interestPrompt.trim();
 
@@ -41,10 +39,10 @@ export default function SettingsScreen() {
     void updatePrefs({ interestPrompt: value.trim() });
   };
 
-  const toggleTopic = (t: Topic) => {
-    const next = prefs.enabledTopics.includes(t)
-      ? prefs.enabledTopics.filter((x) => x !== t)
-      : [...prefs.enabledTopics, t];
+  const toggleTopic = (topic: Topic) => {
+    const next = prefs.enabledTopics.includes(topic)
+      ? prefs.enabledTopics.filter((x) => x !== topic)
+      : [...prefs.enabledTopics, topic];
     void updatePrefs({ enabledTopics: next });
   };
   const toggleKind = (k: Kind) => {
@@ -64,10 +62,28 @@ export default function SettingsScreen() {
         paddingBottom: spacing.xxl,
       }}
     >
-      <Text style={styles.title}>Settings</Text>
+      <Text style={styles.title}>{t("settings.title")}</Text>
 
       <View style={styles.card}>
-        <Text style={styles.h}>Daily quota</Text>
+        <Text style={styles.h}>{t("settings.language")}</Text>
+        <Text style={styles.sub}>{t("settings.languageSub")}</Text>
+        <View style={styles.wrap}>
+          {LANGUAGES.map((l) => (
+            <Pressable
+              key={l.code}
+              onPress={() => updatePrefs({ language: l.code })}
+              style={[styles.pill, prefs.language === l.code && styles.pillActive]}
+            >
+              <Text style={[styles.pillText, prefs.language === l.code && styles.pillTextActive]}>
+                {l.endonym}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.h}>{t("settings.dailyQuota")}</Text>
         <View style={styles.wrap}>
           {QUOTAS.map((q) => (
             <Pressable
@@ -84,16 +100,16 @@ export default function SettingsScreen() {
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.h}>Topics</Text>
+        <Text style={styles.h}>{t("settings.topics")}</Text>
         <View style={styles.wrap}>
-          {TOPICS.map((t) => (
+          {TOPICS.map((topic) => (
             <Pressable
-              key={t}
-              onPress={() => toggleTopic(t)}
-              style={[styles.pill, prefs.enabledTopics.includes(t) && styles.pillActive]}
+              key={topic}
+              onPress={() => toggleTopic(topic)}
+              style={[styles.pill, prefs.enabledTopics.includes(topic) && styles.pillActive]}
             >
-              <Text style={[styles.pillText, prefs.enabledTopics.includes(t) && styles.pillTextActive]}>
-                {t}
+              <Text style={[styles.pillText, prefs.enabledTopics.includes(topic) && styles.pillTextActive]}>
+                {topic}
               </Text>
             </Pressable>
           ))}
@@ -101,16 +117,16 @@ export default function SettingsScreen() {
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.h}>Content types</Text>
+        <Text style={styles.h}>{t("settings.contentTypes")}</Text>
         <View style={styles.wrap}>
           {KINDS.map((k) => (
             <Pressable
-              key={k.id}
-              onPress={() => toggleKind(k.id)}
-              style={[styles.pill, prefs.includeKinds.includes(k.id) && styles.pillActive]}
+              key={k}
+              onPress={() => toggleKind(k)}
+              style={[styles.pill, prefs.includeKinds.includes(k) && styles.pillActive]}
             >
-              <Text style={[styles.pillText, prefs.includeKinds.includes(k.id) && styles.pillTextActive]}>
-                {k.label}
+              <Text style={[styles.pillText, prefs.includeKinds.includes(k) && styles.pillTextActive]}>
+                {t(`settings.kind.${k}`)}
               </Text>
             </Pressable>
           ))}
@@ -118,8 +134,8 @@ export default function SettingsScreen() {
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.h}>Drift sensitivity</Text>
-        <Text style={styles.sub}>How far from 50/50 before we warn you and counter-weight the feed.</Text>
+        <Text style={styles.h}>{t("settings.drift")}</Text>
+        <Text style={styles.sub}>{t("settings.driftSub")}</Text>
         <View style={styles.wrap}>
           {THRESHOLDS.map((th) => (
             <Pressable
@@ -128,7 +144,7 @@ export default function SettingsScreen() {
               style={[styles.pill, prefs.driftThreshold === th && styles.pillActive]}
             >
               <Text style={[styles.pillText, prefs.driftThreshold === th && styles.pillTextActive]}>
-                {th === 0.15 ? "Strict" : th === 0.25 ? "Balanced" : "Relaxed"}
+                {th === 0.15 ? t("settings.strict") : th === 0.25 ? t("settings.balanced") : t("settings.relaxed")}
               </Text>
             </Pressable>
           ))}
@@ -137,19 +153,15 @@ export default function SettingsScreen() {
 
       <View style={styles.card}>
         <View style={styles.rowBetween}>
-          <Text style={styles.h}>Steer your feed</Text>
+          <Text style={styles.h}>{t("settings.steer")}</Text>
           <Ionicons name="navigate" size={18} color={colors.accent} />
         </View>
-        <Text style={styles.sub}>
-          Tell the AI what you care about. It scores every story against this and surfaces the
-          matches first — low-signal filler (accidents, crime-blotter, gossip) is always pushed
-          down. Leave blank to rank on general importance.
-        </Text>
+        <Text style={styles.sub}>{t("settings.steerSub")}</Text>
         <TextInput
           style={styles.interestInput}
           value={interestDraft}
           onChangeText={setInterestDraft}
-          placeholder="e.g. AI and AI-related scientific progress"
+          placeholder={t("settings.steerPlaceholder")}
           placeholderTextColor={colors.textFaint}
           multiline
           textAlignVertical="top"
@@ -172,7 +184,7 @@ export default function SettingsScreen() {
                 interestDraft.trim().length === 0 && { color: colors.textFaint },
               ]}
             >
-              Clear
+              {t("settings.clear")}
             </Text>
           </Pressable>
           <Pressable
@@ -186,7 +198,7 @@ export default function SettingsScreen() {
               color={interestDirty ? colors.bg : colors.textFaint}
             />
             <Text style={[styles.saveText, !interestDirty && { color: colors.textFaint }]}>
-              {interestDirty ? "Save & update feed" : "Saved"}
+              {interestDirty ? t("settings.saveUpdate") : t("settings.saved")}
             </Text>
           </Pressable>
         </View>
@@ -194,30 +206,25 @@ export default function SettingsScreen() {
 
       <View style={styles.card}>
         <View style={styles.rowBetween}>
-          <Text style={styles.h}>How your feed is built</Text>
+          <Text style={styles.h}>{t("settings.howBuilt")}</Text>
           <Ionicons name="sparkles" size={18} color={colors.accent} />
         </View>
-        <Text style={styles.sub}>
-          A local AI model reads each story — and YouTube transcripts — to tag its topic,
-          perspective, and relevance, then ranks for balance and variety. It runs on your own
-          machine; nothing is uploaded. The model has its own biases, so treat its tags as a
-          second opinion, not ground truth.
-        </Text>
+        <Text style={styles.sub}>{t("settings.howBuiltSub")}</Text>
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.h}>Data</Text>
+        <Text style={styles.h}>{t("settings.data")}</Text>
         <Pressable onPress={() => refreshFeed({ force: true })} style={styles.btn}>
-          <Text style={styles.btnText}>Refresh feed now</Text>
+          <Text style={styles.btnText}>{t("settings.refreshNow")}</Text>
         </Pressable>
         <Pressable onPress={resetToday} style={styles.btn}>
-          <Text style={styles.btnText}>Reset today's progress</Text>
+          <Text style={styles.btnText}>{t("settings.resetToday")}</Text>
         </Pressable>
         <Pressable
           onPress={() => updatePrefs({ onboarded: false })}
           style={styles.btn}
         >
-          <Text style={styles.btnText}>Re-run onboarding</Text>
+          <Text style={styles.btnText}>{t("settings.rerunOnboarding")}</Text>
         </Pressable>
         <Pressable
           onPress={async () => {
@@ -226,11 +233,11 @@ export default function SettingsScreen() {
           }}
           style={[styles.btn, styles.btnDanger]}
         >
-          <Text style={[styles.btnText, { color: colors.danger }]}>Erase all local data</Text>
+          <Text style={[styles.btnText, { color: colors.danger }]}>{t("settings.eraseAll")}</Text>
         </Pressable>
       </View>
 
-      <Text style={styles.footnote}>Counterpoint v0.1 — your feed, your balance, your device.</Text>
+      <Text style={styles.footnote}>{t("settings.footnote")}</Text>
     </ScrollView>
   );
 }

@@ -11,6 +11,7 @@ import type {
   FeedItem,
   KnowledgeInsight,
   KnowledgeProfile,
+  Lang,
   RewrittenArticle,
   Story,
   SummaryGrade,
@@ -101,8 +102,10 @@ export async function fetchRankedFeed(
  * for in-app reading. Throws with a clear message on failure so the reader UI
  * can surface it (paywall, model offline, item aged out, ...).
  */
-export async function fetchRewrite(id: string): Promise<RewrittenArticle> {
-  const res = await fetch(`${apiBaseUrl()}/api/rewrite?id=${encodeURIComponent(id)}`, {
+export async function fetchRewrite(id: string, lang?: Lang): Promise<RewrittenArticle> {
+  const params = new URLSearchParams({ id });
+  if (lang) params.set("lang", lang);
+  const res = await fetch(`${apiBaseUrl()}/api/rewrite?${params.toString()}`, {
     method: "GET",
   });
   const data = (await res.json().catch(() => null)) as
@@ -124,6 +127,8 @@ export interface RewriteStreamHandlers {
   /** A failure (or that streaming is unsupported here) — caller may fall back. */
   onError: (message: string) => void;
   world?: string;
+  /** UI/AI language — the rewrite is written in this. */
+  lang?: Lang;
 }
 
 /**
@@ -138,6 +143,7 @@ export function streamRewrite(id: string, h: RewriteStreamHandlers): { cancel: (
 
   const params = new URLSearchParams({ id });
   if (h.world) params.set("world", h.world);
+  if (h.lang) params.set("lang", h.lang);
   const controller = new AbortController();
 
   const dispatch = (frame: string) => {
@@ -204,11 +210,12 @@ export async function gradeSummary(
   id: string,
   summary: string,
   world?: string,
+  lang?: Lang,
 ): Promise<SummaryGrade> {
   const res = await fetch(`${apiBaseUrl()}/api/grade`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ id, summary, world }),
+    body: JSON.stringify({ id, summary, world, lang }),
   });
   const data = (await res.json().catch(() => null)) as
     | { grade?: SummaryGrade; error?: string }
@@ -254,11 +261,12 @@ export interface StoriesResponse {
  * state) — never throws.
  */
 export async function fetchStories(
-  opts: { world?: string; force?: boolean } = {},
+  opts: { world?: string; force?: boolean; lang?: Lang } = {},
 ): Promise<StoriesResponse> {
   const world = (opts.world ?? "").trim();
   const params = new URLSearchParams();
   if (world) params.set("world", world);
+  if (opts.lang) params.set("lang", opts.lang);
   if (opts.force) params.set("force", "1");
   const qs = params.toString();
   try {
@@ -297,9 +305,10 @@ export async function fetchRelated(
  * Fetch a single synthesized story by id. Throws with a clear message on failure
  * (aged out / model offline) so the detail view can surface it.
  */
-export async function fetchStory(id: string, world?: string): Promise<Story> {
+export async function fetchStory(id: string, world?: string, lang?: Lang): Promise<Story> {
   const params = new URLSearchParams({ id });
   if (world) params.set("world", world);
+  if (lang) params.set("lang", lang);
   const res = await fetch(`${apiBaseUrl()}/api/story?${params.toString()}`, { method: "GET" });
   const data = (await res.json().catch(() => null)) as { story?: Story; error?: string } | null;
   if (!res.ok || !data?.story) {
@@ -329,13 +338,14 @@ export async function fetchStatus(world?: string): Promise<AnalysisStatus | null
  * throws — the briefing is a nice-to-have, not load-bearing.
  */
 export async function fetchBriefing(
-  opts: { interest?: string; force?: boolean; world?: string } = {},
+  opts: { interest?: string; force?: boolean; world?: string; lang?: Lang } = {},
 ): Promise<Briefing | null> {
   const interest = (opts.interest ?? "").trim();
   const world = (opts.world ?? "").trim();
   const params = new URLSearchParams();
   if (interest) params.set("interest", interest);
   if (world) params.set("world", world);
+  if (opts.lang) params.set("lang", opts.lang);
   if (opts.force) params.set("force", "1");
   const qs = params.toString();
   try {

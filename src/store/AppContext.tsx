@@ -11,6 +11,7 @@ import React, {
 } from "react";
 import { fetchBriefing, fetchRankedFeed, fetchStatus, gradeSummary } from "../lib/api";
 import { buildFeed } from "../lib/buildFeed";
+import { translate } from "../lib/i18n";
 import { PASS_SCORE } from "../lib/knowledge";
 import { applyCompletion } from "../lib/lean";
 import {
@@ -112,13 +113,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   interestRef.current = prefs.interestPrompt;
   const worldRef = useRef(prefs.worldId);
   worldRef.current = prefs.worldId;
+  const langRef = useRef(prefs.language);
+  langRef.current = prefs.language;
 
   // Best-effort, non-blocking. The pool is already fresh after a feed load, so
   // we never force here (avoids a second rebuild). Steered by the same interest.
   const loadBriefing = useCallback(async () => {
     setLoadingBriefing(true);
     try {
-      setBriefing(await fetchBriefing({ interest: interestRef.current, world: worldRef.current }));
+      setBriefing(
+        await fetchBriefing({
+          interest: interestRef.current,
+          world: worldRef.current,
+          lang: langRef.current,
+        }),
+      );
     } finally {
       setLoadingBriefing(false);
     }
@@ -194,6 +203,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [ready, prefs.onboarded, prefs.worldId, refreshFeed]);
 
+  // Re-synthesize the briefing in the new language when it changes (skip first
+  // run). The feed/stories re-fetch in their own language-aware effects.
+  const lastLang = useRef<string | null>(null);
+  useEffect(() => {
+    if (!ready || !prefs.onboarded) return;
+    if (lastLang.current === null) {
+      lastLang.current = prefs.language;
+      return;
+    }
+    if (lastLang.current !== prefs.language) {
+      lastLang.current = prefs.language;
+      void loadBriefing();
+    }
+  }, [ready, prefs.onboarded, prefs.language, loadBriefing]);
+
   // Keep a ref of loadingFeed so the status poller can avoid overlapping loads.
   const loadingFeedRef = useRef(loadingFeed);
   loadingFeedRef.current = loadingFeed;
@@ -266,7 +290,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const gradeAndRecord = useCallback(
     async (item: FeedItem, summaryText: string): Promise<SummaryGrade> => {
-      const grade = await gradeSummary(item.id, summaryText, worldRef.current);
+      const grade = await gradeSummary(item.id, summaryText, worldRef.current, langRef.current);
       const passed = grade.score >= PASS_SCORE;
       const record: StoredSummary = {
         id: item.id,
@@ -347,4 +371,14 @@ export function useApp(): AppState {
 export function useTrailingWindow(): LeanHistoryPoint[] {
   const { history, progress } = useApp();
   return useMemo(() => trailingWindow(history, progress), [history, progress]);
+}
+
+/** Hook returning a `t(key, params)` bound to the reader's current language. */
+export function useT(): (key: string, params?: Record<string, string | number>) => string {
+  const { prefs } = useApp();
+  const lang = prefs.language;
+  return useCallback(
+    (key: string, params?: Record<string, string | number>) => translate(lang, key, params),
+    [lang],
+  );
 }

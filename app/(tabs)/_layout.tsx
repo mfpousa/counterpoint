@@ -1,9 +1,11 @@
 import React from "react";
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { useT } from "../../src/store/AppContext";
 import { colors } from "../../src/theme";
 
 export default function TabsLayout() {
+  const t = useT();
   return (
     <Tabs
       screenOptions={{
@@ -20,7 +22,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Today",
+          title: t("tabs.today"),
           tabBarIcon: ({ color, size }) => <Ionicons name="today-outline" size={size} color={color} />,
         }}
       />
@@ -30,21 +32,21 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="balance"
         options={{
-          title: "Balance",
+          title: t("tabs.balance"),
           tabBarIcon: ({ color, size }) => <Ionicons name="git-compare-outline" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="learn"
         options={{
-          title: "Learn",
+          title: t("tabs.learn"),
           tabBarIcon: ({ color, size }) => <Ionicons name="school-outline" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
-          title: "Settings",
+          title: t("tabs.settings"),
           tabBarIcon: ({ color, size }) => <Ionicons name="settings-outline" size={size} color={color} />,
         }}
       />

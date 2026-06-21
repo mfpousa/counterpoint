@@ -180,6 +180,71 @@ export const SOURCES: Source[] = [
     leanRationale: "AS Lean Right (opinion page); pro-market editorial.",
   },
 
+  // ----------------------------------------- NEWS: UK & SPAIN (international)
+  // The front page shouldn't be US-only. These broaden the lens with UK and
+  // Spanish outlets across the spectrum (Guardian/BBC above are also UK). The
+  // Spanish outlet is intentionally NOT exclusive to the Spain world.
+  {
+    id: "uk-sky-world",
+    title: "Sky News — World",
+    url: "https://feeds.skynews.com/feeds/rss/world.xml",
+    kind: "news",
+    topic: "world",
+    lean: 0.0,
+    confidence: 0.65,
+    leanRationale: "UK: broadly centrist broadcaster (MBFC Left-Center, near center).",
+  },
+  {
+    id: "uk-independent-world",
+    title: "The Independent — World",
+    url: "https://www.independent.co.uk/news/world/rss",
+    kind: "news",
+    topic: "world",
+    lean: -0.3,
+    confidence: 0.7,
+    leanRationale: "UK: AS/MBFC Left-Center; liberal editorial line.",
+  },
+  {
+    id: "uk-telegraph",
+    title: "The Telegraph",
+    url: "https://www.telegraph.co.uk/rss.xml",
+    kind: "news",
+    topic: "politics",
+    lean: 0.45,
+    confidence: 0.75,
+    leanRationale: "UK: MBFC Right-Center; conservative editorial tradition.",
+  },
+  {
+    id: "uk-dailymail",
+    title: "Daily Mail",
+    url: "https://www.dailymail.co.uk/articles.rss",
+    kind: "news",
+    topic: "politics",
+    lean: 0.6,
+    confidence: 0.7,
+    leanRationale: "UK: AS/MBFC Right; conservative tabloid.",
+  },
+  {
+    id: "uk-mirror",
+    title: "Daily Mirror",
+    url: "https://www.mirror.co.uk/news/?service=rss",
+    kind: "news",
+    topic: "politics",
+    lean: -0.5,
+    confidence: 0.65,
+    leanRationale: "UK: MBFC Left; Labour-leaning tabloid.",
+  },
+  {
+    id: "es-elpais-english",
+    title: "El País — English",
+    url: "https://feeds.elpais.com/mrss-s/pages/ep/site/english.elpais.com/portada",
+    kind: "news",
+    topic: "world",
+    lean: -0.3,
+    confidence: 0.75,
+    leanRationale: "Spain: center-left daily (English edition) — Spanish perspective on world news.",
+  },
+
   // ----------------------------------------------------- SCIENCE (non-political)
   {
     id: "nasa",

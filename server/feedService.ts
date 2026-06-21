@@ -12,7 +12,7 @@
 //    no new model calls.
 
 import { fetchAll } from "../src/lib/rss";
-import type { AnalysisStatus, Briefing, FeedItem, Story } from "../src/types";
+import type { AnalysisStatus, Briefing, FeedItem, Lang, Story } from "../src/types";
 import { DEFAULT_WORLD_ID, worldSources } from "../src/data/worlds";
 import { aiReachable, withConcurrency } from "./ai";
 import { analyzeItems, detectClickbait } from "./analysis";
@@ -67,9 +67,10 @@ interface WorldState {
   viewCache: Map<string, { builtAt: number; result: FeedResult }>;
   briefingCache: Map<string, { builtAt: number; briefing: Briefing | null }>;
   briefingInFlight: Map<string, Promise<Briefing | null>>;
-  /** Synthesized cross-source stories (valid while builtAt === lastBuildAt). */
-  storiesCache: { builtAt: number; stories: Story[] } | null;
-  storiesInFlight: Promise<Story[]> | null;
+  /** Synthesized cross-source stories, keyed by language (valid while
+   *  builtAt === lastBuildAt). */
+  storiesCache: Map<string, { builtAt: number; stories: Story[] }>;
+  storiesInFlight: Map<string, Promise<Story[]>>;
   buildInFlight: Promise<void> | null;
   analyzeInFlight: Promise<{ remaining: number; progressed: number }> | null;
   embedInFlight: Promise<{ remaining: number; progressed: number }> | null;
@@ -88,8 +89,8 @@ function ws(worldId: string): WorldState {
       viewCache: new Map(),
       briefingCache: new Map(),
       briefingInFlight: new Map(),
-      storiesCache: null,
-      storiesInFlight: null,
+      storiesCache: new Map(),
+      storiesInFlight: new Map(),
       buildInFlight: null,
       analyzeInFlight: null,
       embedInFlight: null,
@@ -570,10 +571,13 @@ export async function getBriefing(
   worldId: string = DEFAULT_WORLD_ID,
   force = false,
   interest = config.feed.interest,
+  lang: Lang = "en",
 ): Promise<Briefing | null> {
   await ensurePool(worldId, force);
   const state = ws(worldId);
-  const key = interestKey(interest);
+  // Key per language so an EN and ES briefing don't overwrite each other.
+  const key = `${lang}:${interestKey(interest)}`;
+  const interestStr = interestKey(interest);
 
   const cached = state.briefingCache.get(key);
   if (cached && cached.builtAt === state.lastBuildAt) return cached.briefing;
@@ -585,13 +589,13 @@ export async function getBriefing(
   const p = (async (): Promise<Briefing | null> => {
     // Don't cache failures from an offline model — let a later request retry.
     if (!(await aiReachable())) return null;
-    const parsed = await interpretQuery(key);
+    const parsed = await interpretQuery(interestStr);
     const queryVec = await embedQuery(parsed.positive);
-    const view = assembleView(worldId, key, parsed, queryVec);
+    const view = assembleView(worldId, interestStr, parsed, queryVec);
     const sample = view.items.slice(0, 40);
     const started = Date.now();
-    console.log(`[feed:${worldId}] briefing: synthesizing "${key || "general"}" from ${sample.length} item(s)…`);
-    const briefing = await generateBriefing(key, sample);
+    console.log(`[feed:${worldId}] briefing(${lang}): synthesizing "${interestStr || "general"}" from ${sample.length} item(s)…`);
+    const briefing = await generateBriefing(interestStr, sample, lang);
     state.briefingCache.set(key, { builtAt: builtAtSnapshot, briefing });
     console.log(
       `[feed:${worldId}] briefing: ${briefing ? `${briefing.threads.length} thread(s)` : "none"}` +
@@ -659,16 +663,21 @@ function linkRelated(
 export async function getStories(
   worldId: string = DEFAULT_WORLD_ID,
   force = false,
+  lang: Lang = "en",
 ): Promise<{ stories: Story[]; busyWith: string | null }> {
   const { busyWith } = await ensurePool(worldId, force);
   if (!config.stories.enabled) return { stories: [], busyWith };
 
   const state = ws(worldId);
-  if (state.storiesCache && state.storiesCache.builtAt === state.lastBuildAt) {
-    return { stories: state.storiesCache.stories, busyWith };
+  const cachedForLang = state.storiesCache.get(lang);
+  if (cachedForLang && cachedForLang.builtAt === state.lastBuildAt) {
+    return { stories: cachedForLang.stories, busyWith };
   }
-  if (state.storiesInFlight) return { stories: await state.storiesInFlight, busyWith };
+  const inFlight = state.storiesInFlight.get(lang);
+  if (inFlight) return { stories: await inFlight, busyWith };
 
+  // Per-language persistent store so EN and ES syntheses don't cross-pollinate.
+  const storeKey = lang === "en" ? worldId : `${worldId}__${lang}`;
   const builtAtSnapshot = state.lastBuildAt;
   const p = (async (): Promise<Story[]> => {
     const eligible = storyEligible(worldId);
@@ -750,14 +759,14 @@ export async function getStories(
         `${issues.length} issues; ${developing.length} developing + ${topEvents.length} event spec(s)`,
     );
     if (specs.length === 0) {
-      state.storiesCache = { builtAt: builtAtSnapshot, stories: [] };
+      state.storiesCache.set(lang, { builtAt: builtAtSnapshot, stories: [] });
       return [];
     }
 
     // INCREMENTAL: reuse cached stories whose article set is unchanged; only
     // (re)synthesize new or changed ones, preserving a development's id when it
     // merely gained/lost coverage. This is what stops a refresh re-computing all.
-    const store = getStoryStore(worldId);
+    const store = getStoryStore(storeKey);
     type Built = { story: Story; centroid: number[] | null; tokens: Set<string> };
     const used = new Set<string>();
     const reused: Built[] = [];
@@ -782,8 +791,8 @@ export async function getStories(
       toSynth.map((t) => async (): Promise<Built> => {
         const story =
           t.spec.kind === "issue"
-            ? await buildDevelopingStory(t.spec.events ?? [t.spec.members])
-            : await buildStory(t.spec.members);
+            ? await buildDevelopingStory(t.spec.events ?? [t.spec.members], lang)
+            : await buildStory(t.spec.members, lang);
         // Keep the development's identity across membership changes.
         if (t.reuseId) story.id = t.reuseId;
         store.upsert({
@@ -817,13 +826,13 @@ export async function getStories(
       `[stories:${worldId}] ${result.length} stor${result.length === 1 ? "y" : "ies"} ` +
         `(${synthed.length} synthesized in ${((Date.now() - started) / 1000).toFixed(0)}s, ${reused.length} cached)`,
     );
-    state.storiesCache = { builtAt: builtAtSnapshot, stories: result };
+    state.storiesCache.set(lang, { builtAt: builtAtSnapshot, stories: result });
     return result;
   })().finally(() => {
-    state.storiesInFlight = null;
+    state.storiesInFlight.delete(lang);
   });
 
-  state.storiesInFlight = p;
+  state.storiesInFlight.set(lang, p);
   return { stories: await p, busyWith };
 }
 
@@ -831,8 +840,9 @@ export async function getStories(
 export async function getStory(
   worldId: string = DEFAULT_WORLD_ID,
   id: string,
+  lang: Lang = "en",
 ): Promise<Story | null> {
-  const { stories } = await getStories(worldId);
+  const { stories } = await getStories(worldId, false, lang);
   return stories.find((s) => s.id === id) ?? null;
 }
 
@@ -895,5 +905,5 @@ export function clearCaches(worldId: string = DEFAULT_WORLD_ID): void {
   state.lastBuildAt = 0;
   state.viewCache.clear();
   state.briefingCache.clear();
-  state.storiesCache = null;
+  state.storiesCache.clear();
 }

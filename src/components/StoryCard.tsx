@@ -7,6 +7,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, font, radius, spacing } from "../theme";
 import { topicMeta } from "../lib/topics";
+import { useT } from "../store/AppContext";
 import type { Story } from "../types";
 import { IssueTag, leanColor } from "./ui";
 
@@ -30,6 +31,7 @@ export function StoryCard({
   issue?: { id: string; title: string; severity: number };
   onOpenIssue?: (id: string) => void;
 }) {
+  const t = useT();
   const m = topicMeta(story.topic);
   const outlets = story.sources.length;
   const developing = !!story.developing;
@@ -50,12 +52,12 @@ export function StoryCard({
         {developing ? (
           <View style={styles.developingTag}>
             <Ionicons name="pulse" size={11} color={colors.warn} />
-            <Text style={styles.developingText}>Developing</Text>
+            <Text style={styles.developingText}>{t("story.developing")}</Text>
           </View>
         ) : (
           <View style={styles.synthTag}>
             <Ionicons name="git-merge-outline" size={11} color={colors.accent} />
-            <Text style={styles.synthText}>Synthesis</Text>
+            <Text style={styles.synthText}>{t("story.synthesis")}</Text>
           </View>
         )}
         <View style={{ flex: 1 }} />
@@ -77,24 +79,27 @@ export function StoryCard({
           ))}
         </View>
         <Text style={styles.outlets}>
-          {outlets} outlet{outlets === 1 ? "" : "s"}
+          {t(outlets === 1 ? "story.outletsOne" : "story.outlets", { count: outlets })}
         </Text>
         {developing && events > 0 && (
           <View style={styles.events}>
             <Ionicons name="time-outline" size={11} color={colors.textDim} />
-            <Text style={styles.outlets}>{events} events</Text>
+            <Text style={styles.outlets}>{t("story.events", { count: events })}</Text>
           </View>
         )}
         {story.contradictions.length > 0 && (
           <View style={styles.conflict}>
             <Ionicons name="flash-outline" size={11} color={colors.warn} />
             <Text style={styles.conflictText}>
-              {story.contradictions.length} difference{story.contradictions.length === 1 ? "" : "s"}
+              {t(
+                story.contradictions.length === 1 ? "story.differencesOne" : "story.differences",
+                { count: story.contradictions.length },
+              )}
             </Text>
           </View>
         )}
         {story.degraded && (
-          <Text style={styles.degraded}>limited</Text>
+          <Text style={styles.degraded}>{t("story.limited")}</Text>
         )}
       </View>
       </Pressable>

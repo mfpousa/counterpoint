@@ -7,6 +7,8 @@ import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { Briefing } from "../types";
 import { Typewriter } from "./anim";
+import { Skeleton } from "./Skeleton";
+import { useT } from "../store/AppContext";
 import { colors, font, radius, spacing } from "../theme";
 
 export function BriefingCard({
@@ -16,30 +18,37 @@ export function BriefingCard({
   briefing: Briefing | null;
   loading: boolean;
 }) {
-  // While first synthesizing (and we have nothing yet), show a calm placeholder.
-  if (loading && !briefing) {
+  const t = useT();
+  // No briefing yet: keep the SAME reserved footprint (minHeight) and show a
+  // skeleton while it synthesizes, so the cards below don't jump when it lands.
+  if (!briefing) {
     return (
       <View style={styles.card}>
         <View style={styles.headerRow}>
           <Ionicons name="sparkles" size={16} color={colors.accent} />
-          <Text style={styles.heading}>Briefing</Text>
+          <Text style={styles.heading}>{t("briefing.title")}</Text>
+          {loading && <ActivityIndicator size="small" color={colors.accent} />}
         </View>
-        <View style={styles.loadingRow}>
-          <ActivityIndicator size="small" color={colors.accent} />
-          <Text style={styles.loadingText}>Synthesizing today’s briefing…</Text>
-        </View>
+        {loading ? (
+          <View style={styles.skeleton}>
+            <Skeleton width="65%" height={18} />
+            <Skeleton width="100%" height={12} />
+            <Skeleton width="94%" height={12} />
+            <Skeleton width="78%" height={12} />
+          </View>
+        ) : (
+          <Text style={styles.loadingText}>{t("briefing.unavailable")}</Text>
+        )}
       </View>
     );
   }
-
-  if (!briefing) return null;
   const { mood, threads, outlook, interest } = briefing;
 
   return (
     <View style={styles.card}>
       <View style={styles.headerRow}>
         <Ionicons name="sparkles" size={16} color={colors.accent} />
-        <Text style={styles.heading}>Briefing</Text>
+        <Text style={styles.heading}>{t("briefing.title")}</Text>
         {interest.length > 0 && (
           <View style={styles.interestPill}>
             <Ionicons name="navigate" size={11} color={colors.accent} />
@@ -72,7 +81,7 @@ export function BriefingCard({
         <View style={styles.outlookRow}>
           <Ionicons name="trending-up" size={14} color={colors.good} />
           <Text style={styles.outlookText}>
-            <Text style={styles.outlookLabel}>Where it’s headed: </Text>
+            <Text style={styles.outlookLabel}>{t("briefing.headed")}</Text>
             <Typewriter text={outlook} cps={260} cursor={false} />
           </Text>
         </View>
@@ -89,7 +98,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.accentDim,
     backgroundColor: colors.surface,
+    // Reserve a stable footprint so the feed below doesn't jump when the briefing
+    // finishes loading (the reader may be mid-tap on a card).
+    minHeight: 132,
   },
+  skeleton: { gap: spacing.sm, marginTop: spacing.xs },
   headerRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   heading: {
     color: colors.text,

@@ -25,7 +25,7 @@ import { Cursor } from "../../src/components/anim";
 import { SummaryModal } from "../../src/components/SummaryModal";
 import { topicMeta } from "../../src/lib/topics";
 import { LeanBadge } from "../../src/components/ui";
-import { useApp } from "../../src/store/AppContext";
+import { useApp, useT } from "../../src/store/AppContext";
 import { colors, font, radius, spacing } from "../../src/theme";
 import type { FeedItem, RewrittenArticle } from "../../src/types";
 
@@ -34,7 +34,8 @@ const READ_WIDTH = 720;
 export default function NewsReader() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
-  const { pool, worldId, summaries, gradeAndRecord, progress } = useApp();
+  const { pool, worldId, prefs, summaries, gradeAndRecord, progress } = useApp();
+  const t = useT();
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -61,7 +62,7 @@ export default function NewsReader() {
 
     // Non-streaming fallback (streaming unsupported here, or it errored).
     const plain = () => {
-      fetchRewrite(id)
+      fetchRewrite(id, prefs.language)
         .then((a) => {
           if (!cancelled) setArticle(a);
         })
@@ -76,6 +77,7 @@ export default function NewsReader() {
     // Stream the rewrite so the reader shows the model writing in real time.
     const handle = streamRewrite(id, {
       world: worldId,
+      lang: prefs.language,
       onDelta: (d) => {
         if (!cancelled) setStreamed((p) => p + d);
       },
@@ -102,7 +104,7 @@ export default function NewsReader() {
       cancelled = true;
       handle?.cancel();
     };
-  }, [id, worldId]);
+  }, [id, worldId, prefs.language]);
 
   // Paragraphs to show WHILE streaming (before the final cleaned article lands).
   const streamingParas = streamed
@@ -138,7 +140,7 @@ export default function NewsReader() {
           <View style={styles.center}>
             <ActivityIndicator size="large" color={colors.accent} />
             <Text style={styles.centerText}>
-              {thinking ? "Thinking…" : "Reading the article…"}
+              {thinking ? t("reader.thinking") : t("reader.reading")}
             </Text>
             {!!thinking && (
               <Text style={styles.thinkingPreview} numberOfLines={3}>

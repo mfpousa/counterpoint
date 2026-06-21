@@ -5,9 +5,10 @@
 // to confirm the reader genuinely understood the piece — and to TEACH when they
 // didn't.
 
-import type { SummaryGrade } from "../src/types";
+import type { Lang, SummaryGrade } from "../src/types";
 import { aiReachable, chatJsonObject, type JsonSchema } from "./ai";
 import { config } from "./config";
+import { langDirective } from "./lang";
 import { rewriteArticle } from "./rewrite";
 import type { StoredItem } from "./store";
 
@@ -47,8 +48,11 @@ const GRADE_RULES =
   "Output ONLY the JSON object. No markdown, no prose outside the JSON.";
 
 /** Build the reference text the summary is graded against. */
-async function referenceText(stored: StoredItem): Promise<{ title: string; body: string } | null> {
-  const article = await rewriteArticle(stored);
+async function referenceText(
+  stored: StoredItem,
+  lang: Lang,
+): Promise<{ title: string; body: string } | null> {
+  const article = await rewriteArticle(stored, lang);
   if (article && article.paragraphs.length > 0) {
     return {
       title: article.title || stored.item.title,
@@ -80,19 +84,20 @@ function strArray(v: unknown): string[] {
 export async function gradeSummary(
   stored: StoredItem,
   userSummary: string,
+  lang: Lang = "en",
 ): Promise<SummaryGrade | null> {
   const summary = userSummary.trim();
   if (summary.length < 10) return null;
   if (!(await aiReachable())) return null;
 
-  const ref = await referenceText(stored);
+  const ref = await referenceText(stored, lang);
   if (!ref) return null;
 
   const payload = {
     article: { title: ref.title, body: ref.body },
     readerSummary: summary,
   };
-  const obj = await chatJsonObject(GRADE_RULES, payload, {
+  const obj = await chatJsonObject(GRADE_RULES + langDirective(lang), payload, {
     maxTokens: 700,
     schema: GRADE_SCHEMA,
   });

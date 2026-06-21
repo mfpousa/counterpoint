@@ -12,11 +12,12 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useApp } from "../../src/store/AppContext";
+import { useApp, useT } from "../../src/store/AppContext";
 import { assessDrift } from "../../src/lib/lean";
 import { topicMeta, TOPIC_ORDER } from "../../src/lib/topics";
 import { FeedCard } from "../../src/components/FeedCard";
 import { StoryCard } from "../../src/components/StoryCard";
+import { StoryCardSkeleton } from "../../src/components/Skeleton";
 import { FadeInView } from "../../src/components/anim";
 import { BriefingCard } from "../../src/components/BriefingCard";
 import { AnalysisProgress } from "../../src/components/AnalysisProgress";
@@ -58,6 +59,7 @@ export default function FeedScreen() {
     setWorld,
     updatePrefs,
   } = useApp();
+  const t = useT();
   const [selected, setSelected] = useState<Topic | "all">("all");
 
   // Synthesized stories (developing issues + deduped multi-source events) are
@@ -70,7 +72,7 @@ export default function FeedScreen() {
     async (force = false) => {
       setLoadingStories(true);
       try {
-        const res = await fetchStories({ world: worldId, force });
+        const res = await fetchStories({ world: worldId, force, lang: prefs.language });
         setStories(res.stories);
         // Share with the routed story panel so opening a listed story is instant
         // and never dead-ends on an id that changed during a rebuild.
@@ -80,7 +82,7 @@ export default function FeedScreen() {
         setLoadingStories(false);
       }
     },
-    [worldId],
+    [worldId, prefs.language],
   );
   useEffect(() => {
     setStories([]);
@@ -270,10 +272,7 @@ export default function FeedScreen() {
         {busyWorld && busyWorld !== worldId && feed.length === 0 && (
           <View style={styles.busyBanner}>
             <ActivityIndicator size="small" color={colors.warn} />
-            <Text style={styles.busyText}>
-              “{worldById(busyWorld).title}” is still refreshing. Only one world refreshes at a
-              time — this one will update once it’s free.
-            </Text>
+            <Text style={styles.busyText}>{t("feed.busy", { world: worldById(busyWorld).title })}</Text>
           </View>
         )}
 
@@ -287,7 +286,7 @@ export default function FeedScreen() {
             value={query}
             onChangeText={setQuery}
             onSubmitEditing={submitSearch}
-            placeholder="Search your feed — e.g. AI and scientific progress"
+            placeholder={t("feed.searchPlaceholder")}
             placeholderTextColor={colors.textFaint}
             returnKeyType="search"
             autoCapitalize="none"
@@ -305,12 +304,15 @@ export default function FeedScreen() {
         {/* Header */}
         <View style={styles.headerRow}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.title}>Today</Text>
+            <Text style={styles.title}>{t("feed.title")}</Text>
             {feed.length > 0 && (
               <Text style={styles.subtitle}>
                 {unreadCount > 0
-                  ? `${unreadCount} pick${unreadCount === 1 ? "" : "s"} across ${sections.length} topic${sections.length === 1 ? "" : "s"}, balanced for you`
-                  : "You're all caught up — revisit anything you've read below"}
+                  ? t(unreadCount === 1 ? "feed.summaryOne" : "feed.summary", {
+                      count: unreadCount,
+                      topics: sections.length,
+                    })
+                  : t("feed.caughtUp")}
               </Text>
             )}
           </View>
@@ -329,7 +331,7 @@ export default function FeedScreen() {
               color={loadingFeed ? colors.textFaint : colors.accent}
             />
             <Text style={[styles.refreshText, loadingFeed && { color: colors.textFaint }]}>
-              Refresh
+              {t("feed.refresh")}
             </Text>
           </Pressable>
         </View>
@@ -359,7 +361,7 @@ export default function FeedScreen() {
             contentContainerStyle={styles.filterRow}
           >
             <FilterChip
-              label="All"
+              label={t("feed.all")}
               icon="albums"
               color={colors.accent}
               count={sections.reduce((n, s) => n + s.entries.length, 0)}
@@ -383,34 +385,39 @@ export default function FeedScreen() {
           </ScrollView>
         )}
 
-        {/* First-build indicator: stories are synthesized lazily (an LLM call per
-            story), so surface that work instead of showing nothing. */}
-        {loadingStories && !storiesLoadedOnce.current && (
-          <View style={styles.busyBanner}>
-            <ActivityIndicator size="small" color={colors.warn} />
-            <Text style={styles.busyText}>
-              Synthesizing stories from the latest coverage… this can take a moment.
-            </Text>
-          </View>
-        )}
-
-        {/* Developing issues — highlighted band of ongoing storylines. */}
-        {visibleDeveloping.length > 0 && (
+        {/* Developing issues — highlighted band of ongoing storylines. Stories are
+            synthesized lazily (an LLM call each), so on the FIRST load we reserve
+            the band's space with skeleton cards. This keeps the feed below from
+            jumping down when the band resolves (the reader may be mid-tap). Once
+            loaded, the band only stays if there are actual developing stories. */}
+        {(!storiesLoadedOnce.current || visibleDeveloping.length > 0) && (
           <View style={{ gap: spacing.md }}>
             <View style={styles.sectionHeader}>
               <View style={[styles.sectionIcon, { backgroundColor: colors.warn + "22" }]}>
                 <Ionicons name="pulse" size={15} color={colors.warn} />
               </View>
-              <Text style={styles.sectionTitle}>Developing</Text>
-              <Text style={styles.sectionCount}>{visibleDeveloping.length}</Text>
-              {loadingStories && <ActivityIndicator size="small" color={colors.warn} />}
+              <Text style={styles.sectionTitle}>{t("feed.developing")}</Text>
+              {storiesLoadedOnce.current ? (
+                <>
+                  <Text style={styles.sectionCount}>{visibleDeveloping.length}</Text>
+                  {loadingStories && <ActivityIndicator size="small" color={colors.warn} />}
+                </>
+              ) : (
+                <ActivityIndicator size="small" color={colors.warn} />
+              )}
             </View>
             <View style={[styles.grid, { gap: GAP }]}>
-              {visibleDeveloping.map((story) => (
-                <FadeInView key={story.id} style={{ width: cardW }}>
-                  <StoryCard story={story} onOpen={(s) => openStory(s.id)} />
-                </FadeInView>
-              ))}
+              {storiesLoadedOnce.current
+                ? visibleDeveloping.map((story) => (
+                    <FadeInView key={story.id} style={{ width: cardW }}>
+                      <StoryCard story={story} onOpen={(s) => openStory(s.id)} />
+                    </FadeInView>
+                  ))
+                : Array.from({ length: cols === 1 ? 2 : cols }).map((_, i) => (
+                    <View key={`sk-${i}`} style={{ width: cardW }}>
+                      <StoryCardSkeleton />
+                    </View>
+                  ))}
             </View>
           </View>
         )}
@@ -420,7 +427,7 @@ export default function FeedScreen() {
           loadingFeed ? (
             <View style={styles.empty}>
               <ActivityIndicator color={colors.accent} />
-              <Text style={styles.emptySub}>Curating your balanced feed…</Text>
+              <Text style={styles.emptySub}>{t("feed.curating")}</Text>
             </View>
           ) : feedError || visibleDeveloping.length > 0 ? null : (
             <View style={styles.empty}>
@@ -430,12 +437,10 @@ export default function FeedScreen() {
                 color={colors.textFaint}
               />
               <Text style={styles.emptyTitle}>
-                {atQuota ? "You've hit today's quota." : "No items to show."}
+                {atQuota ? t("feed.empty.quotaTitle") : t("feed.empty.noItemsTitle")}
               </Text>
               <Text style={styles.emptySub}>
-                {atQuota
-                  ? "Come back tomorrow, or raise your quota in Settings."
-                  : "Pull down to refresh, or steer your feed in Settings."}
+                {atQuota ? t("feed.empty.quotaSub") : t("feed.empty.noItemsSub")}
               </Text>
             </View>
           )

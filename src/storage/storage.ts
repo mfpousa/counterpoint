@@ -32,6 +32,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   driftThreshold: 0.25,
   onboarded: false,
   worldId: DEFAULT_WORLD_ID,
+  language: "en",
 };
 
 /** Local YYYY-MM-DD for "today". */

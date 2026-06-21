@@ -59,7 +59,7 @@ function tlDate(ms: number): string {
 export default function StoryPanel() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
-  const { worldId } = useApp();
+  const { worldId, prefs } = useApp();
 
   // Seed from the shared cache so a story opened from the feed renders INSTANTLY
   // (no /api/stories rebuild wait, and immune to ids that changed in a rebuild).
@@ -83,7 +83,7 @@ export default function StoryPanel() {
     setStory(null);
     setLoading(true);
     setError(null);
-    fetchStory(id, worldId)
+    fetchStory(id, worldId, prefs.language)
       .then((s) => {
         if (cancelled) return;
         cacheStories([s]);
@@ -98,7 +98,7 @@ export default function StoryPanel() {
     return () => {
       cancelled = true;
     };
-  }, [id, worldId]);
+  }, [id, worldId, prefs.language]);
 
   // Related stories resolve from whatever's cached (siblings loaded with it).
   const related = useMemo(() => {

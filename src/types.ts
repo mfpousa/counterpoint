@@ -3,6 +3,11 @@
 /** What kind of media an item is. */
 export type Kind = "video" | "podcast" | "news";
 
+/** UI + AI-output language. The UI is localized to this and the backend is asked
+ *  to write article rewrites / briefings / stories in it, regardless of the
+ *  source article's language. */
+export type Lang = "en" | "es";
+
 /**
  * Editorial topic / discipline. Used to guarantee breadth across the feed so
  * no single subject dominates. "politics" / "world" are the contested topics
@@ -311,6 +316,8 @@ export interface Preferences {
   onboarded: boolean;
   /** The active news world (set of sources). Defaults to the front page. */
   worldId: string;
+  /** UI + AI-output language (the app is shown in this; AI writes in it too). */
+  language: Lang;
 }
 
 /** Today's consumption progress, persisted locally and reset per day. */

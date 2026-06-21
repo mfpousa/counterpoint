@@ -6,9 +6,10 @@
 // makes the model STOP — the same fix used by analysis/briefing. Results are
 // cached in memory (per item) so re-opening an article is instant.
 
-import type { RewrittenArticle } from "../src/types";
+import type { Lang, RewrittenArticle } from "../src/types";
 import { aiReachable, chatJsonObject, chatRaw, type JsonSchema } from "./ai";
 import { config } from "./config";
+import { langDirective } from "./lang";
 import { extractReadable, htmlToText } from "./readability";
 import type { StoredItem } from "./store";
 import { fetchYouTubeTranscript, isYouTube, youTubeVideoId } from "./transcripts";
@@ -63,6 +64,11 @@ interface CacheEntry {
   article: RewrittenArticle;
 }
 const cache = new Map<string, CacheEntry>();
+
+/** Cache key: per item AND per language (a Spanish rewrite ≠ the English one). */
+function cacheKey(id: string, lang: Lang): string {
+  return `${id}:${lang}`;
+}
 
 /** Strip code fences / stray markdown a weak model sometimes wraps text in. */
 function stripFences(s: string): string {
@@ -130,7 +136,7 @@ export function cleanTitle(raw: unknown, fallback: string): string {
  * or we have too little context to say anything meaningful (avoids title-only
  * filler). The result is marked `degraded` so the reader can flag it.
  */
-async function degradedBrief(stored: StoredItem): Promise<RewrittenArticle | null> {
+async function degradedBrief(stored: StoredItem, lang: Lang = "en"): Promise<RewrittenArticle | null> {
   if (!config.reader.degradedFallback) return null;
   const { item } = stored;
   const summary = (item.summary || stored.summary || "").trim();
@@ -144,7 +150,7 @@ async function degradedBrief(stored: StoredItem): Promise<RewrittenArticle | nul
     feedSummary: summary,
     keywords,
   };
-  const obj = await chatJsonObject(DEGRADED_RULES, payload, {
+  const obj = await chatJsonObject(DEGRADED_RULES + langDirective(lang), payload, {
     maxTokens: 600,
     schema: REWRITE_SCHEMA,
   });
@@ -167,10 +173,21 @@ async function degradedBrief(stored: StoredItem): Promise<RewrittenArticle | nul
   return article;
 }
 
+/** True when the URL's host is a known HARD paywall — extraction can't beat it,
+ *  so we skip the fetch and fail fast (then fall back to feed body / brief). */
+export function isKnownPaywall(url: string): boolean {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, "").toLowerCase();
+    return config.reader.paywallDomains.some((d) => host === d || host.endsWith(`.${d}`));
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Find the best available FULL source text for an item, in order:
  *   1. YouTube transcript (videos).
- *   2. Live page extraction — publisher direct, then reader proxies.
+ *   2. Live page extraction — skipped for known hard-paywall hosts (fail fast).
  *   3. The feed's own full-content body (content:encoded), when shipped.
  * Returns null only when no full body is obtainable (caller may then fall back
  * to a clearly-labeled degraded brief).
@@ -186,8 +203,14 @@ async function sourceText(stored: StoredItem): Promise<{ text: string; fallbackT
     return null;
   }
 
-  const extracted = await extractReadable(item.url);
-  if (extracted) return { text: extracted.text, fallbackTitle: extracted.title || item.title };
+  // Don't waste a request on a domain we know we can't read — go straight to the
+  // feed body (some feeds ship full text) or the degraded brief.
+  if (isKnownPaywall(item.url)) {
+    console.log(`[reader] ${item.url} is a known paywall — skipping extraction`);
+  } else {
+    const extracted = await extractReadable(item.url);
+    if (extracted) return { text: extracted.text, fallbackTitle: extracted.title || item.title };
+  }
 
   // Last resort before degrading: the feed may have shipped the full body itself.
   if (item.content) {
@@ -251,10 +274,12 @@ export async function rewriteArticleStream(
   stored: StoredItem,
   onDelta: (delta: string) => void,
   onReasoning?: (delta: string) => void,
+  lang: Lang = "en",
 ): Promise<RewrittenArticle | null> {
   const { item } = stored;
+  const key = cacheKey(item.id, lang);
 
-  const cached = cache.get(item.id);
+  const cached = cache.get(key);
   if (cached && Date.now() - cached.at < config.reader.cacheTtlMs) {
     onDelta(`${cached.article.title}\n\n${cached.article.paragraphs.join("\n\n")}`);
     return cached.article;
@@ -267,7 +292,7 @@ export async function rewriteArticleStream(
   let system: string;
   let payload: Record<string, unknown>;
   if (src) {
-    system = PLAIN_RULES;
+    system = PLAIN_RULES + langDirective(lang);
     payload = { sourceTitle: item.sourceTitle, originalTitle: item.title, kind: item.kind, content: src.text };
   } else {
     if (!config.reader.degradedFallback) return null;
@@ -275,7 +300,7 @@ export async function rewriteArticleStream(
     const keywords = stored.keywords?.length ? stored.keywords.join(", ") : "";
     if (summary.length < 60 && keywords.length < 20) return null;
     degraded = true;
-    system = PLAIN_DEGRADED_RULES;
+    system = PLAIN_DEGRADED_RULES + langDirective(lang);
     payload = { headline: item.title, sourceTitle: item.sourceTitle, feedSummary: summary, keywords };
   }
 
@@ -293,7 +318,7 @@ export async function rewriteArticleStream(
     estMinutes: readMinutes(parsed.paragraphs),
     degraded,
   };
-  cache.set(item.id, { at: Date.now(), article });
+  cache.set(key, { at: Date.now(), article });
   return article;
 }
 
@@ -302,10 +327,14 @@ export async function rewriteArticleStream(
  * reading. Returns null when the model is unreachable, the page can't be fetched
  * (paywall/JS-only), or the model gives nothing usable.
  */
-export async function rewriteArticle(stored: StoredItem): Promise<RewrittenArticle | null> {
+export async function rewriteArticle(
+  stored: StoredItem,
+  lang: Lang = "en",
+): Promise<RewrittenArticle | null> {
   const { item } = stored;
+  const key = cacheKey(item.id, lang);
 
-  const cached = cache.get(item.id);
+  const cached = cache.get(key);
   if (cached && Date.now() - cached.at < config.reader.cacheTtlMs) return cached.article;
 
   if (!(await aiReachable())) return null;
@@ -314,8 +343,8 @@ export async function rewriteArticle(stored: StoredItem): Promise<RewrittenArtic
   if (!src) {
     // No full body anywhere (hard paywall / JS-only). Don't dead-end — fall back
     // to a clearly-labeled short brief built from the headline + feed summary.
-    const brief = await degradedBrief(stored);
-    if (brief) cache.set(item.id, { at: Date.now(), article: brief });
+    const brief = await degradedBrief(stored, lang);
+    if (brief) cache.set(key, { at: Date.now(), article: brief });
     return brief;
   }
 
@@ -325,7 +354,7 @@ export async function rewriteArticle(stored: StoredItem): Promise<RewrittenArtic
     kind: item.kind,
     content: src.text,
   };
-  const obj = await chatJsonObject(REWRITE_RULES, payload, {
+  const obj = await chatJsonObject(REWRITE_RULES + langDirective(lang), payload, {
     maxTokens: config.reader.maxTokens,
     schema: REWRITE_SCHEMA,
   });
@@ -347,6 +376,6 @@ export async function rewriteArticle(stored: StoredItem): Promise<RewrittenArtic
     kind: item.kind,
     estMinutes: readMinutes(paragraphs),
   };
-  cache.set(item.id, { at: Date.now(), article });
+  cache.set(key, { at: Date.now(), article });
   return article;
 }

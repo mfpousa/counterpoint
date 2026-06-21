@@ -42,6 +42,7 @@ function makePrefs(over: Partial<Preferences> = {}): Preferences {
     driftThreshold: 0.25,
     onboarded: true,
     worldId: "frontpage",
+    language: "en",
     ...over,
   };
 }
