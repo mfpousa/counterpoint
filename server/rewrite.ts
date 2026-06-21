@@ -4,12 +4,15 @@
 //
 // Constrained decoding (JSON schema) guarantees a valid, complete reply and
 // makes the model STOP — the same fix used by analysis/briefing. Results are
-// cached in memory (per item) so re-opening an article is instant.
+// persisted on disk (see rewriteStore) keyed by item id + language, SHARED across
+// all users and surviving restarts, and concurrent identical requests are
+// coalesced into ONE generation — so the LLM rewrites each article at most once.
 
 import type { Lang, RewrittenArticle } from "../src/types";
 import { aiReachable, chatJsonObject, chatRaw, type JsonSchema } from "./ai";
 import { config } from "./config";
 import { langDirective } from "./lang";
+import { rewriteStore } from "./rewriteStore";
 import { extractReadable, htmlToText } from "./readability";
 import type { StoredItem } from "./store";
 import { fetchYouTubeTranscript, isYouTube, youTubeVideoId } from "./transcripts";
@@ -59,11 +62,10 @@ const DEGRADED_RULES =
   'Output ONLY a JSON object {"title": "clean headline", "paragraphs": ["para 1", ' +
   '...]}. No markdown, no prose outside the JSON.';
 
-interface CacheEntry {
-  at: number;
-  article: RewrittenArticle;
-}
-const cache = new Map<string, CacheEntry>();
+/** In-flight de-duplication: when several readers open the SAME article+language
+ *  before it's cached, they all await ONE generation instead of each firing the
+ *  LLM. Shared by the streaming and non-streaming paths (same key). */
+const inFlight = new Map<string, Promise<RewrittenArticle | null>>();
 
 /** Cache key: per item AND per language (a Spanish rewrite ≠ the English one). */
 function cacheKey(id: string, lang: Lang): string {
@@ -278,48 +280,65 @@ export async function rewriteArticleStream(
 ): Promise<RewrittenArticle | null> {
   const { item } = stored;
   const key = cacheKey(item.id, lang);
+  const replay = (a: RewrittenArticle) =>
+    onDelta(`${a.title}\n\n${a.paragraphs.join("\n\n")}`);
 
-  const cached = cache.get(key);
-  if (cached && Date.now() - cached.at < config.reader.cacheTtlMs) {
-    onDelta(`${cached.article.title}\n\n${cached.article.paragraphs.join("\n\n")}`);
-    return cached.article;
+  // Shared, persisted cache (survives restarts; serves every user).
+  const cached = rewriteStore.get(key);
+  if (cached) {
+    replay(cached);
+    return cached;
   }
 
-  if (!(await aiReachable())) return null;
-
-  const src = await sourceText(stored);
-  let degraded = false;
-  let system: string;
-  let payload: Record<string, unknown>;
-  if (src) {
-    system = PLAIN_RULES + langDirective(lang);
-    payload = { sourceTitle: item.sourceTitle, originalTitle: item.title, kind: item.kind, content: src.text };
-  } else {
-    if (!config.reader.degradedFallback) return null;
-    const summary = (item.summary || stored.summary || "").trim();
-    const keywords = stored.keywords?.length ? stored.keywords.join(", ") : "";
-    if (summary.length < 60 && keywords.length < 20) return null;
-    degraded = true;
-    system = PLAIN_DEGRADED_RULES + langDirective(lang);
-    payload = { headline: item.title, sourceTitle: item.sourceTitle, feedSummary: summary, keywords };
+  // Another reader is already producing this exact rewrite — await it and replay
+  // the result instead of firing a second, identical LLM call.
+  const pending = inFlight.get(key);
+  if (pending) {
+    const a = await pending;
+    if (a) replay(a);
+    return a;
   }
 
-  const full = await chatRaw(system, payload, { maxTokens: config.reader.maxTokens, onDelta, onReasoning });
-  const parsed = parsePlainArticle(full, src?.fallbackTitle || item.title);
-  if (!parsed) return null;
+  const job = (async (): Promise<RewrittenArticle | null> => {
+    if (!(await aiReachable())) return null;
 
-  const article: RewrittenArticle = {
-    id: item.id,
-    title: parsed.title,
-    paragraphs: parsed.paragraphs,
-    sourceTitle: item.sourceTitle,
-    url: item.url,
-    kind: item.kind,
-    estMinutes: readMinutes(parsed.paragraphs),
-    degraded,
-  };
-  cache.set(key, { at: Date.now(), article });
-  return article;
+    const src = await sourceText(stored);
+    let degraded = false;
+    let system: string;
+    let payload: Record<string, unknown>;
+    if (src) {
+      system = PLAIN_RULES + langDirective(lang);
+      payload = { sourceTitle: item.sourceTitle, originalTitle: item.title, kind: item.kind, content: src.text };
+    } else {
+      if (!config.reader.degradedFallback) return null;
+      const summary = (item.summary || stored.summary || "").trim();
+      const keywords = stored.keywords?.length ? stored.keywords.join(", ") : "";
+      if (summary.length < 60 && keywords.length < 20) return null;
+      degraded = true;
+      system = PLAIN_DEGRADED_RULES + langDirective(lang);
+      payload = { headline: item.title, sourceTitle: item.sourceTitle, feedSummary: summary, keywords };
+    }
+
+    const full = await chatRaw(system, payload, { maxTokens: config.reader.maxTokens, onDelta, onReasoning });
+    const parsed = parsePlainArticle(full, src?.fallbackTitle || item.title);
+    if (!parsed) return null;
+
+    const article: RewrittenArticle = {
+      id: item.id,
+      title: parsed.title,
+      paragraphs: parsed.paragraphs,
+      sourceTitle: item.sourceTitle,
+      url: item.url,
+      kind: item.kind,
+      estMinutes: readMinutes(parsed.paragraphs),
+      degraded,
+    };
+    rewriteStore.set(key, article);
+    return article;
+  })().finally(() => inFlight.delete(key));
+
+  inFlight.set(key, job);
+  return job;
 }
 
 /**
@@ -334,48 +353,58 @@ export async function rewriteArticle(
   const { item } = stored;
   const key = cacheKey(item.id, lang);
 
-  const cached = cache.get(key);
-  if (cached && Date.now() - cached.at < config.reader.cacheTtlMs) return cached.article;
+  const cached = rewriteStore.get(key);
+  if (cached) return cached;
 
-  if (!(await aiReachable())) return null;
+  // Coalesce with an in-flight generation for the same article+language (could be
+  // from a streaming reader) so we never run the LLM twice for the same thing.
+  const pending = inFlight.get(key);
+  if (pending) return pending;
 
-  const src = await sourceText(stored);
-  if (!src) {
-    // No full body anywhere (hard paywall / JS-only). Don't dead-end — fall back
-    // to a clearly-labeled short brief built from the headline + feed summary.
-    const brief = await degradedBrief(stored, lang);
-    if (brief) cache.set(key, { at: Date.now(), article: brief });
-    return brief;
-  }
+  const job = (async (): Promise<RewrittenArticle | null> => {
+    if (!(await aiReachable())) return null;
 
-  const payload = {
-    sourceTitle: item.sourceTitle,
-    originalTitle: item.title,
-    kind: item.kind,
-    content: src.text,
-  };
-  const obj = await chatJsonObject(REWRITE_RULES + langDirective(lang), payload, {
-    maxTokens: config.reader.maxTokens,
-    schema: REWRITE_SCHEMA,
-  });
-  if (!obj) return null;
+    const src = await sourceText(stored);
+    if (!src) {
+      // No full body anywhere (hard paywall / JS-only). Don't dead-end — fall back
+      // to a clearly-labeled short brief built from the headline + feed summary.
+      const brief = await degradedBrief(stored, lang);
+      if (brief) rewriteStore.set(key, brief);
+      return brief;
+    }
 
-  const title = cleanTitle(obj["title"], src.fallbackTitle || item.title);
-  const paragraphs = parseParagraphs(obj, title);
-  if (paragraphs.length === 0) {
-    console.warn(`[reader] discarded unusable/garbled rewrite for ${item.url}`);
-    return null;
-  }
+    const payload = {
+      sourceTitle: item.sourceTitle,
+      originalTitle: item.title,
+      kind: item.kind,
+      content: src.text,
+    };
+    const obj = await chatJsonObject(REWRITE_RULES + langDirective(lang), payload, {
+      maxTokens: config.reader.maxTokens,
+      schema: REWRITE_SCHEMA,
+    });
+    if (!obj) return null;
 
-  const article: RewrittenArticle = {
-    id: item.id,
-    title,
-    paragraphs,
-    sourceTitle: item.sourceTitle,
-    url: item.url,
-    kind: item.kind,
-    estMinutes: readMinutes(paragraphs),
-  };
-  cache.set(key, { at: Date.now(), article });
-  return article;
+    const title = cleanTitle(obj["title"], src.fallbackTitle || item.title);
+    const paragraphs = parseParagraphs(obj, title);
+    if (paragraphs.length === 0) {
+      console.warn(`[reader] discarded unusable/garbled rewrite for ${item.url}`);
+      return null;
+    }
+
+    const article: RewrittenArticle = {
+      id: item.id,
+      title,
+      paragraphs,
+      sourceTitle: item.sourceTitle,
+      url: item.url,
+      kind: item.kind,
+      estMinutes: readMinutes(paragraphs),
+    };
+    rewriteStore.set(key, article);
+    return article;
+  })().finally(() => inFlight.delete(key));
+
+  inFlight.set(key, job);
+  return job;
 }

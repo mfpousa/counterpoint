@@ -1,7 +1,14 @@
 // Local persistence (AsyncStorage). No backend in v1.
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import type { DailyProgress, LeanHistoryPoint, Preferences, StoredSummary, Topic } from "../types";
+import type {
+  DailyProgress,
+  LeanHistoryPoint,
+  Preferences,
+  StoredSummary,
+  StoryView,
+  Topic,
+} from "../types";
 import { DEFAULT_WORLD_ID } from "../data/worlds";
 
 const KEYS = {
@@ -9,7 +16,11 @@ const KEYS = {
   progress: "cp:progress:v1",
   history: "cp:leanHistory:v1",
   summaries: "cp:summaries:v1",
+  storyViews: "cp:storyViews:v1",
 } as const;
+
+/** Cap on remembered story views (newest by seenAt kept). Bounds local storage. */
+const MAX_STORY_VIEWS = 400;
 
 /** Cap on stored recall summaries (newest kept). Bounds local storage. */
 const MAX_SUMMARIES = 500;
@@ -168,8 +179,45 @@ export async function upsertSummary(
   return next;
 }
 
+/** Load the reader's per-story "last viewed" snapshots (keyed by story id). */
+export async function loadStoryViews(): Promise<Record<string, StoryView>> {
+  try {
+    const raw = await AsyncStorage.getItem(KEYS.storyViews);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Record<string, StoryView>;
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Persist story views, capping to the most recently seen MAX_STORY_VIEWS so the
+ * record can't grow without bound. Returns the (possibly trimmed) map actually
+ * written so callers can keep state in sync.
+ */
+export async function saveStoryViews(
+  views: Record<string, StoryView>,
+): Promise<Record<string, StoryView>> {
+  const entries = Object.entries(views);
+  const trimmed =
+    entries.length <= MAX_STORY_VIEWS
+      ? views
+      : Object.fromEntries(
+          entries.sort((a, b) => b[1].seenAt - a[1].seenAt).slice(0, MAX_STORY_VIEWS),
+        );
+  await AsyncStorage.setItem(KEYS.storyViews, JSON.stringify(trimmed));
+  return trimmed;
+}
+
 export async function resetAll(): Promise<void> {
-  await AsyncStorage.multiRemove([KEYS.prefs, KEYS.progress, KEYS.history, KEYS.summaries]);
+  await AsyncStorage.multiRemove([
+    KEYS.prefs,
+    KEYS.progress,
+    KEYS.history,
+    KEYS.summaries,
+    KEYS.storyViews,
+  ]);
 }
 
 export async function resetProgressOnly(): Promise<void> {

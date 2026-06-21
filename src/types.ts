@@ -115,6 +115,14 @@ export interface FeedItem {
    * (bot-walls, JS-only pages). Stripped before items are sent to the client.
    */
   content?: string;
+  /**
+   * True when this item was DISCOVERED by story-driven YouTube search rather than
+   * pulled from a curated RSS source — i.e. we searched YouTube for a headline the
+   * outlets were covering and found a relevant news/podcast video. `sourceTitle`
+   * holds the channel name. The UI shows a bespoke "YouTube" tag so these are
+   * never confused with traditional articles.
+   */
+  youtubeSearch?: boolean;
 }
 
 /** One storyline within the daily briefing. */
@@ -273,6 +281,22 @@ export interface RewrittenArticle {
    * never hidden.
    */
   degraded?: boolean;
+}
+
+/**
+ * Per-reader record of when a developing story was last VIEWED, plus a snapshot
+ * of its state at that time. Comparing the live story against this snapshot tells
+ * us what changed since (new articles / fresher coverage), powering the "last
+ * minute" section and the per-card "new" indicator. Persisted locally; keyed by
+ * story id.
+ */
+export interface StoryView {
+  /** When the reader last opened this story (epoch ms). */
+  seenAt: number;
+  /** The story's `updatedAt` (most recent article time) as of that view. */
+  updatedAt: number;
+  /** The story's source-article count as of that view (delta -> new articles). */
+  sourceCount: number;
 }
 
 /** Live backend build/analysis progress, surfaced from GET /api/status. */

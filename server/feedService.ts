@@ -29,13 +29,19 @@ import {
 } from "./cluster";
 import { config } from "./config";
 import { cosineSim, embedQuery, embedTexts, itemEmbedText } from "./embeddings";
-import { interestTokens, partitionByExclusion, toFeedItem } from "./personalize";
+import { interestTokens, partitionByExclusion, toFeedItem, tokenize } from "./personalize";
 import { interpretQuery, type ParsedQuery } from "./query";
 import { rankItems } from "./rank";
 import { getStore, type StoredItem } from "./store";
 import { getStoryStore, type StoryKind } from "./storyStore";
 import { buildDevelopingStory, buildStory } from "./synthesize";
 import { fetchTranscripts } from "./transcripts";
+import {
+  cleanHeadlineQuery,
+  searchYouTube,
+  youTubeSearchDisabled,
+  type YouTubeHit,
+} from "./youtubeSearch";
 
 export interface FeedResult {
   items: FeedItem[];
@@ -74,6 +80,8 @@ interface WorldState {
   buildInFlight: Promise<void> | null;
   analyzeInFlight: Promise<{ remaining: number; progressed: number }> | null;
   embedInFlight: Promise<{ remaining: number; progressed: number }> | null;
+  /** Story-driven YouTube augmentation pass (fire-and-forget, one per world). */
+  youtubeInFlight: Promise<void> | null;
   catchUpTimer: ReturnType<typeof setTimeout> | null;
 }
 
@@ -94,6 +102,7 @@ function ws(worldId: string): WorldState {
       buildInFlight: null,
       analyzeInFlight: null,
       embedInFlight: null,
+      youtubeInFlight: null,
       catchUpTimer: null,
     };
     worldStates.set(worldId, s);
@@ -382,6 +391,188 @@ function embedPending(worldId: string): Promise<{ remaining: number; progressed:
   return state.embedInFlight;
 }
 
+/**
+ * Pick the single most relevant search hit for a source headline (relevance gate
+ * only — the chosen video is analyzed/embedded later like any other item).
+ * Embedding-based when available, else lexical token overlap. Returns null when
+ * nothing clears the bar — i.e. YouTube had nothing genuinely on-topic.
+ */
+async function pickRelevantVideo(
+  hits: YouTubeHit[],
+  src: StoredItem,
+): Promise<YouTubeHit | null> {
+  if (config.ai.embeddingsEnabled && src.embedding) {
+    const vecs = await embedTexts(hits.map((h) => h.title));
+    let best: YouTubeHit | null = null;
+    let bestScore = -1;
+    hits.forEach((h, i) => {
+      const v = vecs[i];
+      if (!v || v.length === 0) return;
+      const sim = cosineSim(src.embedding as number[], v);
+      if (sim > bestScore) {
+        bestScore = sim;
+        best = h;
+      }
+    });
+    return best && bestScore >= config.youtube.minRelevance ? best : null;
+  }
+  // Fallback (no embeddings): lexical overlap between candidate title & source.
+  const tks = new Set<string>([
+    ...tokenize(src.item.title),
+    ...src.keywords.flatMap((k) => tokenize(k)),
+  ]);
+  let best: YouTubeHit | null = null;
+  let bestScore = 0;
+  for (const h of hits) {
+    const overlap = tokenize(h.title).reduce((n, t) => n + (tks.has(t) ? 1 : 0), 0);
+    if (overlap > bestScore) {
+      bestScore = overlap;
+      best = h;
+    }
+  }
+  return best && bestScore >= 2 ? best : null;
+}
+
+/**
+ * Build a PENDING StoredItem for a discovered video. It enters the pool exactly
+ * like a freshly-fetched RSS item (`analyzed: false`) so the normal pipeline —
+ * transcript fetch + deep model analysis + embedding — gives it the SAME
+ * treatment as any other article: a model-written summary, its own
+ * topic/keywords/importance, and lean refinement. The only YouTube-specific bits
+ * are discovery (it came from search), the channel name as its source, and the
+ * `youtubeSearch` tag. `publishedAt` is clamped to be no older than the source
+ * story so it stays in-window and sorts alongside the coverage it extends; the
+ * source's topic is a prior the analysis is free to overwrite.
+ */
+function youTubePendingItem(hit: YouTubeHit, src: StoredItem): StoredItem {
+  const slug =
+    hit.channel.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "youtube";
+  const estMinutes = hit.durationSec
+    ? Math.max(1, Math.round(hit.durationSec / 60))
+    : Math.max(3, src.item.estMinutes);
+  const item: FeedItem = {
+    id: `ytsearch:${hit.videoId}`,
+    sourceId: `youtube:${slug}`,
+    sourceTitle: hit.channel,
+    title: hit.title,
+    summary: "",
+    url: hit.url,
+    thumbnail: hit.thumbnail,
+    publishedAt: Math.max(hit.uploadedAt ?? 0, src.item.publishedAt),
+    kind: "video",
+    topic: src.topic,
+    lean: null,
+    leanSource: "source",
+    confidence: 0,
+    estMinutes,
+    youtubeSearch: true,
+  };
+  return {
+    item,
+    clickbait: false,
+    analyzed: false, // deep analysis pending — treated like any other new item
+    topic: src.topic,
+    lean: null,
+    importance: 0,
+    summary: "",
+    keywords: [],
+    analyzedAt: 0,
+  };
+}
+
+/**
+ * Story-driven YouTube augmentation: search YouTube for the top current headlines
+ * and, when a relevant longer-form news/podcast video turns up, add it to the pool
+ * as a PENDING video article (channel name as the source, `youtubeSearch` tag).
+ * The discovered videos then go through the SAME analysis as everything else —
+ * transcript fetch + deep model analysis + embedding — so their summary, topic,
+ * keywords, importance, and lean are the model's, not inherited placeholders.
+ *
+ * Discovery itself is bounded (maxQueries), per-query cached, and shared across
+ * users. Fire-and-forget; guarded so only one runs per world at a time. To honor
+ * the GLOBAL single-build invariant, the analysis of the new videos is run only
+ * when the build lock is free (it's normally invoked right after this world
+ * released it); otherwise the videos stay pending and the next build drains them.
+ */
+function augmentWithYouTube(worldId: string): Promise<void> {
+  const state = ws(worldId);
+  if (!config.youtube.searchEnabled || youTubeSearchDisabled()) return Promise.resolve();
+  if (state.youtubeInFlight) return state.youtubeInFlight;
+
+  state.youtubeInFlight = (async () => {
+    const st = getStore(worldId);
+    const now = Date.now();
+    // Seed queries from the most important, recent, NON-youtube headlines.
+    const candidates = st
+      .all()
+      .filter(
+        (s) =>
+          s.analyzed &&
+          !s.clickbait &&
+          !s.item.youtubeSearch &&
+          s.importance >= config.youtube.minSourceImportance &&
+          now - s.item.publishedAt <= config.youtube.sourceMaxAgeMs,
+      )
+      .sort((a, b) => b.importance - a.importance || b.item.publishedAt - a.item.publishedAt);
+
+    // Dedupe near-identical headlines (same event covered by many outlets) by a
+    // sorted token signature so we don't spend several queries on one story.
+    const picked: { q: string; src: StoredItem }[] = [];
+    const seenSig = new Set<string>();
+    for (const s of candidates) {
+      if (picked.length >= config.youtube.maxQueries) break;
+      const q = cleanHeadlineQuery(s.item.title);
+      if (q.length < 8) continue;
+      const sig = tokenize(q).sort().slice(0, 8).join(" ");
+      if (!sig || seenSig.has(sig)) continue;
+      seenSig.add(sig);
+      picked.push({ q, src: s });
+    }
+    if (picked.length === 0) return;
+
+    let added = 0;
+    for (const { q, src } of picked) {
+      const hits = await searchYouTube(q);
+      const fresh = hits.filter((h) => !st.has(`ytsearch:${h.videoId}`));
+      if (fresh.length === 0) continue;
+      // Relevance gate (off-topic noise out); the embedding here is only used to
+      // rank candidates — the stored item is re-embedded properly post-analysis.
+      const best = await pickRelevantVideo(fresh, src);
+      if (!best) continue;
+      st.upsert(youTubePendingItem(best, src));
+      added += 1;
+    }
+    if (added === 0) return;
+
+    st.save();
+    console.log(`[youtube:${worldId}] queued ${added} searched video(s) for analysis`);
+
+    // Analyze the new videos exactly like any other pending item. Only do so if
+    // the global build lock is free (we acquire it, mirroring buildPool); if a
+    // different world is building, leave them pending for the next drain.
+    if (buildingWorld) return;
+    buildingWorld = worldId;
+    try {
+      const a = await analyzePending(worldId);
+      const e = await embedPending(worldId);
+      const moreWork =
+        (a.remaining > 0 && a.progressed > 0) || (e.remaining > 0 && e.progressed > 0);
+      if (moreWork) scheduleCatchUp(worldId);
+      else if (buildingWorld === worldId) buildingWorld = null;
+    } catch (err) {
+      if (buildingWorld === worldId) buildingWorld = null;
+      throw err;
+    }
+  })()
+    .catch((e) => {
+      console.warn(`[youtube:${worldId}] augmentation failed:`, e);
+    })
+    .finally(() => {
+      state.youtubeInFlight = null;
+    });
+  return state.youtubeInFlight;
+}
+
 /** Schedule a background chunk to keep chewing through a world's analysis +
  *  embedding backlogs. Holds the GLOBAL build lock until the backlog clears. */
 function scheduleCatchUp(worldId: string): void {
@@ -404,6 +595,9 @@ function scheduleCatchUp(worldId: string): void {
           // Backlog drained (or stalled) — release the global build lock so
           // another world may refresh.
           if (buildingWorld === worldId) buildingWorld = null;
+          // The pool is now fully analyzed — extend the stories with relevant
+          // YouTube videos (background, no model cost).
+          void augmentWithYouTube(worldId);
         }
       } catch (err) {
         console.warn(`[feed:${worldId}] catch-up failed:`, err);
@@ -431,6 +625,8 @@ async function buildPool(worldId: string): Promise<void> {
   } else if (buildingWorld === worldId) {
     // No background work scheduled — release the lock now.
     buildingWorld = null;
+    // Pool fully analyzed in one pass — augment with YouTube in the background.
+    void augmentWithYouTube(worldId);
   }
 }
 
@@ -627,21 +823,30 @@ export async function getBriefingStream(
 
   const cached = state.briefingCache.get(key);
   if (cached && cached.builtAt === state.lastBuildAt) return cached.briefing;
+  // Coalesce with any in-flight generation for the same world+lang+interest
+  // (incl. a non-streaming getBriefing) so concurrent readers share ONE LLM call.
+  const existing = state.briefingInFlight.get(key);
+  if (existing) return existing;
   if (!(await aiReachable())) return null;
 
   const builtAtSnapshot = state.lastBuildAt;
-  const parsed = await interpretQuery(interestStr);
-  const queryVec = await embedQuery(parsed.positive);
-  const view = assembleView(worldId, interestStr, parsed, queryVec);
-  const sample = view.items.slice(0, 40);
-  console.log(`[feed:${worldId}] briefing(${lang}): streaming "${interestStr || "general"}" from ${sample.length} item(s)…`);
-  // Fall back to the (reliable, constrained) JSON generator if the streamed prose
-  // doesn't parse into anything usable.
-  const briefing =
-    (await generateBriefingStream(interestStr, sample, onDelta, lang)) ??
-    (await generateBriefing(interestStr, sample, lang));
-  state.briefingCache.set(key, { builtAt: builtAtSnapshot, briefing });
-  return briefing;
+  const p = (async (): Promise<Briefing | null> => {
+    const parsed = await interpretQuery(interestStr);
+    const queryVec = await embedQuery(parsed.positive);
+    const view = assembleView(worldId, interestStr, parsed, queryVec);
+    const sample = view.items.slice(0, 40);
+    console.log(`[feed:${worldId}] briefing(${lang}): streaming "${interestStr || "general"}" from ${sample.length} item(s)…`);
+    // Fall back to the (reliable, constrained) JSON generator if the streamed
+    // prose doesn't parse into anything usable.
+    const briefing =
+      (await generateBriefingStream(interestStr, sample, onDelta, lang)) ??
+      (await generateBriefing(interestStr, sample, lang));
+    state.briefingCache.set(key, { builtAt: builtAtSnapshot, briefing });
+    return briefing;
+  })().finally(() => state.briefingInFlight.delete(key));
+
+  state.briefingInFlight.set(key, p);
+  return p;
 }
 
 /** The recent, analyzed pool eligible to be clustered into stories. Uses the

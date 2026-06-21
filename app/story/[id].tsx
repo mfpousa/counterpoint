@@ -5,7 +5,7 @@
 // + left->right comparison are layered in once the server emits them; this screen
 // already renders them when present and degrades cleanly when they're absent.
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams } from "expo-router";
@@ -14,11 +14,12 @@ import { fetchStory } from "../../src/lib/api";
 import { cacheStories, getCachedStories, getCachedStory } from "../../src/lib/storyCache";
 import { goBack, openNews, openStory } from "../../src/lib/nav";
 import { topicMeta } from "../../src/lib/topics";
+import { storyChange, milestoneIsNew } from "../../src/lib/storyUpdates";
 import { leanColor } from "../../src/components/ui";
 import { TypewriterParagraphs } from "../../src/components/anim";
 import { useApp, useT } from "../../src/store/AppContext";
 import { colors, font, radius, spacing } from "../../src/theme";
-import type { Lean, Story, StorySpectrum } from "../../src/types";
+import type { Lean, Story, StorySpectrum, StoryView } from "../../src/types";
 
 const READ_WIDTH = 760;
 
@@ -61,7 +62,7 @@ function tlDate(ms: number): string {
 export default function StoryPanel() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
-  const { worldId, prefs } = useApp();
+  const { worldId, prefs, storyViews, markStorySeen } = useApp();
   const t = useT();
 
   // Seed from the shared cache so a story opened from the feed renders INSTANTLY
@@ -102,6 +103,27 @@ export default function StoryPanel() {
       cancelled = true;
     };
   }, [id, worldId, prefs.language]);
+
+  // Capture the reader's PRIOR view (before this visit) so we can show what's new
+  // since, then record this visit once the story has loaded. Guarded to run once
+  // per id: when markStorySeen updates storyViews, this effect re-runs but exits
+  // early, so the captured prior snapshot isn't clobbered with the fresh one.
+  const [priorView, setPriorView] = useState<StoryView | null>(null);
+  const seenMarkedRef = useRef<string | null>(null);
+  useEffect(() => {
+    seenMarkedRef.current = null;
+    setPriorView(null);
+  }, [id]);
+  useEffect(() => {
+    if (!story || !id || seenMarkedRef.current === id) return;
+    seenMarkedRef.current = id;
+    setPriorView(storyViews[id] ?? null);
+    void markStorySeen(story);
+  }, [story, id, storyViews, markStorySeen]);
+
+  // What changed since the reader last opened this story.
+  const change = story ? storyChange(story, priorView) : null;
+  const priorSeenAt = priorView?.seenAt ?? null;
 
   // Related stories resolve from whatever's cached (siblings loaded with it).
   const related = useMemo(() => {
@@ -186,32 +208,54 @@ export default function StoryPanel() {
               )}
             </View>
 
+            {change?.hasUpdates && (
+              <View style={styles.updateBanner}>
+                <Ionicons name="flash" size={14} color={colors.accent} />
+                <Text style={styles.updateBannerText}>
+                  {change.newSources > 0
+                    ? t(
+                        change.newSources === 1
+                          ? "storyPanel.sinceLastOne"
+                          : "storyPanel.sinceLast",
+                        { count: change.newSources },
+                      )
+                    : t("storyPanel.sinceLastUpdated")}
+                </Text>
+              </View>
+            )}
+
             <TypewriterParagraphs paragraphs={story.synthesis} cps={320} style={styles.paragraph} />
 
             {story.timeline && story.timeline.length > 0 && (
               <View style={styles.section}>
                 <SectionHeader icon="time-outline" label={t("storyPanel.timeline")} />
-                {story.timeline.map((mst, i) => (
-                  <Pressable
-                    key={i}
-                    style={styles.tlRow}
-                    onPress={() => mst.sourceIds[0] && openNews(mst.sourceIds[0])}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Read coverage from ${tlDate(mst.at)}`}
-                  >
-                    <View style={styles.tlRail}>
-                      <View style={styles.tlDot} />
-                      {i < story.timeline!.length - 1 && <View style={styles.tlLine} />}
-                    </View>
-                    <View style={styles.tlBody}>
-                      <Text style={styles.tlDate}>{tlDate(mst.at)}</Text>
-                      <Text style={styles.tlTitle}>{mst.title}</Text>
-                      {!!mst.detail && mst.detail !== mst.title && (
-                        <Text style={styles.tlDetail}>{mst.detail}</Text>
-                      )}
-                    </View>
-                  </Pressable>
-                ))}
+                {story.timeline.map((mst, i) => {
+                  const isNew = milestoneIsNew(mst, priorSeenAt);
+                  return (
+                    <Pressable
+                      key={i}
+                      style={styles.tlRow}
+                      onPress={() => mst.sourceIds[0] && openNews(mst.sourceIds[0])}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Read coverage from ${tlDate(mst.at)}`}
+                    >
+                      <View style={styles.tlRail}>
+                        <View style={[styles.tlDot, isNew && styles.tlDotNew]} />
+                        {i < story.timeline!.length - 1 && <View style={styles.tlLine} />}
+                      </View>
+                      <View style={styles.tlBody}>
+                        <View style={styles.tlDateRow}>
+                          <Text style={styles.tlDate}>{tlDate(mst.at)}</Text>
+                          {isNew && <Text style={styles.tlNewTag}>{t("storyPanel.new")}</Text>}
+                        </View>
+                        <Text style={styles.tlTitle}>{mst.title}</Text>
+                        {!!mst.detail && mst.detail !== mst.title && (
+                          <Text style={styles.tlDetail}>{mst.detail}</Text>
+                        )}
+                      </View>
+                    </Pressable>
+                  );
+                })}
               </View>
             )}
 
@@ -401,6 +445,33 @@ const styles = StyleSheet.create({
   tlDot: { width: 11, height: 11, borderRadius: 6, backgroundColor: colors.accent, marginTop: 3 },
   tlLine: { flex: 1, width: 2, backgroundColor: colors.border, marginTop: 2 },
   tlBody: { flex: 1, paddingBottom: spacing.md },
+  tlDotNew: { backgroundColor: colors.accent, width: 13, height: 13, borderRadius: 7, borderWidth: 2, borderColor: colors.accent + "55" },
+  tlDateRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  tlNewTag: {
+    color: colors.accent,
+    fontSize: font.tiny,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+    backgroundColor: colors.accent + "22",
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 1,
+    borderRadius: radius.pill,
+    overflow: "hidden",
+  },
+  updateBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.accent + "66",
+    backgroundColor: colors.accent + "14",
+    marginBottom: spacing.sm,
+  },
+  updateBannerText: { color: colors.accent, fontSize: font.small, fontWeight: "700", flex: 1 },
   tlDate: { color: colors.accent, fontSize: font.tiny, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.4 },
   tlTitle: { color: colors.text, fontSize: font.small, fontWeight: "700", marginTop: 1 },
   tlDetail: { color: colors.textDim, fontSize: font.small, lineHeight: font.small * 1.45, marginTop: 1 },

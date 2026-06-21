@@ -24,6 +24,7 @@ import { AnalysisProgress } from "../../src/components/AnalysisProgress";
 import { WorldSwitcher } from "../../src/components/WorldSwitcher";
 import { fetchStories } from "../../src/lib/api";
 import { cacheStories } from "../../src/lib/storyCache";
+import { lastMinuteStories } from "../../src/lib/storyUpdates";
 import { openNews, openStory } from "../../src/lib/nav";
 import { LeanDial, QuotaMeter } from "../../src/components/meters";
 import { colors, font, radius, spacing } from "../../src/theme";
@@ -53,6 +54,7 @@ export default function FeedScreen() {
     briefingStream,
     status,
     summaries,
+    storyViews,
     worldId,
     busyWorld,
     refreshFeed,
@@ -246,6 +248,12 @@ export default function FeedScreen() {
     activeSelected === "all"
       ? developingStories
       : developingStories.filter((s) => s.topic === activeSelected);
+  // "Last minute": stories with new coverage since the reader last opened them,
+  // honoring the active topic filter.
+  const visibleLastMinute = useMemo(() => {
+    const lm = lastMinuteStories(stories, storyViews);
+    return activeSelected === "all" ? lm : lm.filter((s) => s.topic === activeSelected);
+  }, [stories, storyViews, activeSelected]);
 
   // Responsive layout math.
   const contentW = Math.min(width, MAX_CONTENT_WIDTH) - H_PAD * 2;
@@ -395,6 +403,29 @@ export default function FeedScreen() {
               );
             })}
           </ScrollView>
+        )}
+
+        {/* Last minute — stories that changed since the reader last opened them
+            (new articles / fresher coverage). Only shown once there's something
+            genuinely new to surface, so a first-time reader never sees it. */}
+        {visibleLastMinute.length > 0 && (
+          <View style={{ gap: spacing.md }}>
+            <View style={styles.sectionHeader}>
+              <View style={[styles.sectionIcon, { backgroundColor: colors.accent + "22" }]}>
+                <Ionicons name="flash" size={15} color={colors.accent} />
+              </View>
+              <Text style={styles.sectionTitle}>{t("feed.lastMinute")}</Text>
+              <Text style={styles.sectionCount}>{visibleLastMinute.length}</Text>
+            </View>
+            <Text style={styles.lastMinuteSub}>{t("feed.lastMinuteSub")}</Text>
+            <View style={[styles.grid, { gap: GAP }]}>
+              {visibleLastMinute.map((story) => (
+                <FadeInView key={`lm-${story.id}`} style={{ width: cardW }}>
+                  <StoryCard story={story} onOpen={(s) => openStory(s.id)} />
+                </FadeInView>
+              ))}
+            </View>
+          </View>
         )}
 
         {/* Developing issues — highlighted band of ongoing storylines. Stories are
@@ -613,6 +644,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: { color: colors.text, fontSize: font.h3, fontWeight: "800" },
   sectionCount: { color: colors.textFaint, fontSize: font.small, fontWeight: "700" },
+  lastMinuteSub: { color: colors.textDim, fontSize: font.small, marginTop: -spacing.xs, lineHeight: font.small * 1.4 },
   grid: { flexDirection: "row", flexWrap: "wrap" },
   empty: { padding: spacing.xl, alignItems: "center", gap: spacing.sm, marginTop: spacing.xl },
   emptyTitle: { color: colors.text, fontSize: font.h3, fontWeight: "700", textAlign: "center" },

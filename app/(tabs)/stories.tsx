@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useApp } from "../../src/store/AppContext";
 import { fetchStories } from "../../src/lib/api";
 import { StoryCard } from "../../src/components/StoryCard";
+import { lastMinuteStories } from "../../src/lib/storyUpdates";
 import { WorldSwitcher } from "../../src/components/WorldSwitcher";
 import { openStory } from "../../src/lib/nav";
 import { AnalysisProgress } from "../../src/components/AnalysisProgress";
@@ -33,7 +34,7 @@ function columnsFor(contentWidth: number): number {
 export default function StoriesScreen() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const { worldId, busyWorld, setWorld, status } = useApp();
+  const { worldId, busyWorld, setWorld, status, storyViews } = useApp();
 
   const [stories, setStories] = useState<Story[]>([]);
   const [loading, setLoading] = useState(false);
@@ -73,6 +74,12 @@ export default function StoriesScreen() {
   const cols = columnsFor(contentW);
   const GAP = spacing.lg;
   const cardW = cols === 1 ? contentW : Math.floor((contentW - GAP * (cols - 1)) / cols);
+
+  // Stories that gained new coverage since the reader last opened them.
+  const lastMinute = useMemo(
+    () => lastMinuteStories(stories, storyViews),
+    [stories, storyViews],
+  );
 
   return (
       <ScrollView
@@ -127,6 +134,28 @@ export default function StoriesScreen() {
             </View>
           )}
 
+          {lastMinute.length > 0 && (
+            <View style={{ gap: spacing.md }}>
+              <View style={styles.lastMinHeader}>
+                <View style={styles.lastMinIcon}>
+                  <Ionicons name="flash" size={15} color={colors.accent} />
+                </View>
+                <Text style={styles.lastMinTitle}>Last minute</Text>
+                <Text style={styles.lastMinCount}>{lastMinute.length}</Text>
+              </View>
+              <Text style={styles.lastMinSub}>
+                Stories that moved on since you last opened them.
+              </Text>
+              <View style={[styles.grid, { gap: GAP }]}>
+                {lastMinute.map((s) => (
+                  <View key={`lm-${s.id}`} style={{ width: cardW }}>
+                    <StoryCard story={s} onOpen={(st) => openStory(st.id)} />
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+
           {stories.length === 0 ? (
             loading ? (
               <View style={styles.empty}>
@@ -167,6 +196,18 @@ const styles = StyleSheet.create({
   },
   refreshText: { color: colors.accent, fontSize: font.small, fontWeight: "700" },
   grid: { flexDirection: "row", flexWrap: "wrap" },
+  lastMinHeader: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  lastMinIcon: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.accent + "22",
+  },
+  lastMinTitle: { color: colors.text, fontSize: font.h3, fontWeight: "800" },
+  lastMinCount: { color: colors.accent, fontSize: font.small, fontWeight: "800" },
+  lastMinSub: { color: colors.textDim, fontSize: font.small, marginTop: -spacing.xs },
   busyBanner: {
     flexDirection: "row",
     alignItems: "center",

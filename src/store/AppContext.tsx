@@ -20,10 +20,12 @@ import {
   loadHistory,
   loadPreferences,
   loadProgress,
+  loadStoryViews,
   loadSummaries,
   resetProgressOnly,
   savePreferences,
   saveProgress,
+  saveStoryViews,
   trailingWindow,
   upsertSummary,
 } from "../storage/storage";
@@ -35,6 +37,8 @@ import type {
   LeanHistoryPoint,
   Preferences,
   StoredSummary,
+  Story,
+  StoryView,
   SummaryGrade,
 } from "../types";
 
@@ -58,6 +62,8 @@ interface AppState {
   status: AnalysisStatus | null;
   /** Graded recall summaries (newest first), persisted locally. */
   summaries: StoredSummary[];
+  /** Per-story "last viewed" snapshots, for new-coverage detection (local). */
+  storyViews: Record<string, StoryView>;
   /** The active world id (set of sources). */
   worldId: string;
   /** If a DIFFERENT world is currently refreshing (only one at a time), its id. */
@@ -71,6 +77,9 @@ interface AppState {
    */
   gradeAndRecord: (item: FeedItem, summaryText: string) => Promise<SummaryGrade>;
   refreshFeed: (opts?: { force?: boolean }) => Promise<void>;
+  /** Record that the reader just viewed a story (snapshots its current state so
+   *  later coverage can be flagged as "new"). Persisted locally. */
+  markStorySeen: (story: Story) => Promise<void>;
   /** Switch the active world (persists, clears the current pool, re-fetches). */
   setWorld: (worldId: string) => Promise<void>;
   resetToday: () => Promise<void>;
@@ -91,21 +100,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [briefingStream, setBriefingStream] = useState("");
   const [status, setStatus] = useState<AnalysisStatus | null>(null);
   const [summaries, setSummaries] = useState<StoredSummary[]>([]);
+  const [storyViews, setStoryViews] = useState<Record<string, StoryView>>({});
   const [busyWorld, setBusyWorld] = useState<string | null>(null);
 
   // Initial load of persisted state.
   useEffect(() => {
     (async () => {
-      const [p, pr, h, sm] = await Promise.all([
+      const [p, pr, h, sm, sv] = await Promise.all([
         loadPreferences(),
         loadProgress(),
         loadHistory(),
         loadSummaries(),
+        loadStoryViews(),
       ]);
       setPrefs(p);
       setProgress(pr);
       setHistory(h);
       setSummaries(sm);
+      setStoryViews(sv);
       setReady(true);
     })();
   }, []);
@@ -365,6 +377,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [prefs],
   );
 
+  // Keep a ref of story views so markStorySeen stays stable (no re-creation on
+  // every view change) while always reading the latest map.
+  const storyViewsRef = useRef(storyViews);
+  storyViewsRef.current = storyViews;
+
+  const markStorySeen = useCallback(async (story: Story) => {
+    const snapshot: StoryView = {
+      seenAt: Date.now(),
+      updatedAt: story.updatedAt,
+      sourceCount: story.sources.length,
+    };
+    const next = { ...storyViewsRef.current, [story.id]: snapshot };
+    setStoryViews(next);
+    // saveStoryViews may trim to the cap; mirror what was actually written.
+    const written = await saveStoryViews(next);
+    if (Object.keys(written).length !== Object.keys(next).length) setStoryViews(written);
+  }, []);
+
   const resetToday = useCallback(async () => {
     await resetProgressOnly();
     const fresh = emptyProgress();
@@ -386,12 +416,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     briefingStream,
     status,
     summaries,
+    storyViews,
     worldId: prefs.worldId,
     busyWorld,
     updatePrefs,
     completeItem,
     gradeAndRecord,
     refreshFeed,
+    markStorySeen,
     setWorld,
     resetToday,
   };

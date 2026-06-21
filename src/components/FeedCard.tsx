@@ -24,6 +24,9 @@ export function whenLabel(ms: number, t: T): string {
   return new Date(ms).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
+/** YouTube brand red, for the bespoke "found via YouTube search" tag. */
+const YT_RED = "#FF3D33";
+
 const KIND_ICON: Record<FeedItem["kind"], keyof typeof Ionicons.glyphMap> = {
   video: "play-circle",
   podcast: "mic",
@@ -108,6 +111,12 @@ export function FeedCard({
 
       <View style={styles.tagRow}>
         <TopicPill topic={item.topic} />
+        {item.youtubeSearch && (
+          <View style={styles.ytBadge}>
+            <Ionicons name="logo-youtube" size={12} color={YT_RED} />
+            <Text style={styles.ytText}>{t("card.youtube")}</Text>
+          </View>
+        )}
         {typeof item.relevance === "number" && <ScoreBadge relevance={item.relevance} />}
         <View style={{ flex: 1 }} />
         <LeanBadge lean={item.lean} source={item.leanSource} rationale={item.leanRationale} />
@@ -228,6 +237,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   scoreText: { fontSize: font.tiny, fontWeight: "800" },
+  ytBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: YT_RED,
+    backgroundColor: YT_RED + "1A",
+  },
+  ytText: { color: YT_RED, fontSize: font.tiny, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.4 },
   reasonRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   reason: { color: colors.accent, fontSize: font.tiny, fontWeight: "600", flexShrink: 1 },
   aiNoteRow: { flexDirection: "row", alignItems: "flex-start", gap: spacing.xs },

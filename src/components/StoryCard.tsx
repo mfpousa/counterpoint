@@ -7,7 +7,8 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, font, radius, spacing } from "../theme";
 import { topicMeta } from "../lib/topics";
-import { useT } from "../store/AppContext";
+import { storyChange } from "../lib/storyUpdates";
+import { useApp, useT } from "../store/AppContext";
 import type { Story } from "../types";
 import { IssueTag, leanColor } from "./ui";
 
@@ -32,12 +33,15 @@ export function StoryCard({
   onOpenIssue?: (id: string) => void;
 }) {
   const t = useT();
+  const { storyViews } = useApp();
   const m = topicMeta(story.topic);
   const outlets = story.sources.length;
   const developing = !!story.developing;
   const events = story.timeline?.length ?? 0;
+  // What changed since the reader last opened this story (new coverage).
+  const change = storyChange(story, storyViews[story.id]);
   return (
-    <View style={[styles.card, developing && styles.cardDeveloping]}>
+    <View style={[styles.card, developing && styles.cardDeveloping, change.hasUpdates && styles.cardUpdated]}>
       <Pressable
         style={styles.body}
         onPress={() => onOpen(story)}
@@ -61,6 +65,18 @@ export function StoryCard({
           </View>
         )}
         <View style={{ flex: 1 }} />
+        {change.hasUpdates && (
+          <View style={styles.newBadge} accessibilityLabel={t("story.updatedA11y")}>
+            <View style={styles.newDot} />
+            <Text style={styles.newText}>
+              {change.newSources > 0
+                ? t(change.newSources === 1 ? "story.newArticlesOne" : "story.newArticles", {
+                    count: change.newSources,
+                  })
+                : t("story.updated")}
+            </Text>
+          </View>
+        )}
         <Text style={styles.age}>{age(story.updatedAt)}</Text>
       </View>
 
@@ -121,6 +137,18 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   cardDeveloping: { borderColor: colors.warn + "66", borderLeftWidth: 3, borderLeftColor: colors.warn },
+  cardUpdated: { borderColor: colors.accent + "99" },
+  newBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: colors.accent + "22",
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
+  },
+  newDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.accent },
+  newText: { color: colors.accent, fontSize: font.tiny, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.4 },
   body: { gap: spacing.sm },
   developingTag: {
     flexDirection: "row",

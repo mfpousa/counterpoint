@@ -138,6 +138,14 @@ export const config = {
     maxTokens: num("READER_MAX_TOKENS", 2200),
     // How long a rewritten article is cached in memory (ms). Default 6h.
     cacheTtlMs: num("READER_CACHE_TTL_MS", 6 * 60 * 60 * 1000),
+    // On-disk cache of rewritten articles, SHARED across all users and surviving
+    // restarts so the LLM never re-rewrites an article another reader (or a prior
+    // process) already did. Keyed by item id + language. Relative paths from cwd.
+    cachePath: str("READER_CACHE_PATH", ".cache/rewrite-cache.json"),
+    // How long a persisted rewrite stays valid on disk. Article rewrites don't go
+    // stale (the source is immutable), so this is generous to maximize reuse and
+    // minimize model spend. Default 14 days.
+    diskTtlMs: num("READER_DISK_TTL_MS", 14 * 24 * 60 * 60 * 1000),
     // When direct extraction fails (bot-wall / JS-only page), retry via reader
     // proxies (r.jina.ai renders JS; CORS proxies re-fetch the HTML). In practice
     // the free proxies are captcha-gated/flaky and don't beat hard paywalls, while
@@ -235,6 +243,37 @@ export const config = {
     // Parallel yt-dlp processes (each spawns a child + network; keep low).
     concurrency: num("TRANSCRIPT_CONCURRENCY", 2),
     timeoutMs: num("TRANSCRIPT_TIMEOUT_MS", 30_000),
+  },
+  youtube: {
+    // Story-driven YouTube SEARCH. Instead of relying on raw channel feeds (whose
+    // unfiltered output is mostly noise), we search YouTube for the headlines the
+    // OUTLETS are already covering and, when a relevant longer-form news/podcast
+    // video turns up, add it to the pool as a tagged video "article" (channel name
+    // as the source). Keyless via yt-dlp's `ytsearch`. Discovered videos are then
+    // analyzed like ANY other item (transcript + model summary/topic/keywords/lean)
+    // — search only adds candidates; it doesn't shortcut the analysis. The search
+    // step itself is bounded + cached so discovery stays cheap. Disable with
+    // YT_SEARCH_OFF=1. Shared across users + cached server-side.
+    searchEnabled: !bool("YT_SEARCH_OFF"),
+    // Max distinct headline queries searched per build (bounds yt-dlp load/time).
+    maxQueries: num("YT_SEARCH_MAX_QUERIES", 6),
+    // Results requested per query (we keep at most ONE, the most relevant).
+    resultsPerQuery: num("YT_SEARCH_RESULTS", 10),
+    // Only seed queries from source items at least this important (0..1) and no
+    // older than the source-age window (keeps searches on live, substantive news).
+    minSourceImportance: num("YT_SEARCH_MIN_IMPORTANCE", 0.55),
+    sourceMaxAgeMs: num("YT_SEARCH_SOURCE_MAX_AGE_MS", 2 * 24 * 60 * 60 * 1000),
+    // Relevance gate: min cosine similarity between a candidate's title embedding
+    // and the source headline's embedding to accept it (filters off-topic noise).
+    minRelevance: num("YT_SEARCH_MIN_RELEVANCE", 0.5),
+    // Duration gate (seconds): exclude shorts/clips and multi-hour livestreams so
+    // we keep substantive news segments / podcast episodes (applied when known).
+    minDurationSec: num("YT_SEARCH_MIN_DURATION_SEC", 180),
+    maxDurationSec: num("YT_SEARCH_MAX_DURATION_SEC", 4 * 60 * 60),
+    // Re-search the same query at most this often (ms) — server-side, shared.
+    queryTtlMs: num("YT_SEARCH_QUERY_TTL_MS", 12 * 60 * 60 * 1000),
+    // yt-dlp search timeout (ms).
+    searchTimeoutMs: num("YT_SEARCH_TIMEOUT_MS", 25_000),
   },
 } as const;
 
