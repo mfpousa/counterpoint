@@ -297,7 +297,13 @@ export const config = {
     perZoneItemCap: num("ZONES_PER_ZONE_ITEMS", 6),
     // Relatedness gate: min shared salient tokens between a fetched zone article
     // and the story's seed tokens to keep it (we don't want ALL of a region's news).
+    // English feeds match here; ORIGINAL-LANGUAGE feeds (different script) won't, so
+    // they're matched by embedding similarity instead (minRelevance below).
     minSharedTokens: num("ZONES_MIN_SHARED_TOKENS", 2),
+    // Embedding relatedness gate (cross-lingual): min cosine between a fetched zone
+    // article's title and a seed story's embedding to keep it. This is what lets
+    // original-language coverage attach to a story when token overlap can't.
+    minRelevance: num("ZONES_MIN_RELEVANCE", 0.5),
     // Re-fetch the same zone at most this often (ms) — bounds repeated loads.
     zoneTtlMs: num("ZONES_TTL_MS", 6 * 60 * 60 * 1000),
   },

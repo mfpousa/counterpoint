@@ -578,18 +578,23 @@ async function addZonePending(worldId: string): Promise<number> {
     .slice(0, config.zones.seedItems);
   if (seeds.length === 0) return 0;
 
-  // Accumulate involved zones + the salient tokens of the stories that triggered
-  // each (used to keep only RELATED foreign coverage, not a region's whole feed).
-  const involved = new Map<string, { score: number; tokens: Set<string> }>();
+  // Accumulate involved zones + the salient tokens AND embeddings of the stories
+  // that triggered each. Tokens relate English coverage; embeddings relate
+  // ORIGINAL-LANGUAGE coverage (cross-lingual) that shares no Latin tokens.
+  const involved = new Map<
+    string,
+    { score: number; tokens: Set<string>; embeddings: number[][] }
+  >();
   for (const s of seeds) {
     const text = `${s.item.title} ${s.summary} ${s.keywords.join(" ")}`;
     const zoneIds = detectZones(text, ZONES, config.zones.minAliasHits);
     if (zoneIds.length === 0) continue;
     const seedToks = titleTokens(s.item.title, s.keywords);
     for (const id of zoneIds) {
-      const cur = involved.get(id) ?? { score: 0, tokens: new Set<string>() };
+      const cur = involved.get(id) ?? { score: 0, tokens: new Set<string>(), embeddings: [] };
       cur.score += 1;
       for (const t of seedToks) cur.tokens.add(t);
+      if (s.embedding && s.embedding.length > 0) cur.embeddings.push(s.embedding);
       involved.set(id, cur);
     }
   }
@@ -603,7 +608,7 @@ async function addZonePending(worldId: string): Promise<number> {
   if (chosen.length === 0) return 0;
 
   let added = 0;
-  for (const [zoneId, { tokens }] of chosen) {
+  for (const [zoneId, { tokens, embeddings }] of chosen) {
     const zone = ZONES_BY_ID[zoneId];
     if (!zone || zone.sources.length === 0) continue;
     state.zoneFetchedAt.set(zoneId, now);
@@ -614,17 +619,30 @@ async function addZonePending(worldId: string): Promise<number> {
       console.warn(`[zones:${worldId}] fetch failed for "${zoneId}":`, e);
       continue;
     }
-    // Keep only NEW, recent articles RELATED to the triggering stories (shared
-    // salient tokens) — we want this zone's take on THESE stories, not all its news.
-    const related = raw
-      .filter((it) => !st.has(it.id) && it.publishedAt >= cutoff)
-      .map((it) => {
-        let shared = 0;
-        for (const t of articleTokens(it.title)) if (tokens.has(t)) shared += 1;
-        return { it, shared };
-      })
-      .filter((x) => x.shared >= config.zones.minSharedTokens)
-      .sort((a, b) => b.shared - a.shared || b.it.publishedAt - a.it.publishedAt)
+    // Candidates: NEW, recent articles from this zone. We then keep only those
+    // RELATED to the triggering stories — by shared salient tokens (English) OR by
+    // cross-lingual embedding similarity (original-language) — so we get this
+    // zone's take on THESE stories, not its entire feed.
+    const candidates = raw.filter((it) => !st.has(it.id) && it.publishedAt >= cutoff);
+    const scored = candidates.map((it) => {
+      let shared = 0;
+      for (const t of articleTokens(it.title)) if (tokens.has(t)) shared += 1;
+      return { it, shared, sim: 0 };
+    });
+    // Embedding relatedness (what attaches non-Latin-script coverage to a story).
+    if (config.ai.embeddingsEnabled && embeddings.length > 0 && scored.length > 0) {
+      const vecs = await embedTexts(scored.map((x) => x.it.title));
+      scored.forEach((x, i) => {
+        const v = vecs[i];
+        if (!v || v.length === 0) return;
+        let best = 0;
+        for (const e of embeddings) best = Math.max(best, cosineSim(v, e));
+        x.sim = best;
+      });
+    }
+    const related = scored
+      .filter((x) => x.shared >= config.zones.minSharedTokens || x.sim >= config.zones.minRelevance)
+      .sort((a, b) => b.sim - a.sim || b.shared - a.shared || b.it.publishedAt - a.it.publishedAt)
       .slice(0, config.zones.perZoneItemCap);
 
     for (const { it } of related) {

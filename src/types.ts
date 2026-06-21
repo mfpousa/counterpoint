@@ -54,6 +54,13 @@ export interface Source {
   /** Relative sampling weight (higher = drawn more often). Default 1. */
   weight?: number;
   /**
+   * ISO 639-1 language of the feed's content (e.g. "en", "ru", "uk", "ar").
+   * Defaults to "en" when absent. Set on reactive international sources so we can
+   * report coverage by language and surface ORIGINAL-language reporting (the model
+   * reads it directly; summaries are produced in the reader's language).
+   */
+  lang?: string;
+  /**
    * Geographic / affiliation ZONE this outlet belongs to (e.g. "russia",
    * "ukraine", "china"). Set ONLY on reactive international sources — outlets
    * fetched on demand when a story involves their zone (see src/data/zones.ts).
