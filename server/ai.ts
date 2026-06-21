@@ -106,6 +106,11 @@ export async function chatRaw(
   };
   arm();
 
+  // Hoisted so a mid-stream error can still return whatever already streamed —
+  // discarding it would fail a rewrite the user already watched being written.
+  let content = "";
+  let raw = ""; // full decoded body, for the non-streaming fallback
+
   try {
     const res = await fetch(`${config.ai.baseUrl}/chat/completions`, {
       method: "POST",
@@ -149,8 +154,6 @@ export async function chatRaw(
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = ""; // unparsed SSE text (may hold a partial line)
-    let raw = ""; // full decoded body, for the non-streaming fallback
-    let content = "";
 
     const drainLine = (line: string) => {
       const trimmed = line.trim();
@@ -203,8 +206,18 @@ export async function chatRaw(
     return content;
   } catch (e) {
     const why = e instanceof Error && e.name === "AbortError" ? "idle timeout" : String(e);
-    console.warn(`[ai] request error: ${why}`);
-    return "";
+    // Salvage whatever streamed before the error rather than failing outright —
+    // a truncated rewrite is far better than wiping text the user watched appear.
+    if (!content && raw) {
+      const obj = extractJsonObject(raw) as
+        | { choices?: { message?: { content?: string } }[] }
+        | null;
+      content = obj?.choices?.[0]?.message?.content ?? "";
+    }
+    console.warn(
+      `[ai] request error: ${why}${content ? ` — returning ${content.length} partial char(s)` : ""}`,
+    );
+    return content;
   } finally {
     if (timer) clearTimeout(timer);
   }
