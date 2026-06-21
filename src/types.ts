@@ -191,9 +191,6 @@ export interface Preferences {
   dailyQuotaMin: number;
   enabledTopics: Topic[];
   includeKinds: Kind[];
-  /** Opt-in: refine per-item lean via an LLM (needs an API key). */
-  llmTaggingEnabled: boolean;
-  llmApiKey?: string;
   /**
    * Free-text steering prompt sent to the backend AI to personalize relevance
    * (e.g. "AI and AI-related scientific progress"). Empty = general importance.

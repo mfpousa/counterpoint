@@ -28,7 +28,6 @@ export const DEFAULT_PREFERENCES: Preferences = {
   dailyQuotaMin: 120,
   enabledTopics: ALL_TOPICS,
   includeKinds: ["video", "podcast", "news"],
-  llmTaggingEnabled: false,
   interestPrompt: "",
   driftThreshold: 0.25,
   onboarded: false,
