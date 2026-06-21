@@ -3,6 +3,7 @@
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { colors, font, radius, spacing } from "../theme";
+import { useT } from "../store/AppContext";
 import type { DriftStatus } from "../lib/lean";
 
 export function QuotaMeter({
@@ -12,15 +13,16 @@ export function QuotaMeter({
   consumed: number;
   target: number;
 }) {
+  const t = useT();
   const pct = target > 0 ? Math.min(1, consumed / target) : 0;
   const remaining = Math.max(0, target - consumed);
   const done = consumed >= target && target > 0;
   return (
     <View style={styles.card}>
       <View style={styles.rowBetween}>
-        <Text style={styles.label}>Today's learning</Text>
+        <Text style={styles.label}>{t("meter.todayLearning")}</Text>
         <Text style={styles.label}>
-          {Math.round(consumed)} / {target} min
+          {t("meter.minXY", { consumed: Math.round(consumed), target })}
         </Text>
       </View>
       <View style={styles.track}>
@@ -32,7 +34,7 @@ export function QuotaMeter({
         />
       </View>
       <Text style={styles.sub}>
-        {done ? "Quota reached — nice work." : `${Math.round(remaining)} min to go`}
+        {done ? t("meter.quotaReached") : t("meter.toGo", { n: Math.round(remaining) })}
       </Text>
     </View>
   );
@@ -45,7 +47,7 @@ export function QuotaMeter({
 export function LeanDial({
   drift,
   threshold,
-  title = "Your perspective balance",
+  title,
   compact = false,
 }: {
   drift: DriftStatus;
@@ -53,6 +55,7 @@ export function LeanDial({
   title?: string;
   compact?: boolean;
 }) {
+  const t = useT();
   const mean = drift.mean ?? 0;
   // Marker position: map -1..+1 to 0..100%.
   const markerPct = ((mean + 1) / 2) * 100;
@@ -62,21 +65,18 @@ export function LeanDial({
   let message: string;
   let messageColor: string = colors.good;
   if (drift.mean === null) {
-    message = "No political content consumed yet today.";
+    message = t("meter.noPolitical");
     messageColor = colors.textDim;
   } else if (drift.warn) {
-    message =
-      drift.direction === "left"
-        ? "You're leaning too far left — try a right-leaning view next."
-        : "You're leaning too far right — try a left-leaning view next.";
+    message = drift.direction === "left" ? t("meter.tooLeft") : t("meter.tooRight");
     messageColor = colors.warn;
   } else {
-    message = "Well balanced. Keep it up.";
+    message = t("meter.balanced");
   }
 
   return (
     <View style={styles.card}>
-      <Text style={styles.label}>{title}</Text>
+      <Text style={styles.label}>{title ?? t("meter.balanceTitle")}</Text>
 
       <View style={styles.spectrum}>
         <View style={styles.spectrumGradient}>
@@ -95,9 +95,9 @@ export function LeanDial({
       </View>
 
       <View style={styles.rowBetween}>
-        <Text style={[styles.endLabel, { color: colors.left }]}>Left {leftPct}%</Text>
-        <Text style={styles.endLabelCenter}>50 / 50 target</Text>
-        <Text style={[styles.endLabel, { color: colors.right }]}>{rightPct}% Right</Text>
+        <Text style={[styles.endLabel, { color: colors.left }]}>{t("meter.left", { pct: leftPct })}</Text>
+        <Text style={styles.endLabelCenter}>{t("meter.target")}</Text>
+        <Text style={[styles.endLabel, { color: colors.right }]}>{t("meter.right", { pct: rightPct })}</Text>
       </View>
 
       {!compact && <Text style={[styles.driftMsg, { color: messageColor }]}>{message}</Text>}

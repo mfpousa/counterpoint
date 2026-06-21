@@ -7,7 +7,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useApp } from "../../src/store/AppContext";
+import { useApp, useT } from "../../src/store/AppContext";
 import { fetchKnowledgeInsight } from "../../src/lib/api";
 import { computeProfile, pickCandidates } from "../../src/lib/knowledge";
 import { topicMeta } from "../../src/lib/topics";
@@ -20,6 +20,7 @@ import type { FeedItem, KnowledgeInsight, StoredSummary } from "../../src/types"
 export default function LearnScreen() {
   const insets = useSafeAreaInsets();
   const { summaries, pool, gradeAndRecord } = useApp();
+  const t = useT();
 
   // In-app read -> summarize loop for gap-filling suggestions (the learning chain).
   const [readingItem, setReadingItem] = useState<FeedItem | null>(null);
@@ -95,20 +96,15 @@ export default function LearnScreen() {
       }}
     >
       <View>
-        <Text style={styles.title}>Learn</Text>
-        <Text style={styles.subtitle}>
-          What you've understood, where your gaps are, and what to read next.
-        </Text>
+        <Text style={styles.title}>{t("learn.title")}</Text>
+        <Text style={styles.subtitle}>{t("learn.subtitle")}</Text>
       </View>
 
       {profile.totalGraded === 0 ? (
         <View style={styles.empty}>
           <Ionicons name="school-outline" size={40} color={colors.textFaint} />
-          <Text style={styles.emptyTitle}>No summaries yet</Text>
-          <Text style={styles.emptySub}>
-            On the Today tab, read an article then tap "Summarize to mark read". Your graded
-            summaries build a knowledge profile here.
-          </Text>
+          <Text style={styles.emptyTitle}>{t("learn.noSummaries")}</Text>
+          <Text style={styles.emptySub}>{t("learn.noSummariesSub")}</Text>
         </View>
       ) : (
         <>
@@ -119,38 +115,42 @@ export default function LearnScreen() {
                 <Text style={[styles.bigScoreNum, { color: scoreColor(profile.avgScore) }]}>
                   {profile.avgScore}
                 </Text>
-                <Text style={styles.bigScoreLabel}>avg</Text>
+                <Text style={styles.bigScoreLabel}>{t("learn.avg")}</Text>
               </View>
               <View style={{ flex: 1, gap: 2 }}>
                 <Text style={styles.overviewStat}>
-                  {profile.totalGraded} {profile.totalGraded === 1 ? "summary" : "summaries"} graded
+                  {t(profile.totalGraded === 1 ? "learn.gradedOne" : "learn.graded", {
+                    n: profile.totalGraded,
+                  })}
                 </Text>
                 <Text style={styles.overviewSub}>
-                  across {profile.topics.length} topic{profile.topics.length === 1 ? "" : "s"}
+                  {t(profile.topics.length === 1 ? "learn.acrossTopicsOne" : "learn.acrossTopics", {
+                    n: profile.topics.length,
+                  })}
                 </Text>
               </View>
             </View>
 
             {/* Per-topic mastery bars */}
             <View style={{ gap: spacing.sm, marginTop: spacing.md }}>
-              {profile.topics.map((t) => {
-                const m = topicMeta(t.topic);
+              {profile.topics.map((tp) => {
+                const m = topicMeta(tp.topic);
                 return (
-                  <View key={t.topic} style={styles.masteryRow}>
+                  <View key={tp.topic} style={styles.masteryRow}>
                     <View style={styles.masteryLabel}>
                       <Ionicons name={m.icon} size={13} color={m.color} />
-                      <Text style={styles.masteryName}>{m.label}</Text>
+                      <Text style={styles.masteryName}>{t(`topic.${tp.topic}`)}</Text>
                     </View>
                     <View style={styles.barTrack}>
                       <View
                         style={[
                           styles.barFill,
-                          { width: `${t.avgScore}%`, backgroundColor: scoreColor(t.avgScore) },
+                          { width: `${tp.avgScore}%`, backgroundColor: scoreColor(tp.avgScore) },
                         ]}
                       />
                     </View>
-                    <Text style={[styles.masteryScore, { color: scoreColor(t.avgScore) }]}>
-                      {t.avgScore}
+                    <Text style={[styles.masteryScore, { color: scoreColor(tp.avgScore) }]}>
+                      {tp.avgScore}
                     </Text>
                   </View>
                 );
@@ -162,24 +162,24 @@ export default function LearnScreen() {
           <View style={styles.card}>
             <View style={styles.cardHeader}>
               <Ionicons name="sparkles" size={16} color={colors.accent} />
-              <Text style={styles.cardTitle}>Your knowledge profile</Text>
+              <Text style={styles.cardTitle}>{t("learn.profile")}</Text>
             </View>
             {loadingInsight ? (
               <View style={styles.insightLoading}>
                 <ActivityIndicator size="small" color={colors.accent} />
-                <Text style={styles.emptySub}>Analyzing your gaps…</Text>
+                <Text style={styles.emptySub}>{t("learn.analyzingGaps")}</Text>
               </View>
             ) : insight ? (
               <>
                 {!!insight.narrative && <Text style={styles.narrative}>{insight.narrative}</Text>}
                 {profile.weakTopics.length > 0 && (
                   <View style={styles.gapChips}>
-                    {profile.weakTopics.map((t) => {
-                      const m = topicMeta(t);
+                    {profile.weakTopics.map((wt) => {
+                      const m = topicMeta(wt);
                       return (
-                        <View key={t} style={[styles.gapChip, { borderColor: m.color }]}>
+                        <View key={wt} style={[styles.gapChip, { borderColor: m.color }]}>
                           <Ionicons name={m.icon} size={11} color={m.color} />
-                          <Text style={[styles.gapChipText, { color: m.color }]}>{m.label}</Text>
+                          <Text style={[styles.gapChipText, { color: m.color }]}>{t(`topic.${wt}`)}</Text>
                         </View>
                       );
                     })}
@@ -187,7 +187,7 @@ export default function LearnScreen() {
                 )}
                 {insight.suggestions.length > 0 && (
                   <View style={{ gap: spacing.sm, marginTop: spacing.sm }}>
-                    <Text style={styles.suggestHeader}>Read these to fill the gaps</Text>
+                    <Text style={styles.suggestHeader}>{t("learn.fillGaps")}</Text>
                     {insight.suggestions.map((s) => {
                       const it = poolById.get(s.id);
                       if (!it) return null;
@@ -198,7 +198,7 @@ export default function LearnScreen() {
                           <View style={styles.suggestTopRow}>
                             <View style={[styles.suggestTopic, { borderColor: m.color }]}>
                               <Ionicons name={m.icon} size={11} color={m.color} />
-                              <Text style={[styles.suggestTopicText, { color: m.color }]}>{m.label}</Text>
+                              <Text style={[styles.suggestTopicText, { color: m.color }]}>{t(`topic.${it.topic}`)}</Text>
                             </View>
                             {existing && <ScorePill score={existing.grade.score} size="sm" />}
                           </View>
@@ -216,7 +216,7 @@ export default function LearnScreen() {
                               accessibilityRole="button"
                             >
                               <Ionicons name="book-outline" size={15} color={colors.accent} />
-                              <Text style={styles.suggestReadText}>Read in app</Text>
+                              <Text style={styles.suggestReadText}>{t("learn.readInApp")}</Text>
                             </Pressable>
                             <Pressable
                               onPress={() => setSummarizingItem(it)}
@@ -225,7 +225,7 @@ export default function LearnScreen() {
                             >
                               <Ionicons name="create-outline" size={15} color={colors.bg} />
                               <Text style={styles.suggestSummText}>
-                                {existing ? "Revise" : "Summarize"}
+                                {existing ? t("learn.revise") : t("learn.summarize")}
                               </Text>
                             </Pressable>
                           </View>
@@ -236,14 +236,12 @@ export default function LearnScreen() {
                 )}
               </>
             ) : (
-              <Text style={styles.emptySub}>
-                Couldn't reach the model for insights. Your local stats above are still up to date.
-              </Text>
+              <Text style={styles.emptySub}>{t("learn.noInsight")}</Text>
             )}
           </View>
 
           {/* History */}
-          <Text style={styles.sectionLabel}>Your summaries</Text>
+          <Text style={styles.sectionLabel}>{t("learn.yourSummaries")}</Text>
           {summaries.map((s) => (
             <SummaryHistoryCard key={s.id} summary={s} />
           ))}
@@ -264,6 +262,7 @@ export default function LearnScreen() {
 }
 
 function SummaryHistoryCard({ summary }: { summary: StoredSummary }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const m = topicMeta(summary.topic);
   return (
@@ -276,7 +275,7 @@ function SummaryHistoryCard({ summary }: { summary: StoredSummary }) {
           </Text>
           <View style={styles.histMeta}>
             <Ionicons name={m.icon} size={11} color={m.color} />
-            <Text style={[styles.histTopic, { color: m.color }]}>{m.label}</Text>
+            <Text style={[styles.histTopic, { color: m.color }]}>{t(`topic.${summary.topic}`)}</Text>
             <Text style={styles.histDot}>·</Text>
             <Text style={styles.histSource} numberOfLines={1}>
               {summary.sourceTitle}
@@ -288,7 +287,7 @@ function SummaryHistoryCard({ summary }: { summary: StoredSummary }) {
       {open && (
         <View style={{ gap: spacing.md, marginTop: spacing.md }}>
           <View style={styles.yourSummary}>
-            <Text style={styles.yourSummaryLabel}>Your summary</Text>
+            <Text style={styles.yourSummaryLabel}>{t("learn.yourSummary")}</Text>
             <Text style={styles.yourSummaryText}>{summary.summary}</Text>
           </View>
           <GradeFeedback grade={summary.grade} />
@@ -298,7 +297,7 @@ function SummaryHistoryCard({ summary }: { summary: StoredSummary }) {
             accessibilityRole="link"
           >
             <Ionicons name="open-outline" size={14} color={colors.accent} />
-            <Text style={styles.openLinkText}>Open original</Text>
+            <Text style={styles.openLinkText}>{t("learn.openOriginal")}</Text>
           </Pressable>
         </View>
       )}

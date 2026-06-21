@@ -4,7 +4,8 @@ import React, { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, font, radius, spacing } from "../theme";
-import { leanBucket, leanBucketLabel } from "../lib/lean";
+import { leanBucket } from "../lib/lean";
+import { useT } from "../store/AppContext";
 import type { Lean, LeanSource } from "../types";
 
 /** A 0..1 opacity as a 2-digit hex alpha suffix for "#rrggbb" + alpha colors. */
@@ -101,10 +102,11 @@ export function LeanBadge({
   /** Short justification for the lean tag, shown in a tooltip on hover/press. */
   rationale?: string;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const bucket = leanBucket(lean);
   const c = leanColor(lean);
-  const label = leanBucketLabel(bucket);
+  const label = t(`lean.${bucket}`);
   const value = lean === null ? "" : ` ${lean > 0 ? "+" : ""}${lean.toFixed(2)}`;
 
   const badge = (
@@ -114,7 +116,7 @@ export function LeanBadge({
         {label}
         {value}
       </Text>
-      <Text style={styles.provenance}>{source === "llm" ? "AI-tagged" : "source"}</Text>
+      <Text style={styles.provenance}>{source === "llm" ? t("lean.aiTagged") : t("lean.source")}</Text>
     </View>
   );
 

@@ -15,8 +15,8 @@ import { cacheStories, getCachedStories, getCachedStory } from "../../src/lib/st
 import { goBack, openNews, openStory } from "../../src/lib/nav";
 import { topicMeta } from "../../src/lib/topics";
 import { leanColor } from "../../src/components/ui";
-import { Typewriter } from "../../src/components/anim";
-import { useApp } from "../../src/store/AppContext";
+import { TypewriterParagraphs } from "../../src/components/anim";
+import { useApp, useT } from "../../src/store/AppContext";
 import { colors, font, radius, spacing } from "../../src/theme";
 import type { Lean, Story, StorySpectrum } from "../../src/types";
 
@@ -39,11 +39,13 @@ function leanLabel(lean: Lean): string {
   return "right";
 }
 
-function age(ms: number): string {
+type T = (key: string, params?: Record<string, string | number>) => string;
+
+function age(ms: number, t: T): string {
   const h = Math.max(0, Math.round((Date.now() - ms) / 3_600_000));
-  if (h < 1) return "just now";
-  if (h < 24) return `${h}h ago`;
-  return `${Math.round(h / 24)}d ago`;
+  if (h < 1) return t("time.now");
+  if (h < 24) return t("time.hAgo", { n: h });
+  return t("time.dAgo", { n: Math.round(h / 24) });
 }
 
 /** Date + time for a timeline milestone, e.g. "Jun 18, 14:05". */
@@ -60,6 +62,7 @@ export default function StoryPanel() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
   const { worldId, prefs } = useApp();
+  const t = useT();
 
   // Seed from the shared cache so a story opened from the feed renders INSTANTLY
   // (no /api/stories rebuild wait, and immune to ids that changed in a rebuild).
@@ -116,7 +119,7 @@ export default function StoryPanel() {
         </Pressable>
         <View style={styles.synthTag}>
           <Ionicons name="git-merge-outline" size={12} color={colors.accent} />
-          <Text style={styles.synthTagText}>Synthesis</Text>
+          <Text style={styles.synthTagText}>{t("storyPanel.synthTag")}</Text>
         </View>
         <View style={{ flex: 1 }} />
       </View>
@@ -128,10 +131,8 @@ export default function StoryPanel() {
         {loading && !story && (
           <View style={styles.center}>
             <ActivityIndicator size="large" color={colors.accent} />
-            <Text style={styles.centerText}>Synthesizing this story…</Text>
-            <Text style={styles.centerHint}>
-              Combining the latest coverage across outlets. This can take a moment on a cold start.
-            </Text>
+            <Text style={styles.centerText}>{t("storyPanel.synthesizing")}</Text>
+            <Text style={styles.centerHint}>{t("storyPanel.synthHint")}</Text>
           </View>
         )}
 
@@ -139,11 +140,11 @@ export default function StoryPanel() {
           <View style={styles.center}>
             <Ionicons name="time-outline" size={28} color={colors.textDim} />
             <Text style={styles.centerText}>
-              {error ?? "This story has moved on or aged out."}
+              {error ?? t("storyPanel.aged")}
             </Text>
             <Pressable onPress={goBack} style={styles.backToFeedBtn} accessibilityRole="button">
               <Ionicons name="arrow-back" size={16} color={colors.bg} />
-              <Text style={styles.backToFeedText}>Back to the latest</Text>
+              <Text style={styles.backToFeedText}>{t("storyPanel.backToLatest")}</Text>
             </Pressable>
           </View>
         )}
@@ -153,12 +154,12 @@ export default function StoryPanel() {
             <View style={styles.pillRow}>
               <View style={[styles.topicPill, { backgroundColor: m.color + "22" }]}>
                 <Ionicons name={m.icon} size={12} color={m.color} />
-                <Text style={[styles.topicText, { color: m.color }]}>{m.label}</Text>
+                <Text style={[styles.topicText, { color: m.color }]}>{t(`topic.${story.topic}`)}</Text>
               </View>
               {story.developing && (
                 <View style={styles.developingPill}>
                   <Ionicons name="pulse" size={12} color={colors.warn} />
-                  <Text style={styles.developingText}>Developing</Text>
+                  <Text style={styles.developingText}>{t("story.developing")}</Text>
                 </View>
               )}
             </View>
@@ -166,30 +167,30 @@ export default function StoryPanel() {
             {!!story.summary && <Text style={styles.dek}>{story.summary}</Text>}
             <View style={styles.metaRow}>
               <Text style={styles.meta}>
-                {story.sources.length} outlet{story.sources.length === 1 ? "" : "s"}
+                {t(story.sources.length === 1 ? "story.outletsOne" : "story.outlets", {
+                  count: story.sources.length,
+                })}
               </Text>
               <Text style={styles.dot}>·</Text>
-              <Text style={styles.meta}>{age(story.updatedAt)}</Text>
+              <Text style={styles.meta}>{age(story.updatedAt, t)}</Text>
               {story.lean !== null && (
                 <>
                   <Text style={styles.dot}>·</Text>
                   <View style={[styles.leanChip, { borderColor: leanColor(story.lean) }]}>
                     <View style={[styles.leanDot, { backgroundColor: leanColor(story.lean) }]} />
                     <Text style={[styles.leanChipText, { color: leanColor(story.lean) }]}>
-                      {leanLabel(story.lean)} overall
+                      {t("storyPanel.overall", { lean: t(`olabel.${leanLabel(story.lean)}`) })}
                     </Text>
                   </View>
                 </>
               )}
             </View>
 
-            {story.synthesis.map((p, i) => (
-              <Typewriter key={`${story.id}-${i}`} text={p} cps={320} style={styles.paragraph} />
-            ))}
+            <TypewriterParagraphs paragraphs={story.synthesis} cps={320} style={styles.paragraph} />
 
             {story.timeline && story.timeline.length > 0 && (
               <View style={styles.section}>
-                <SectionHeader icon="time-outline" label="Timeline of the issue" />
+                <SectionHeader icon="time-outline" label={t("storyPanel.timeline")} />
                 {story.timeline.map((mst, i) => (
                   <Pressable
                     key={i}
@@ -217,13 +218,13 @@ export default function StoryPanel() {
             {story.spectrum &&
               (story.spectrum.left || story.spectrum.center || story.spectrum.right) && (
                 <View style={styles.section}>
-                  <SectionHeader icon="swap-horizontal-outline" label="Across the spectrum" />
-                  {SPECTRUM_SIDES.map(([key, label, color]) =>
+                  <SectionHeader icon="swap-horizontal-outline" label={t("storyPanel.spectrum")} />
+                  {SPECTRUM_SIDES.map(([key, , color]) =>
                     story.spectrum && story.spectrum[key] ? (
                       <View key={key} style={styles.spectrumRow}>
                         <View style={[styles.spectrumTag, { borderColor: color }]}>
                           <View style={[styles.leanDot, { backgroundColor: color }]} />
-                          <Text style={[styles.spectrumLabel, { color }]}>{label}</Text>
+                          <Text style={[styles.spectrumLabel, { color }]}>{t(`spectrum.${key}`)}</Text>
                         </View>
                         <Text style={styles.spectrumText}>{story.spectrum[key]}</Text>
                       </View>
@@ -234,14 +235,14 @@ export default function StoryPanel() {
 
             {story.angles.length > 0 && (
               <View style={styles.section}>
-                <SectionHeader icon="color-wand-outline" label="How outlets framed it" />
+                <SectionHeader icon="color-wand-outline" label={t("storyPanel.framed")} />
                 {story.angles.map((a, i) => (
                   <View key={i} style={styles.angleRow}>
                     <View style={[styles.leanDot, { backgroundColor: leanColor(a.lean), marginTop: 5 }]} />
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.angleOutlet, { color: leanColor(a.lean) }]}>
                         {a.outlet}
-                        <Text style={styles.angleLean}>  {leanLabel(a.lean)}</Text>
+                        <Text style={styles.angleLean}>  {t(`olabel.${leanLabel(a.lean)}`)}</Text>
                       </Text>
                       <Text style={styles.angleFraming}>{a.framing}</Text>
                     </View>
@@ -252,7 +253,7 @@ export default function StoryPanel() {
 
             {story.contradictions.length > 0 && (
               <View style={styles.section}>
-                <SectionHeader icon="flash-outline" label="Contradictions & differences" color={colors.warn} />
+                <SectionHeader icon="flash-outline" label={t("storyPanel.contradictions")} color={colors.warn} />
                 {story.contradictions.map((c, i) => (
                   <View key={i} style={styles.bulletRow}>
                     <Text style={[styles.bullet, { color: colors.warn }]}>•</Text>
@@ -263,7 +264,7 @@ export default function StoryPanel() {
             )}
 
             <View style={styles.section}>
-              <SectionHeader icon="link-outline" label={`Sources (${story.sources.length})`} />
+              <SectionHeader icon="link-outline" label={t("storyPanel.sources", { n: story.sources.length })} />
               {story.sources.map((s) => (
                 <Pressable
                   key={s.id}
@@ -286,7 +287,7 @@ export default function StoryPanel() {
 
             {related.length > 0 && (
               <View style={styles.section}>
-                <SectionHeader icon="git-network-outline" label="Related stories" />
+                <SectionHeader icon="git-network-outline" label={t("storyPanel.related")} />
                 {related.map((r) => (
                   <Pressable
                     key={r.id}
@@ -303,10 +304,7 @@ export default function StoryPanel() {
               </View>
             )}
 
-            <Text style={styles.disclaimer}>
-              AI-synthesized from the linked sources for a neutral overview. Open the originals for the
-              authoritative reporting.
-            </Text>
+            <Text style={styles.disclaimer}>{t("storyPanel.disclaimer")}</Text>
           </>
         )}
       </ScrollView>

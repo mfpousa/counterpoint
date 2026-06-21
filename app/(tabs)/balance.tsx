@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useApp, useTrailingWindow } from "../../src/store/AppContext";
+import { useApp, useT, useTrailingWindow } from "../../src/store/AppContext";
 import { assessDrift, windowDrift } from "../../src/lib/lean";
 import { feedLeanBreakdown } from "../../src/lib/buildFeed";
 import { LeanDial } from "../../src/components/meters";
@@ -12,6 +12,7 @@ import type { Topic } from "../../src/types";
 export default function BalanceScreen() {
   const insets = useSafeAreaInsets();
   const { feed, progress, prefs } = useApp();
+  const t = useT();
   const windowPts = useTrailingWindow();
 
   const todayDrift = useMemo(
@@ -53,37 +54,35 @@ export default function BalanceScreen() {
         paddingBottom: spacing.xxl,
       }}
     >
-      <Text style={styles.title}>Balance</Text>
+      <Text style={styles.title}>{t("balance.title")}</Text>
 
-      <LeanDial drift={todayDrift} threshold={prefs.driftThreshold} title="Today's perspective balance" />
-      <LeanDial drift={trailing} threshold={prefs.driftThreshold} title="Last 30 days" />
+      <LeanDial drift={todayDrift} threshold={prefs.driftThreshold} title={t("balance.todayBalance")} />
+      <LeanDial drift={trailing} threshold={prefs.driftThreshold} title={t("balance.last30")} />
 
       <View style={styles.card}>
-        <Text style={styles.h}>Today's feed mix</Text>
-        <Text style={styles.sub}>How the feed offered to balance you across the spectrum.</Text>
+        <Text style={styles.h}>{t("balance.feedMix")}</Text>
+        <Text style={styles.sub}>{t("balance.feedMixSub")}</Text>
         <View style={styles.barRow}>
           <View style={[styles.barSeg, { flex: breakdown.leftMin, backgroundColor: leanColor(-0.7) }]} />
           <View style={[styles.barSeg, { flex: breakdown.centerMin, backgroundColor: leanColor(0) }]} />
           <View style={[styles.barSeg, { flex: breakdown.rightMin, backgroundColor: leanColor(0.7) }]} />
         </View>
         <View style={styles.legendRow}>
-          <Text style={styles.legend}>Left {Math.round((breakdown.leftMin / polTotal) * 100)}%</Text>
-          <Text style={styles.legend}>Center {Math.round((breakdown.centerMin / polTotal) * 100)}%</Text>
-          <Text style={styles.legend}>Right {Math.round((breakdown.rightMin / polTotal) * 100)}%</Text>
+          <Text style={styles.legend}>{t("balance.left", { pct: Math.round((breakdown.leftMin / polTotal) * 100) })}</Text>
+          <Text style={styles.legend}>{t("balance.center", { pct: Math.round((breakdown.centerMin / polTotal) * 100) })}</Text>
+          <Text style={styles.legend}>{t("balance.right", { pct: Math.round((breakdown.rightMin / polTotal) * 100) })}</Text>
         </View>
-        <Text style={styles.sub}>
-          Plus {breakdown.nonPoliticalMin} min of non-political learning (excluded from balance).
-        </Text>
+        <Text style={styles.sub}>{t("balance.nonpolitical", { n: breakdown.nonPoliticalMin })}</Text>
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.h}>Topic diversity (today's feed)</Text>
+        <Text style={styles.h}>{t("balance.topicDiversity")}</Text>
         {topicMinutes.length === 0 ? (
-          <Text style={styles.sub}>No feed yet.</Text>
+          <Text style={styles.sub}>{t("balance.noFeed")}</Text>
         ) : (
           topicMinutes.map(([topic, min]) => (
             <View key={topic} style={styles.topicRow}>
-              <Text style={styles.topicLabel}>{topic}</Text>
+              <Text style={styles.topicLabel}>{t(`topic.${topic}`)}</Text>
               <View style={styles.topicTrack}>
                 <View style={[styles.topicFill, { width: `${(min / totalTopicMin) * 100}%` }]} />
               </View>
@@ -93,10 +92,7 @@ export default function BalanceScreen() {
         )}
       </View>
 
-      <Text style={styles.footnote}>
-        Balance reflects what you've actually marked done — not just what was offered. Non-political
-        content (science, history, tech) never counts toward left/right.
-      </Text>
+      <Text style={styles.footnote}>{t("balance.footnote")}</Text>
     </ScrollView>
   );
 }

@@ -1,4 +1,4 @@
-import { translate, languageName, LANGUAGES } from "../src/lib/i18n";
+import { translate, languageName, LANGUAGES, untranslatedKeys } from "../src/lib/i18n";
 
 describe("i18n translate", () => {
   it("returns the Spanish string for a known key", () => {
@@ -27,5 +27,9 @@ describe("i18n translate", () => {
 
   it("exposes both supported languages", () => {
     expect(LANGUAGES.map((l) => l.code).sort()).toEqual(["en", "es"]);
+  });
+
+  it("has a Spanish translation for every English key (no UI left untranslated)", () => {
+    expect(untranslatedKeys("es")).toEqual([]);
   });
 });

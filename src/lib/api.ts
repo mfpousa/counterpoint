@@ -201,6 +201,87 @@ export function streamRewrite(id: string, h: RewriteStreamHandlers): { cancel: (
   return { cancel: () => controller.abort() };
 }
 
+export interface BriefingStreamHandlers {
+  /** A chunk of generated text (append to the live preview). */
+  onDelta: (delta: string) => void;
+  /** The final parsed briefing (or null if none). */
+  onDone: (briefing: Briefing | null) => void;
+  /** A failure (or that streaming is unsupported here) — caller may fall back. */
+  onError: (message: string) => void;
+  interest?: string;
+  world?: string;
+  lang?: Lang;
+}
+
+/**
+ * Stream the AI briefing over SSE so the card can show the model writing it live.
+ * Returns a handle with `cancel()`, or `null` when streaming isn't supported here
+ * (caller should fall back to the non-streaming fetchBriefing).
+ */
+export function streamBriefing(h: BriefingStreamHandlers): { cancel: () => void } | null {
+  if (typeof fetch === "undefined" || typeof ReadableStream === "undefined") return null;
+
+  const params = new URLSearchParams();
+  if (h.interest) params.set("interest", h.interest);
+  if (h.world) params.set("world", h.world);
+  if (h.lang) params.set("lang", h.lang);
+  const controller = new AbortController();
+
+  const dispatch = (frame: string) => {
+    let event = "message";
+    const dataLines: string[] = [];
+    for (const line of frame.split("\n")) {
+      if (line.startsWith("event:")) event = line.slice(6).trim();
+      else if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
+    }
+    if (dataLines.length === 0) return;
+    let payload: unknown;
+    try {
+      payload = JSON.parse(dataLines.join("\n"));
+    } catch {
+      return;
+    }
+    if (event === "delta" && typeof payload === "string") h.onDelta(payload);
+    else if (event === "done") h.onDone((payload as Briefing | null) ?? null);
+    else if (event === "error") h.onError(typeof payload === "string" ? payload : "briefing failed");
+  };
+
+  (async () => {
+    try {
+      const qs = params.toString();
+      const res = await fetch(`${apiBaseUrl()}/api/briefing/stream${qs ? `?${qs}` : ""}`, {
+        method: "GET",
+        headers: { Accept: "text/event-stream" },
+        signal: controller.signal,
+      });
+      const reader = res.body?.getReader?.();
+      if (!res.ok || !reader) {
+        h.onError("stream unavailable");
+        return;
+      }
+      const decoder = new TextDecoder();
+      let buffer = "";
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        let idx: number;
+        while ((idx = buffer.indexOf("\n\n")) !== -1) {
+          dispatch(buffer.slice(0, idx));
+          buffer = buffer.slice(idx + 2);
+        }
+      }
+      if (buffer.trim()) dispatch(buffer);
+    } catch (e) {
+      if (!controller.signal.aborted) {
+        h.onError(e instanceof Error ? e.message : "stream failed");
+      }
+    }
+  })();
+
+  return { cancel: () => controller.abort() };
+}
+
 /**
  * Grade the reader's recall summary of an item against the article. Throws with
  * a clear message on failure so the summary UI can surface it (model offline,

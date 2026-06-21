@@ -25,7 +25,6 @@ import { WorldSwitcher } from "../../src/components/WorldSwitcher";
 import { fetchStories } from "../../src/lib/api";
 import { cacheStories } from "../../src/lib/storyCache";
 import { openNews, openStory } from "../../src/lib/nav";
-import { worldById } from "../../src/data/worlds";
 import { LeanDial, QuotaMeter } from "../../src/components/meters";
 import { colors, font, radius, spacing } from "../../src/theme";
 import type { FeedItem, Story, Topic } from "../../src/types";
@@ -51,6 +50,7 @@ export default function FeedScreen() {
     feedError,
     briefing,
     loadingBriefing,
+    briefingStream,
     status,
     summaries,
     worldId,
@@ -68,12 +68,16 @@ export default function FeedScreen() {
   const [stories, setStories] = useState<Story[]>([]);
   const [loadingStories, setLoadingStories] = useState(false);
   const storiesLoadedOnce = useRef(false);
+  // Per world+language cache so switching languages (or worlds) shows the already
+  // built set INSTANTLY instead of wiping to skeletons and re-fetching from cold.
+  const storiesByKey = useRef<Map<string, Story[]>>(new Map());
   const loadStories = useCallback(
     async (force = false) => {
       setLoadingStories(true);
       try {
         const res = await fetchStories({ world: worldId, force, lang: prefs.language });
         setStories(res.stories);
+        storiesByKey.current.set(`${worldId}:${prefs.language}`, res.stories);
         // Share with the routed story panel so opening a listed story is instant
         // and never dead-ends on an id that changed during a rebuild.
         cacheStories(res.stories);
@@ -85,10 +89,18 @@ export default function FeedScreen() {
     [worldId, prefs.language],
   );
   useEffect(() => {
-    setStories([]);
-    storiesLoadedOnce.current = false;
+    // Show this world+language's cached stories immediately (no skeleton flash)
+    // when we've built them before; otherwise reset. Always refresh in the bg.
+    const cached = storiesByKey.current.get(`${worldId}:${prefs.language}`);
+    if (cached) {
+      setStories(cached);
+      storiesLoadedOnce.current = true;
+    } else {
+      setStories([]);
+      storiesLoadedOnce.current = false;
+    }
     void loadStories();
-  }, [loadStories]);
+  }, [loadStories, worldId, prefs.language]);
 
   // Live: when the backend finishes analyzing a chunk (analyzed count grows),
   // silently re-fetch stories so new/updated ones appear in real time.
@@ -272,7 +284,7 @@ export default function FeedScreen() {
         {busyWorld && busyWorld !== worldId && feed.length === 0 && (
           <View style={styles.busyBanner}>
             <ActivityIndicator size="small" color={colors.warn} />
-            <Text style={styles.busyText}>{t("feed.busy", { world: worldById(busyWorld).title })}</Text>
+            <Text style={styles.busyText}>{t("feed.busy", { world: t(`world.${busyWorld}`) })}</Text>
           </View>
         )}
 
@@ -338,7 +350,7 @@ export default function FeedScreen() {
 
         <AnalysisProgress status={status} />
 
-        <BriefingCard briefing={briefing} loading={loadingBriefing} />
+        <BriefingCard briefing={briefing} loading={loadingBriefing} stream={briefingStream} />
 
         <QuotaMeter consumed={progress.consumedMin} target={prefs.dailyQuotaMin} />
         <LeanDial drift={todayDrift} threshold={prefs.driftThreshold} compact />
@@ -373,7 +385,7 @@ export default function FeedScreen() {
               return (
                 <FilterChip
                   key={s.topic}
-                  label={m.label}
+                  label={t(`topic.${s.topic}`)}
                   icon={m.icon}
                   color={m.color}
                   count={s.entries.length}
@@ -453,7 +465,7 @@ export default function FeedScreen() {
                   <View style={[styles.sectionIcon, { backgroundColor: m.color + "22" }]}>
                     <Ionicons name={m.icon} size={15} color={m.color} />
                   </View>
-                  <Text style={styles.sectionTitle}>{m.label}</Text>
+                  <Text style={styles.sectionTitle}>{t(`topic.${section.topic}`)}</Text>
                   <Text style={styles.sectionCount}>{section.entries.length}</Text>
                 </View>
                 <View style={[styles.grid, { gap: GAP }]}>

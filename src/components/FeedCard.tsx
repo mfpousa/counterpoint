@@ -1,23 +1,26 @@
 // A single feed item card.
 
 import React, { useState } from "react";
-import { Image, Linking, Pressable, StyleSheet, Text, View } from "react-native";
+import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, font, radius, spacing } from "../theme";
 import { topicMeta } from "../lib/topics";
+import { useT } from "../store/AppContext";
 import type { FeedItem, StoredSummary } from "../types";
 import { ScorePill } from "./GradeFeedback";
 import { IssueTag, LeanBadge } from "./ui";
 
+type T = (key: string, params?: Record<string, string | number>) => string;
+
 /** Human "when": minutes/hours/days ago, then an absolute date past a week. */
-export function whenLabel(ms: number): string {
+export function whenLabel(ms: number, t: T): string {
   const diff = Math.max(0, Date.now() - ms);
   const mins = Math.round(diff / 60000);
-  if (mins < 60) return `${Math.max(1, mins)}m ago`;
+  if (mins < 60) return t("time.mAgo", { n: Math.max(1, mins) });
   const h = Math.round(diff / 3_600_000);
-  if (h < 24) return `${h}h ago`;
+  if (h < 24) return t("time.hAgo", { n: h });
   const d = Math.round(h / 24);
-  if (d <= 6) return `${d}d ago`;
+  if (d <= 6) return t("time.dAgo", { n: d });
   return new Date(ms).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
@@ -37,11 +40,12 @@ function scoreColor(r: number): string {
 
 /** A bold, colored topic pill (icon + label) for at-a-glance scanning. */
 function TopicPill({ topic }: { topic: FeedItem["topic"] }) {
+  const t = useT();
   const m = topicMeta(topic);
   return (
     <View style={[styles.topicPill, { borderColor: m.color, backgroundColor: m.color + "22" }]}>
       <Ionicons name={m.icon} size={12} color={m.color} />
-      <Text style={[styles.topicPillText, { color: m.color }]}>{m.label}</Text>
+      <Text style={[styles.topicPillText, { color: m.color }]}>{t(`topic.${topic}`)}</Text>
     </View>
   );
 }
@@ -78,10 +82,12 @@ export function FeedCard({
   issue?: { id: string; title: string; severity: number };
   onOpenIssue?: (id: string) => void;
 }) {
+  const t = useT();
   const [imgError, setImgError] = useState(false);
-  const open = () => {
-    void Linking.openURL(item.url);
-  };
+  // Tapping the card opens the in-app reader (the article panel) — same behavior
+  // as story cards. The original source is reachable from the reader's top-right
+  // link. Falls back to the summarize gate if no reader handler is provided.
+  const open = () => (onRead ? onRead(item) : onSummarize(item));
   const showThumb = !!item.thumbnail && !imgError;
 
   return (
@@ -126,9 +132,9 @@ export function FeedCard({
           {item.sourceTitle}
         </Text>
         <Text style={styles.dot}>·</Text>
-        <Text style={styles.time}>{item.estMinutes} min</Text>
+        <Text style={styles.time}>{t("card.min", { n: item.estMinutes })}</Text>
         <Text style={styles.dot}>·</Text>
-        <Text style={styles.time}>{whenLabel(item.publishedAt)}</Text>
+        <Text style={styles.time}>{whenLabel(item.publishedAt, t)}</Text>
       </View>
 
       <Pressable onPress={open} accessibilityRole="link">
@@ -153,18 +159,6 @@ export function FeedCard({
       )}
 
       <View style={styles.footer}>
-        {onRead ? (
-          <Pressable
-            onPress={() => onRead(item)}
-            style={styles.readBtn}
-            accessibilityRole="button"
-          >
-            <Ionicons name="sparkles-outline" size={15} color={colors.accent} />
-            <Text style={styles.readText}>Read in app</Text>
-          </Pressable>
-        ) : (
-          <View style={styles.chips} />
-        )}
         <Pressable
           onPress={() => onSummarize(item)}
           style={[styles.doneBtn, done && styles.doneBtnActive]}
@@ -174,13 +168,13 @@ export function FeedCard({
             <>
               <ScorePill score={summary.grade.score} size="sm" />
               <Text style={[styles.doneText, done && { color: colors.good }]}>
-                {done ? "Read" : "Revise"}
+                {done ? t("card.read") : t("card.revise")}
               </Text>
             </>
           ) : (
             <>
               <Ionicons name="create-outline" size={16} color={colors.accent} />
-              <Text style={styles.doneText}>Summarize to mark read</Text>
+              <Text style={styles.doneText}>{t("card.summarizeToRead")}</Text>
             </>
           )}
         </Pressable>
@@ -248,21 +242,9 @@ const styles = StyleSheet.create({
   footer: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent: "flex-end",
     marginTop: spacing.xs,
   },
-  chips: { flexDirection: "row", alignItems: "center", gap: spacing.sm, flexShrink: 1 },
-  readBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.xs,
-    borderColor: colors.accent,
-    borderWidth: 1,
-    borderRadius: radius.pill,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-  },
-  readText: { color: colors.accent, fontSize: font.small, fontWeight: "600" },
   doneBtn: {
     flexDirection: "row",
     alignItems: "center",

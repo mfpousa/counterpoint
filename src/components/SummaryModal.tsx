@@ -20,6 +20,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { GradeFeedback, ScorePill, scoreColor } from "./GradeFeedback";
 import { PASS_SCORE } from "../lib/knowledge";
+import { useT } from "../store/AppContext";
 import { colors, font, radius, spacing } from "../theme";
 import type { FeedItem, StoredSummary, SummaryGrade } from "../types";
 
@@ -38,6 +39,7 @@ export function SummaryModal({
   onClose: () => void;
 }) {
   const insets = useSafeAreaInsets();
+  const tr = useT();
   const [text, setText] = useState("");
   const [editing, setEditing] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -65,7 +67,7 @@ export function SummaryModal({
       setGrade(g);
       setEditing(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't grade your summary.");
+      setError(e instanceof Error ? e.message : tr("summary.couldntGrade"));
     } finally {
       setSubmitting(false);
     }
@@ -87,7 +89,7 @@ export function SummaryModal({
             </Pressable>
             <View style={styles.aiTag}>
               <Ionicons name="create-outline" size={12} color={colors.accent} />
-              <Text style={styles.aiTagText}>Recall check</Text>
+              <Text style={styles.aiTagText}>{tr("summary.recallCheck")}</Text>
             </View>
             <View style={{ flex: 1 }} />
             {grade && <ScorePill score={grade.score} />}
@@ -103,10 +105,7 @@ export function SummaryModal({
                 {item.title}
               </Text>
             )}
-            <Text style={styles.prompt}>
-              In your own words, summarize what this article was about and what you learned. You'll
-              see it marked as read once your summary is mostly accurate.
-            </Text>
+            <Text style={styles.prompt}>{tr("summary.prompt")}</Text>
 
             {editing ? (
               <>
@@ -114,7 +113,7 @@ export function SummaryModal({
                   style={styles.input}
                   value={text}
                   onChangeText={setText}
-                  placeholder="What were the key points? What's the takeaway?"
+                  placeholder={tr("summary.placeholder")}
                   placeholderTextColor={colors.textFaint}
                   multiline
                   textAlignVertical="top"
@@ -123,7 +122,9 @@ export function SummaryModal({
                 />
                 <View style={styles.metaRow}>
                   <Text style={[styles.charCount, charCount < MIN_CHARS && { color: colors.textFaint }]}>
-                    {charCount < MIN_CHARS ? `Write at least ${MIN_CHARS} characters` : `${charCount} characters`}
+                    {charCount < MIN_CHARS
+                      ? tr("summary.minChars", { n: MIN_CHARS })
+                      : tr("summary.charCount", { n: charCount })}
                   </Text>
                 </View>
                 {error && (
@@ -144,7 +145,7 @@ export function SummaryModal({
                     <Ionicons name="checkmark-circle" size={18} color={colors.bg} />
                   )}
                   <Text style={styles.primaryBtnText}>
-                    {submitting ? "Grading your summary…" : "Submit summary"}
+                    {submitting ? tr("summary.grading") : tr("summary.submit")}
                   </Text>
                 </Pressable>
               </>
@@ -157,14 +158,12 @@ export function SummaryModal({
                     color={scoreColor(grade.score)}
                   />
                   <Text style={styles.resultText}>
-                    {passed
-                      ? "Nice — you understood this. Marked as read."
-                      : "Almost. Review the feedback, then revise to mark it read."}
+                    {passed ? tr("summary.passed") : tr("summary.failed")}
                   </Text>
                 </View>
 
                 <View style={styles.yourSummary}>
-                  <Text style={styles.yourSummaryLabel}>Your summary</Text>
+                  <Text style={styles.yourSummaryLabel}>{tr("summary.yourSummary")}</Text>
                   <Text style={styles.yourSummaryText}>{text}</Text>
                 </View>
 
@@ -172,7 +171,7 @@ export function SummaryModal({
 
                 <Pressable onPress={() => setEditing(true)} style={styles.secondaryBtn} accessibilityRole="button">
                   <Ionicons name="refresh" size={16} color={colors.accent} />
-                  <Text style={styles.secondaryBtnText}>{passed ? "Revise summary" : "Try again"}</Text>
+                  <Text style={styles.secondaryBtnText}>{passed ? tr("summary.revise") : tr("summary.tryAgain")}</Text>
                 </Pressable>
               </>
             ) : null}

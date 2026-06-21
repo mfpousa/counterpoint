@@ -108,3 +108,62 @@ export function Typewriter({
     </Text>
   );
 }
+
+/**
+ * Reveals an ARRAY of paragraphs as ONE continuous typewriter: a single cursor
+ * moves top-to-bottom, paragraph by paragraph (vs one independent Typewriter per
+ * paragraph, which animates them all at once). Each paragraph is its own <Text>
+ * so paragraph spacing/styles still apply.
+ */
+export function TypewriterParagraphs({
+  paragraphs,
+  active = true,
+  cps = 320,
+  style,
+}: {
+  paragraphs: string[];
+  active?: boolean;
+  cps?: number;
+  style?: TextStyle;
+}) {
+  const total = paragraphs.reduce((sum, p) => sum + p.length, 0);
+  const [n, setN] = useState(active ? 0 : total);
+  // Re-run when the content changes (join is a cheap identity for the deps).
+  const key = paragraphs.join("\u0001");
+  useEffect(() => {
+    if (!active) {
+      setN(total);
+      return;
+    }
+    setN(0);
+    let raf = 0;
+    let start = 0;
+    const step = (ts: number) => {
+      if (!start) start = ts;
+      const c = Math.min(total, Math.floor(((ts - start) / 1000) * cps));
+      setN(c);
+      if (c < total) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [key, active, cps, total]);
+
+  const out: React.ReactNode[] = [];
+  let remaining = n;
+  for (let i = 0; i < paragraphs.length; i++) {
+    const take = Math.max(0, Math.min(paragraphs[i].length, remaining));
+    remaining -= take;
+    const started = take > 0 || (i === 0 && total === 0);
+    if (!started) break; // below the frontier — reveal as we get there
+    // The "frontier" paragraph is the one that consumed the last revealed char.
+    const isFrontier = active && n < total && remaining <= 0;
+    out.push(
+      <Text key={i} style={style}>
+        {paragraphs[i].slice(0, take)}
+        {isFrontier ? <Cursor /> : null}
+      </Text>,
+    );
+    if (isFrontier) break;
+  }
+  return <>{out}</>;
+}

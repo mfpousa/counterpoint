@@ -16,6 +16,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { fetchRewrite } from "../lib/api";
+import { useApp, useT } from "../store/AppContext";
 import { colors, font, radius, spacing } from "../theme";
 import type { FeedItem, RewrittenArticle } from "../types";
 
@@ -27,6 +28,8 @@ export function ArticleReader({
   onClose: () => void;
 }) {
   const insets = useSafeAreaInsets();
+  const { prefs } = useApp();
+  const t = useT();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [article, setArticle] = useState<RewrittenArticle | null>(null);
@@ -37,12 +40,12 @@ export function ArticleReader({
     setLoading(true);
     setError(null);
     setArticle(null);
-    fetchRewrite(item.id)
+    fetchRewrite(item.id, prefs.language)
       .then((a) => {
         if (!cancelled) setArticle(a);
       })
       .catch((e: unknown) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : "Couldn't load the article.");
+        if (!cancelled) setError(e instanceof Error ? e.message : t("reader.couldntLoad"));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -63,7 +66,7 @@ export function ArticleReader({
           </Pressable>
           <View style={styles.aiTag}>
             <Ionicons name="sparkles" size={12} color={colors.accent} />
-            <Text style={styles.aiTagText}>AI rewrite</Text>
+            <Text style={styles.aiTagText}>{t("reader.aiRewrite")}</Text>
           </View>
           <View style={{ flex: 1 }} />
           {open && (
@@ -80,7 +83,7 @@ export function ArticleReader({
           {loading && (
             <View style={styles.center}>
               <ActivityIndicator size="large" color={colors.accent} />
-              <Text style={styles.centerText}>Rewriting the article for clean reading…</Text>
+              <Text style={styles.centerText}>{t("reader.rewriting")}</Text>
             </View>
           )}
 
@@ -91,7 +94,7 @@ export function ArticleReader({
               {open && (
                 <Pressable onPress={open} style={styles.primaryBtn} accessibilityRole="link">
                   <Ionicons name="open-outline" size={16} color={colors.bg} />
-                  <Text style={styles.primaryBtnText}>Open original</Text>
+                  <Text style={styles.primaryBtnText}>{t("reader.openOriginal")}</Text>
                 </Pressable>
               )}
             </View>
@@ -103,15 +106,12 @@ export function ArticleReader({
               <View style={styles.metaRow}>
                 <Text style={styles.meta}>{article.sourceTitle}</Text>
                 <Text style={styles.dot}>·</Text>
-                <Text style={styles.meta}>{article.estMinutes} min read</Text>
+                <Text style={styles.meta}>{t("reader.minRead", { n: article.estMinutes })}</Text>
               </View>
               {article.degraded && (
                 <View style={styles.degradedBanner}>
                   <Ionicons name="information-circle-outline" size={16} color={colors.warn} />
-                  <Text style={styles.degradedText}>
-                    Full text unavailable (likely a paywall). This is a short summary based on the
-                    headline and feed description.
-                  </Text>
+                  <Text style={styles.degradedText}>{t("reader.degraded")}</Text>
                 </View>
               )}
               {article.paragraphs.map((p, i) => (
@@ -122,13 +122,11 @@ export function ArticleReader({
               {article.degraded && open && (
                 <Pressable onPress={open} style={styles.primaryBtn} accessibilityRole="link">
                   <Ionicons name="open-outline" size={16} color={colors.bg} />
-                  <Text style={styles.primaryBtnText}>Read the full article</Text>
+                  <Text style={styles.primaryBtnText}>{t("reader.readFull")}</Text>
                 </Pressable>
               )}
               <Text style={styles.disclaimer}>
-                {article.degraded
-                  ? "AI-written summary from limited information. Open the original for the full, authoritative text."
-                  : "This is an AI-rewritten version for readability. Check the original for the authoritative text."}
+                {article.degraded ? t("reader.disclaimerDegraded") : t("reader.disclaimer")}
               </Text>
             </>
           )}

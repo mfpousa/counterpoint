@@ -5,15 +5,8 @@
 import React from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import type { AnalysisStatus } from "../types";
+import { useT } from "../store/AppContext";
 import { colors, font, radius, spacing } from "../theme";
-
-const PHASE_LABEL: Record<AnalysisStatus["phase"], string> = {
-  idle: "Up to date",
-  fetching: "Fetching sources…",
-  triage: "Screening headlines…",
-  transcripts: "Fetching transcripts…",
-  analyzing: "Analyzing stories…",
-};
 
 function pct(done: number, total: number): number {
   if (total <= 0) return 0;
@@ -21,10 +14,12 @@ function pct(done: number, total: number): number {
 }
 
 export function AnalysisProgress({ status }: { status: AnalysisStatus | null }) {
+  const t = useT();
   if (!status) return null;
   const { phase, active, done, total, pending, analyzed } = status;
   // Nothing happening and no backlog — stay out of the way.
   if (!active && pending === 0) return null;
+  const phaseLabel = t(`analysis.${phase}`);
 
   const overallTotal = analyzed + pending;
   // Prefer the in-pass bar when we have one; otherwise fall back to overall.
@@ -35,10 +30,14 @@ export function AnalysisProgress({ status }: { status: AnalysisStatus | null }) 
     <View style={styles.card}>
       <View style={styles.headerRow}>
         <ActivityIndicator size="small" color={colors.accent} />
-        <Text style={styles.label}>{PHASE_LABEL[phase]}</Text>
+        <Text style={styles.label}>{phaseLabel}</Text>
         <Text style={styles.count}>
-          {analyzed.toLocaleString()}
-          {overallTotal > 0 ? ` / ${overallTotal.toLocaleString()}` : ""} analyzed
+          {overallTotal > 0
+            ? t("analysis.analyzed", {
+                done: analyzed.toLocaleString(),
+                total: overallTotal.toLocaleString(),
+              })
+            : t("analysis.analyzedOnly", { n: analyzed.toLocaleString() })}
         </Text>
       </View>
 
@@ -48,9 +47,9 @@ export function AnalysisProgress({ status }: { status: AnalysisStatus | null }) 
 
       <Text style={styles.sub}>
         {showPassCount
-          ? `${done.toLocaleString()}/${total.toLocaleString()} in this batch`
-          : PHASE_LABEL[phase]}
-        {pending > 0 ? ` · ${pending.toLocaleString()} pending` : " · done"}
+          ? t("analysis.batch", { done: done.toLocaleString(), total: total.toLocaleString() })
+          : phaseLabel}
+        {pending > 0 ? ` · ${t("analysis.pending", { n: pending.toLocaleString() })}` : ` · ${t("analysis.done")}`}
       </Text>
     </View>
   );

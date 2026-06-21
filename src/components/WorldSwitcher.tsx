@@ -7,6 +7,7 @@ import React from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { WORLDS } from "../data/worlds";
+import { useT } from "../store/AppContext";
 import { colors, font, radius, spacing } from "../theme";
 
 export function WorldSwitcher({
@@ -18,6 +19,7 @@ export function WorldSwitcher({
   busyWorld: string | null;
   onSelect: (id: string) => void;
 }) {
+  const t = useT();
   return (
     <ScrollView
       horizontal
@@ -41,7 +43,7 @@ export function WorldSwitcher({
               color={active ? colors.bg : colors.textDim}
             />
             <Text style={[styles.label, active && styles.labelActive]} numberOfLines={1}>
-              {w.title}
+              {t(`world.${w.id}`)}
             </Text>
             {busy && (
               <ActivityIndicator size="small" color={active ? colors.bg : colors.accent} />

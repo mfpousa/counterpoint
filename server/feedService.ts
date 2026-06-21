@@ -16,7 +16,7 @@ import type { AnalysisStatus, Briefing, FeedItem, Lang, Story } from "../src/typ
 import { DEFAULT_WORLD_ID, worldSources } from "../src/data/worlds";
 import { aiReachable, withConcurrency } from "./ai";
 import { analyzeItems, detectClickbait } from "./analysis";
-import { generateBriefing } from "./briefing";
+import { generateBriefing, generateBriefingStream } from "./briefing";
 import {
   clusterItems,
   distinctSources,
@@ -606,6 +606,42 @@ export async function getBriefing(
 
   state.briefingInFlight.set(key, p);
   return p;
+}
+
+/**
+ * STREAMING briefing: forwards the model's tokens via `onDelta` so the card shows
+ * the AI writing live, then returns (and caches) the parsed Briefing. A fresh
+ * cached briefing is returned immediately (no stream). Falls back to the JSON
+ * generator if the streamed prose can't be parsed.
+ */
+export async function getBriefingStream(
+  worldId: string = DEFAULT_WORLD_ID,
+  interest = config.feed.interest,
+  lang: Lang = "en",
+  onDelta: (delta: string) => void = () => {},
+): Promise<Briefing | null> {
+  await ensurePool(worldId, false);
+  const state = ws(worldId);
+  const key = `${lang}:${interestKey(interest)}`;
+  const interestStr = interestKey(interest);
+
+  const cached = state.briefingCache.get(key);
+  if (cached && cached.builtAt === state.lastBuildAt) return cached.briefing;
+  if (!(await aiReachable())) return null;
+
+  const builtAtSnapshot = state.lastBuildAt;
+  const parsed = await interpretQuery(interestStr);
+  const queryVec = await embedQuery(parsed.positive);
+  const view = assembleView(worldId, interestStr, parsed, queryVec);
+  const sample = view.items.slice(0, 40);
+  console.log(`[feed:${worldId}] briefing(${lang}): streaming "${interestStr || "general"}" from ${sample.length} item(s)…`);
+  // Fall back to the (reliable, constrained) JSON generator if the streamed prose
+  // doesn't parse into anything usable.
+  const briefing =
+    (await generateBriefingStream(interestStr, sample, onDelta, lang)) ??
+    (await generateBriefing(interestStr, sample, lang));
+  state.briefingCache.set(key, { builtAt: builtAtSnapshot, briefing });
+  return briefing;
 }
 
 /** The recent, analyzed pool eligible to be clustered into stories. Uses the

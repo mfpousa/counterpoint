@@ -7,6 +7,7 @@ import { StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, font, radius, spacing } from "../theme";
 import { PASS_SCORE } from "../lib/knowledge";
+import { useT } from "../store/AppContext";
 import type { SummaryGrade } from "../types";
 
 /** Color for a 0..100 score: danger -> warn -> accent -> good. */
@@ -57,12 +58,13 @@ function FeedbackList({
 }
 
 export function GradeFeedback({ grade }: { grade: SummaryGrade }) {
+  const t = useT();
   return (
     <View style={{ gap: spacing.md }}>
       {!!grade.verdict && <Text style={styles.verdict}>{grade.verdict}</Text>}
-      <FeedbackList icon="checkmark-circle-outline" color={colors.good} title="You got right" items={grade.correct} />
-      <FeedbackList icon="add-circle-outline" color={colors.warn} title="You missed" items={grade.missed} />
-      <FeedbackList icon="close-circle-outline" color={colors.danger} title="Not quite" items={grade.inaccuracies} />
+      <FeedbackList icon="checkmark-circle-outline" color={colors.good} title={t("grade.gotRight")} items={grade.correct} />
+      <FeedbackList icon="add-circle-outline" color={colors.warn} title={t("grade.missed")} items={grade.missed} />
+      <FeedbackList icon="close-circle-outline" color={colors.danger} title={t("grade.notQuite")} items={grade.inaccuracies} />
       {!!grade.lesson && (
         <View style={styles.lesson}>
           <Ionicons name="school-outline" size={16} color={colors.accent} />

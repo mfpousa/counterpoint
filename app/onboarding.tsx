@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useApp } from "../src/store/AppContext";
+import { useApp, useT } from "../src/store/AppContext";
 import { colors, font, radius, spacing } from "../src/theme";
 import type { Kind, Topic } from "../src/types";
 
@@ -16,16 +16,13 @@ const TOPICS: Topic[] = [
   "history",
   "culture",
 ];
-const KINDS: { id: Kind; label: string }[] = [
-  { id: "video", label: "Videos" },
-  { id: "podcast", label: "Podcasts" },
-  { id: "news", label: "News" },
-];
+const KINDS: Kind[] = ["video", "podcast", "news"];
 
 export default function Onboarding() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { prefs, updatePrefs } = useApp();
+  const t = useT();
 
   const [quota, setQuota] = useState(prefs.dailyQuotaMin);
   const [topics, setTopics] = useState<Topic[]>(prefs.enabledTopics);
@@ -55,14 +52,11 @@ export default function Onboarding() {
     >
       <View>
         <Text style={styles.brand}>Counterpoint</Text>
-        <Text style={styles.tagline}>
-          A learning feed that works for you — not the algorithm. Set a daily quota and get a
-          balanced mix of ideas from across the spectrum.
-        </Text>
+        <Text style={styles.tagline}>{t("onb.tagline")}</Text>
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.h}>Daily learning quota</Text>
+        <Text style={styles.h}>{t("onb.quota")}</Text>
         <View style={styles.row}>
           {QUOTAS.map((q) => (
             <Pressable
@@ -79,31 +73,33 @@ export default function Onboarding() {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.h}>What do you want to learn about?</Text>
+        <Text style={styles.h}>{t("onb.learnAbout")}</Text>
         <View style={styles.wrap}>
-          {TOPICS.map((t) => (
+          {TOPICS.map((topic) => (
             <Pressable
-              key={t}
-              onPress={() => toggleTopic(t)}
-              style={[styles.pill, topics.includes(t) && styles.pillActive]}
+              key={topic}
+              onPress={() => toggleTopic(topic)}
+              style={[styles.pill, topics.includes(topic) && styles.pillActive]}
             >
-              <Text style={[styles.pillText, topics.includes(t) && styles.pillTextActive]}>{t}</Text>
+              <Text style={[styles.pillText, topics.includes(topic) && styles.pillTextActive]}>
+                {t(`topic.${topic}`)}
+              </Text>
             </Pressable>
           ))}
         </View>
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.h}>Content types</Text>
+        <Text style={styles.h}>{t("onb.contentTypes")}</Text>
         <View style={styles.row}>
           {KINDS.map((k) => (
             <Pressable
-              key={k.id}
-              onPress={() => toggleKind(k.id)}
-              style={[styles.pill, kinds.includes(k.id) && styles.pillActive]}
+              key={k}
+              onPress={() => toggleKind(k)}
+              style={[styles.pill, kinds.includes(k) && styles.pillActive]}
             >
-              <Text style={[styles.pillText, kinds.includes(k.id) && styles.pillTextActive]}>
-                {k.label}
+              <Text style={[styles.pillText, kinds.includes(k) && styles.pillTextActive]}>
+                {t(`settings.kind.${k}`)}
               </Text>
             </Pressable>
           ))}
@@ -115,11 +111,9 @@ export default function Onboarding() {
         disabled={!canStart}
         style={[styles.cta, !canStart && styles.ctaDisabled]}
       >
-        <Text style={styles.ctaText}>Start learning</Text>
+        <Text style={styles.ctaText}>{t("onb.start")}</Text>
       </Pressable>
-      <Text style={styles.footnote}>
-        Your perspective balance is tracked locally on your device. Nothing is uploaded.
-      </Text>
+      <Text style={styles.footnote}>{t("onb.footnote")}</Text>
     </ScrollView>
   );
 }

@@ -6,7 +6,7 @@ import React from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { Briefing } from "../types";
-import { Typewriter } from "./anim";
+import { Cursor } from "./anim";
 import { Skeleton } from "./Skeleton";
 import { useT } from "../store/AppContext";
 import { colors, font, radius, spacing } from "../theme";
@@ -14,14 +14,22 @@ import { colors, font, radius, spacing } from "../theme";
 export function BriefingCard({
   briefing,
   loading,
+  stream = "",
 }: {
   briefing: Briefing | null;
   loading: boolean;
+  /** Live token stream while the briefing is being written (empty otherwise). */
+  stream?: string;
 }) {
   const t = useT();
-  // No briefing yet: keep the SAME reserved footprint (minHeight) and show a
-  // skeleton while it synthesizes, so the cards below don't jump when it lands.
+  // No briefing yet: keep the SAME reserved footprint (minHeight). While the model
+  // writes, show its tokens live with a single top-to-bottom cursor; before any
+  // token arrives, show a skeleton so the cards below don't jump when it lands.
   if (!briefing) {
+    const lines = stream
+      .split(/\n+/)
+      .map((l) => l.trim())
+      .filter(Boolean);
     return (
       <View style={styles.card}>
         <View style={styles.headerRow}>
@@ -29,7 +37,16 @@ export function BriefingCard({
           <Text style={styles.heading}>{t("briefing.title")}</Text>
           {loading && <ActivityIndicator size="small" color={colors.accent} />}
         </View>
-        {loading ? (
+        {lines.length > 0 ? (
+          <View style={styles.streamBox}>
+            {lines.map((line, i) => (
+              <Text key={i} style={styles.streamLine}>
+                {line}
+                {i === lines.length - 1 ? <Cursor /> : null}
+              </Text>
+            ))}
+          </View>
+        ) : loading ? (
           <View style={styles.skeleton}>
             <Skeleton width="65%" height={18} />
             <Skeleton width="100%" height={12} />
@@ -60,17 +77,16 @@ export function BriefingCard({
         {loading && <ActivityIndicator size="small" color={colors.accent} />}
       </View>
 
-      {mood.length > 0 && <Typewriter text={mood} cps={260} style={styles.mood} />}
+      {mood.length > 0 && <Text style={styles.mood}>{mood}</Text>}
 
       {threads.length > 0 && (
         <View style={styles.threads}>
-          {threads.map((t, i) => (
+          {threads.map((thread, i) => (
             <View key={i} style={styles.threadRow}>
               <View style={styles.dot} />
               <Text style={styles.threadText}>
-                {t.title.length > 0 && <Text style={styles.threadTitle}>{t.title}: </Text>}
-                {/* Nested in <Text>, so no animated cursor here. */}
-                <Typewriter text={t.detail} cps={260} cursor={false} />
+                {thread.title.length > 0 && <Text style={styles.threadTitle}>{thread.title}: </Text>}
+                {thread.detail}
               </Text>
             </View>
           ))}
@@ -82,7 +98,7 @@ export function BriefingCard({
           <Ionicons name="trending-up" size={14} color={colors.good} />
           <Text style={styles.outlookText}>
             <Text style={styles.outlookLabel}>{t("briefing.headed")}</Text>
-            <Typewriter text={outlook} cps={260} cursor={false} />
+            {outlook}
           </Text>
         </View>
       )}
@@ -103,6 +119,8 @@ const styles = StyleSheet.create({
     minHeight: 132,
   },
   skeleton: { gap: spacing.sm, marginTop: spacing.xs },
+  streamBox: { gap: spacing.xs, marginTop: spacing.xs },
+  streamLine: { color: colors.textDim, fontSize: font.body, lineHeight: 21 },
   headerRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   heading: {
     color: colors.text,

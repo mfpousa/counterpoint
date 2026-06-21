@@ -4,7 +4,7 @@
 // with nothing usable.
 
 import type { Briefing, BriefingThread, FeedItem, Lang } from "../src/types";
-import { chatJsonObject, type JsonSchema } from "./ai";
+import { chatJsonObject, chatRaw, type JsonSchema } from "./ai";
 import { config } from "./config";
 import { langDirective } from "./lang";
 
@@ -102,6 +102,103 @@ export async function generateBriefing(
   const mood = typeof obj["mood"] === "string" ? obj["mood"].trim() : "";
   const outlook = typeof obj["outlook"] === "string" ? obj["outlook"].trim() : "";
   const threads = coerceThreads(obj["threads"]);
+  if (!mood && threads.length === 0 && !outlook) return null;
+
+  return {
+    generatedAt: now,
+    interest: interest.slice(0, config.feed.maxInterestLen),
+    mood,
+    threads,
+    outlook,
+    basedOn: payload.length,
+  };
+}
+
+// Plain-prose variant of the rules for the STREAMING path: the model writes text
+// we can forward token-by-token (no JSON to incrementally parse), in a structure
+// we parse back into a Briefing once complete.
+const BRIEFING_PLAIN_RULES =
+  "You are a sharp, neutral news editor writing a brief daily digest for a reader. " +
+  "Using ONLY the provided recent items (title + one-line summary + topic + age), synthesize " +
+  "what is happening now and the recent trajectory. Be specific and grounded in the items; do " +
+  "NOT invent facts or name events not present. Stay calm and analytical, not sensational.\n" +
+  "Write PLAIN TEXT (no JSON, no markdown headings) in EXACTLY this structure:\n" +
+  "- First, ONE sentence (<= 30 words) capturing the overall mood/direction.\n" +
+  "- Then a blank line, then 3 to 5 lines, each starting with '- ' and formatted " +
+  "'- <short label>: <one sentence (<= 28 words) on what's happening and why it matters>'.\n" +
+  "- Then a blank line, then a final line starting with 'Outlook: ' and ONE sentence on where " +
+  "things appear to be headed next.\n" +
+  "Output nothing else — no preamble, no closing remarks.";
+
+function stripFences(s: string): string {
+  // Only strip the fence markers (and an optional same-line language tag) — never
+  // consume the newline/content that follows (`[ \t]*`, not `\s*`).
+  return s.replace(/```+[ \t]*\w*/g, "").replace(/```+/g, "").trim();
+}
+
+/** Parse the streamed plain-prose briefing back into structured fields. Forgiving:
+ *  the first non-bullet line is the mood, '- label: detail' lines are threads, and
+ *  a line starting 'Outlook:' (or the trailing line) is the outlook. */
+export function parseBriefingText(raw: string): {
+  mood: string;
+  threads: BriefingThread[];
+  outlook: string;
+} {
+  const lines = stripFences(raw)
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+  let mood = "";
+  let outlook = "";
+  const threads: BriefingThread[] = [];
+  for (const line of lines) {
+    if (/^outlook\s*:/i.test(line)) {
+      outlook = line.replace(/^outlook\s*:/i, "").trim();
+      continue;
+    }
+    const bullet = line.replace(/^[-*•]\s+/, "");
+    if (bullet !== line) {
+      const ci = bullet.indexOf(":");
+      if (ci > 0 && ci <= 60) {
+        threads.push({ title: bullet.slice(0, ci).trim(), detail: bullet.slice(ci + 1).trim() });
+      } else {
+        threads.push({ title: "", detail: bullet });
+      }
+      if (threads.length >= 5) continue;
+      continue;
+    }
+    if (!mood) mood = line;
+    else if (threads.length === 0 && !outlook) outlook = line; // prose fallback
+  }
+  return { mood, threads: threads.slice(0, 5), outlook };
+}
+
+/**
+ * STREAMING briefing: forwards the model's tokens to `onDelta` as they generate
+ * (so the card can show the AI writing live), then parses the prose into a
+ * Briefing. Returns null if there's nothing to summarize or no usable answer.
+ */
+export async function generateBriefingStream(
+  interest: string,
+  items: FeedItem[],
+  onDelta: (delta: string) => void,
+  lang: Lang = "en",
+): Promise<Briefing | null> {
+  if (items.length === 0) return null;
+
+  const now = Date.now();
+  const payload = items.slice(0, 40).map((it) => ({
+    title: it.title,
+    summary: (it.aiReason ?? it.summary ?? "").slice(0, 220),
+    topic: it.topic,
+    age: relativeAge(it.publishedAt, now),
+  }));
+
+  const full = await chatRaw(BRIEFING_PLAIN_RULES + steer(interest) + langDirective(lang), payload, {
+    maxTokens: 900,
+    onDelta,
+  });
+  const { mood, threads, outlook } = parseBriefingText(full);
   if (!mood && threads.length === 0 && !outlook) return null;
 
   return {

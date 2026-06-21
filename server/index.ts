@@ -14,6 +14,7 @@ import { config } from "./config";
 import {
   clearCaches,
   getBriefing,
+  getBriefingStream,
   getFeed,
   getRelated,
   getStatus,
@@ -93,6 +94,40 @@ app.get("/api/briefing", async (req, res) => {
   } catch (e) {
     console.error("[api] /api/briefing failed:", e);
     res.status(500).json({ briefing: null, error: e instanceof Error ? e.message : "failed" });
+  }
+});
+
+// Streaming briefing (SSE): forwards the model's tokens as it writes the digest,
+// then a `done` event with the parsed Briefing (or null). Events: delta, done, error.
+app.get("/api/briefing/stream", async (req, res) => {
+  res.set({
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache, no-transform",
+    Connection: "keep-alive",
+    "X-Accel-Buffering": "no",
+  });
+  res.flushHeaders?.();
+  let closed = false;
+  req.on("close", () => {
+    closed = true;
+  });
+  const send = (event: string, data: unknown) => {
+    if (closed) return;
+    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  };
+  try {
+    const briefing = await getBriefingStream(
+      readWorld(req.query.world),
+      readInterest(req.query.interest),
+      readLang(req.query.lang),
+      (delta) => send("delta", delta),
+    );
+    send("done", briefing);
+  } catch (e) {
+    console.error("[api] /api/briefing/stream failed:", e);
+    send("error", e instanceof Error ? e.message : "briefing failed");
+  } finally {
+    if (!closed) res.end();
   }
 });
 

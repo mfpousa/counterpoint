@@ -47,7 +47,7 @@ export function StoryCard({
       <View style={styles.headRow}>
         <View style={[styles.topicPill, { backgroundColor: m.color + "22" }]}>
           <Ionicons name={m.icon} size={12} color={m.color} />
-          <Text style={[styles.topicText, { color: m.color }]}>{m.label}</Text>
+          <Text style={[styles.topicText, { color: m.color }]}>{t(`topic.${story.topic}`)}</Text>
         </View>
         {developing ? (
           <View style={styles.developingTag}>

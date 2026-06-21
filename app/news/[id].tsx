@@ -67,7 +67,7 @@ export default function NewsReader() {
           if (!cancelled) setArticle(a);
         })
         .catch((e: unknown) => {
-          if (!cancelled) setError(e instanceof Error ? e.message : "Couldn't load the article.");
+          if (!cancelled) setError(e instanceof Error ? e.message : t("reader.couldntLoad"));
         })
         .finally(() => {
           if (!cancelled) setLoading(false);
@@ -157,7 +157,7 @@ export default function NewsReader() {
             {open && (
               <Pressable onPress={open} style={styles.primaryBtn} accessibilityRole="link">
                 <Ionicons name="open-outline" size={16} color={colors.bg} />
-                <Text style={styles.primaryBtnText}>Open original</Text>
+                <Text style={styles.primaryBtnText}>{t("reader.openOriginal")}</Text>
               </Pressable>
             )}
           </View>
@@ -168,7 +168,7 @@ export default function NewsReader() {
           <View>
             <View style={styles.writingRow}>
               <Ionicons name="sparkles" size={14} color={colors.accent} />
-              <Text style={styles.writingText}>Writing in real time…</Text>
+              <Text style={styles.writingText}>{t("reader.writing")}</Text>
             </View>
             {streamingParas.map((p, i) => (
               <Text key={i} style={styles.paragraph}>
@@ -185,7 +185,7 @@ export default function NewsReader() {
             <View style={styles.metaRow}>
               <Text style={styles.meta}>{article.sourceTitle}</Text>
               <Text style={styles.dot}>·</Text>
-              <Text style={styles.meta}>{article.estMinutes} min read</Text>
+              <Text style={styles.meta}>{t("reader.minRead", { n: article.estMinutes })}</Text>
               {poolItem && (
                 <>
                   <Text style={styles.dot}>·</Text>
@@ -201,10 +201,7 @@ export default function NewsReader() {
             {article.degraded && (
               <View style={styles.degradedBanner}>
                 <Ionicons name="information-circle-outline" size={16} color={colors.warn} />
-                <Text style={styles.degradedText}>
-                  Full text unavailable (likely a paywall). This is a short summary based on the
-                  headline and feed description.
-                </Text>
+                <Text style={styles.degradedText}>{t("reader.degraded")}</Text>
               </View>
             )}
 
@@ -227,15 +224,17 @@ export default function NewsReader() {
                   color={done ? colors.good : colors.accent}
                 />
                 <Text style={[styles.recallText, done && { color: colors.good }]}>
-                  {summary ? (done ? "Read — revise recall" : "Revise your recall") : "Summarize to mark read"}
+                  {summary
+                    ? done
+                      ? t("reader.readRevise")
+                      : t("reader.reviseRecall")
+                    : t("reader.summarizeToRead")}
                 </Text>
               </Pressable>
             )}
 
             <Text style={styles.disclaimer}>
-              {article.degraded
-                ? "AI-written summary from limited information. Open the original for the full, authoritative text."
-                : "This is an AI-rewritten version for readability. Check the original for the authoritative text."}
+              {article.degraded ? t("reader.disclaimerDegraded") : t("reader.disclaimer")}
             </Text>
 
             {/* Related news rail — continuous in-app reading. */}
@@ -243,7 +242,7 @@ export default function NewsReader() {
               <View style={styles.relatedSection}>
                 <View style={styles.sectionHeader}>
                   <Ionicons name="git-network-outline" size={15} color={colors.accent} />
-                  <Text style={styles.sectionTitle}>Related news</Text>
+                  <Text style={styles.sectionTitle}>{t("reader.related")}</Text>
                 </View>
                 {related.map((r) => {
                   const m = topicMeta(r.topic);

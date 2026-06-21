@@ -9,7 +9,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { fetchBriefing, fetchRankedFeed, fetchStatus, gradeSummary } from "../lib/api";
+import { fetchBriefing, fetchRankedFeed, fetchStatus, gradeSummary, streamBriefing } from "../lib/api";
 import { buildFeed } from "../lib/buildFeed";
 import { translate } from "../lib/i18n";
 import { PASS_SCORE } from "../lib/knowledge";
@@ -52,6 +52,8 @@ interface AppState {
   /** AI digest of what's happening / where it's headed (null if unavailable). */
   briefing: Briefing | null;
   loadingBriefing: boolean;
+  /** Live token stream of the briefing while it's being written (empty otherwise). */
+  briefingStream: string;
   /** Live backend analysis progress (null until first poll). */
   status: AnalysisStatus | null;
   /** Graded recall summaries (newest first), persisted locally. */
@@ -86,6 +88,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [feedError, setFeedError] = useState<string | null>(null);
   const [briefing, setBriefing] = useState<Briefing | null>(null);
   const [loadingBriefing, setLoadingBriefing] = useState(false);
+  const [briefingStream, setBriefingStream] = useState("");
   const [status, setStatus] = useState<AnalysisStatus | null>(null);
   const [summaries, setSummaries] = useState<StoredSummary[]>([]);
   const [busyWorld, setBusyWorld] = useState<string | null>(null);
@@ -117,20 +120,54 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   langRef.current = prefs.language;
 
   // Best-effort, non-blocking. The pool is already fresh after a feed load, so
-  // we never force here (avoids a second rebuild). Steered by the same interest.
+  // we never force here (avoids a second rebuild). Streams tokens so the card
+  // shows the AI writing live (falls back to a single fetch where SSE is absent).
+  const briefingHandleRef = useRef<{ cancel: () => void } | null>(null);
+  // Per world+language+interest cache so switching languages shows the already
+  // written briefing INSTANTLY (no wipe to skeleton) while we refresh in the bg.
+  const briefingByKeyRef = useRef<Map<string, Briefing | null>>(new Map());
   const loadBriefing = useCallback(async () => {
-    setLoadingBriefing(true);
-    try {
-      setBriefing(
-        await fetchBriefing({
-          interest: interestRef.current,
-          world: worldRef.current,
-          lang: langRef.current,
-        }),
-      );
-    } finally {
+    briefingHandleRef.current?.cancel();
+    const key = `${worldRef.current}:${langRef.current}:${interestRef.current}`;
+    const hadCache = briefingByKeyRef.current.has(key);
+    if (hadCache) {
+      // Show the cached briefing immediately; keep it on screen while we refresh.
+      setBriefing(briefingByKeyRef.current.get(key) ?? null);
+      setBriefingStream("");
       setLoadingBriefing(false);
+    } else {
+      setBriefing(null);
+      setBriefingStream("");
+      setLoadingBriefing(true);
     }
+    const finish = (b: Briefing | null) => {
+      setBriefing(b);
+      setBriefingStream("");
+      setLoadingBriefing(false);
+      briefingByKeyRef.current.set(key, b);
+    };
+    const fallback = () => {
+      fetchBriefing({
+        interest: interestRef.current,
+        world: worldRef.current,
+        lang: langRef.current,
+      })
+        .then(finish)
+        .catch(() => finish(null));
+    };
+    const handle = streamBriefing({
+      interest: interestRef.current,
+      world: worldRef.current,
+      lang: langRef.current,
+      // Only show the live token stream when we have nothing cached to display.
+      onDelta: (d) => {
+        if (!hadCache) setBriefingStream((p) => p + d);
+      },
+      onDone: finish,
+      onError: fallback,
+    });
+    briefingHandleRef.current = handle;
+    if (!handle) fallback(); // SSE unsupported in this runtime
   }, []);
 
   // Coalesce overlapping non-forced refreshes (e.g. the world-change effect and
@@ -346,6 +383,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     feedError,
     briefing,
     loadingBriefing,
+    briefingStream,
     status,
     summaries,
     worldId: prefs.worldId,
