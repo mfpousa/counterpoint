@@ -237,6 +237,135 @@ const FILM_SOURCES: Source[] = [
   },
 ];
 
+/**
+ * Spain — national/regional news across the Spanish press. Lean priors follow
+ * the mainstream Spanish media-bias consensus (left ↔ right on the national
+ * political axis). All feeds are free and keyless. Items are re-classified per
+ * article by the analysis pass; these are source-level priors.
+ */
+const SPAIN_SOURCES: Source[] = [
+  {
+    id: "es-elpais-espana",
+    title: "El País — España",
+    url: "https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/section/espana/portada",
+    kind: "news",
+    topic: "politics",
+    lean: -0.3,
+    confidence: 0.8,
+    leanRationale: "Center-left: Spain's leading daily, social-democratic editorial line.",
+  },
+  {
+    id: "es-elpais-economia",
+    title: "El País — Economía",
+    url: "https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/section/economia/portada",
+    kind: "news",
+    topic: "economics",
+    lean: -0.2,
+    confidence: 0.75,
+    leanRationale: "Center-left business desk of El País.",
+  },
+  {
+    id: "es-elmundo-espana",
+    title: "El Mundo — España",
+    url: "https://e00-elmundo.uecdn.es/elmundo/rss/espana.xml",
+    kind: "news",
+    topic: "politics",
+    lean: 0.3,
+    confidence: 0.8,
+    leanRationale: "Center-right: liberal-conservative editorial stance.",
+  },
+  {
+    id: "es-eldiario",
+    title: "elDiario.es",
+    url: "https://www.eldiario.es/rss/",
+    kind: "news",
+    topic: "politics",
+    lean: -0.5,
+    confidence: 0.8,
+    leanRationale: "Left: progressive investigative outlet.",
+  },
+  {
+    id: "es-abc-espana",
+    title: "ABC — España",
+    url: "https://www.abc.es/rss/feeds/abc_EspanaEspana.xml",
+    kind: "news",
+    topic: "politics",
+    lean: 0.5,
+    confidence: 0.8,
+    leanRationale: "Right: conservative, monarchist editorial tradition.",
+  },
+  {
+    id: "es-larazon",
+    title: "La Razón",
+    url: "https://www.larazon.es/rss/portada.xml",
+    kind: "news",
+    topic: "politics",
+    lean: 0.6,
+    confidence: 0.75,
+    leanRationale: "Right: conservative national daily.",
+  },
+  {
+    id: "es-publico",
+    title: "Público",
+    url: "https://www.publico.es/rss/",
+    kind: "news",
+    topic: "politics",
+    lean: -0.6,
+    confidence: 0.75,
+    leanRationale: "Left: left-wing, republican editorial line.",
+  },
+  {
+    id: "es-lavanguardia",
+    title: "La Vanguardia",
+    url: "https://www.lavanguardia.com/rss/home.xml",
+    kind: "news",
+    topic: "world",
+    lean: -0.1,
+    confidence: 0.7,
+    leanRationale: "Center: Barcelona-based daily, broadly centrist.",
+  },
+  {
+    id: "es-elconfidencial",
+    title: "El Confidencial — España",
+    url: "https://rss.elconfidencial.com/espana/",
+    kind: "news",
+    topic: "politics",
+    lean: 0.1,
+    confidence: 0.7,
+    leanRationale: "Center to center-right digital native, investigative.",
+  },
+  {
+    id: "es-20minutos",
+    title: "20minutos",
+    url: "https://www.20minutos.es/rss/",
+    kind: "news",
+    topic: "world",
+    lean: 0.0,
+    confidence: 0.65,
+    leanRationale: "Center: mass-market general news.",
+  },
+  {
+    id: "es-rtve",
+    title: "RTVE — Noticias",
+    url: "https://api2.rtve.es/rss/temas_noticias.xml",
+    kind: "news",
+    topic: "world",
+    lean: -0.1,
+    confidence: 0.7,
+    leanRationale: "Center: public broadcaster, broad national coverage.",
+  },
+  {
+    id: "es-expansion",
+    title: "Expansión",
+    url: "https://e00-expansion.uecdn.es/rss/portada.xml",
+    kind: "news",
+    topic: "economics",
+    lean: 0.3,
+    confidence: 0.75,
+    leanRationale: "Center-right: pro-market business daily.",
+  },
+];
+
 export const WORLDS: World[] = [
   {
     id: "frontpage",
@@ -272,6 +401,13 @@ export const WORLDS: World[] = [
     description: "Movie reviews, criticism and the stories behind the screen.",
     icon: "film",
     sources: FILM_SOURCES,
+  },
+  {
+    id: "spain",
+    title: "Spain",
+    description: "Spanish national news across the political spectrum, left to right.",
+    icon: "flag",
+    sources: SPAIN_SOURCES,
   },
 ];
 

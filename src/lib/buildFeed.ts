@@ -37,6 +37,29 @@ function sideOf(lean: number): Side | "center" {
 }
 
 /**
+ * Honest "why" label for a political pick. We only call something a
+ * counterweight when it ACTUALLY opposes the side you've over-consumed
+ * (`chosenSide === needSide`). Center picks, and same-side fallback picks that
+ * reinforce rather than balance, are labeled plainly — so we never tell the
+ * reader a right-leaning article is "balancing" a right-leaning day, nor label a
+ * center article as a left/right-leaning view.
+ */
+function politicalReason(
+  chosenSide: Side | "center",
+  needSide: Side,
+  topic: string,
+  drifting: boolean,
+): string {
+  if (chosenSide === "center") return `A center take on ${topic}`;
+  if (chosenSide === needSide) {
+    return drifting
+      ? `Counterweight — a ${chosenSide}-leaning view to balance your day`
+      : `Balancing perspectives — a ${chosenSide}-leaning take on ${topic}`;
+  }
+  return `A ${chosenSide}-leaning take on ${topic}`;
+}
+
+/**
  * Seed the running left/right minutes from today's already-consumed directional
  * tally so the feed counter-weights toward the side you've under-consumed.
  */
@@ -252,10 +275,7 @@ export function buildFeed(input: BuildFeedInput): FeedItem[] {
         }
         polMinutes += chosen.estMinutes;
         const drifting = seed.left !== seed.right;
-        const reason = drifting
-          ? `Counterweight — a ${needSide}-leaning view to balance your day`
-          : `Balancing perspectives — a ${needSide}-leaning take on ${chosen.topic}`;
-        take(chosen, political, reason);
+        take(chosen, political, politicalReason(s, needSide, chosen.topic, drifting));
         continue;
       }
       chosen = null;
@@ -279,7 +299,9 @@ export function buildFeed(input: BuildFeedInput): FeedItem[] {
         runRight += anyPol.estMinutes / 2;
       }
       polMinutes += anyPol.estMinutes;
-      take(anyPol, political, `Balancing perspectives — ${anyPol.topic}`);
+      const needSide: Side = runLeft <= runRight ? "left" : "right";
+      const drifting = seed.left !== seed.right;
+      take(anyPol, political, politicalReason(s, needSide, anyPol.topic, drifting));
       continue;
     }
 

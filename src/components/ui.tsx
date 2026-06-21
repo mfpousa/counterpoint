@@ -1,7 +1,7 @@
 // Small shared UI atoms: chips, lean badge, and lean spectrum color helper.
 
-import React from "react";
-import { StyleSheet, Text, View } from "react-native";
+import React, { useState } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { colors, font, radius, spacing } from "../theme";
 import { leanBucket, leanBucketLabel } from "../lib/lean";
 import type { Lean, LeanSource } from "../types";
@@ -51,12 +51,23 @@ export function Chip({
   );
 }
 
-export function LeanBadge({ lean, source }: { lean: Lean; source: LeanSource }) {
+export function LeanBadge({
+  lean,
+  source,
+  rationale,
+}: {
+  lean: Lean;
+  source: LeanSource;
+  /** Short justification for the lean tag, shown in a tooltip on hover/press. */
+  rationale?: string;
+}) {
+  const [open, setOpen] = useState(false);
   const bucket = leanBucket(lean);
   const c = leanColor(lean);
   const label = leanBucketLabel(bucket);
   const value = lean === null ? "" : ` ${lean > 0 ? "+" : ""}${lean.toFixed(2)}`;
-  return (
+
+  const badge = (
     <View style={styles.leanBadge}>
       <View style={[styles.dot, { backgroundColor: c }]} />
       <Text style={[styles.leanText, { color: c }]}>
@@ -64,6 +75,31 @@ export function LeanBadge({ lean, source }: { lean: Lean; source: LeanSource }) 
         {value}
       </Text>
       <Text style={styles.provenance}>{source === "llm" ? "AI-tagged" : "source"}</Text>
+    </View>
+  );
+
+  // No rationale (e.g. non-political items) -> plain badge, no interaction.
+  const hasTip = !!rationale && lean !== null;
+  if (!hasTip) return badge;
+
+  return (
+    <View style={styles.leanWrap}>
+      {open && (
+        <View style={styles.tooltip} pointerEvents="none">
+          <Text style={styles.tooltipText}>{rationale}</Text>
+        </View>
+      )}
+      <Pressable
+        // Hover works on web; press toggles on touch devices.
+        onHoverIn={() => setOpen(true)}
+        onHoverOut={() => setOpen(false)}
+        onPress={() => setOpen((v) => !v)}
+        accessibilityRole="button"
+        accessibilityLabel={`Lean rationale: ${rationale}`}
+        hitSlop={6}
+      >
+        {badge}
+      </Pressable>
     </View>
   );
 }
@@ -84,5 +120,31 @@ const styles = StyleSheet.create({
     fontSize: font.tiny,
     fontStyle: "italic",
     marginLeft: 2,
+  },
+  leanWrap: { position: "relative" },
+  tooltip: {
+    position: "absolute",
+    bottom: "100%",
+    right: 0,
+    marginBottom: spacing.xs,
+    maxWidth: 260,
+    backgroundColor: colors.surfaceAlt,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    zIndex: 50,
+    elevation: 6,
+    shadowColor: "#000",
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  tooltipText: {
+    color: colors.text,
+    fontSize: font.tiny,
+    fontStyle: "italic",
+    lineHeight: 16,
   },
 });

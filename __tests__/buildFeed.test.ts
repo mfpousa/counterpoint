@@ -281,4 +281,77 @@ describe("buildFeed", () => {
     expect(feed.length).toBeGreaterThan(0);
     expect(feed.every((i) => typeof i.reason === "string" && i.reason.length > 0)).toBe(true);
   });
+
+  it("never labels a same-side (reinforcing) pick as a counterweight", () => {
+    // Drifting RIGHT today, but ONLY right-leaning items are available. The
+    // engine must still surface them, but must NOT claim a right article
+    // "balances" a right-leaning day.
+    const items = Array.from({ length: 6 }, () => makeItem({ lean: 0.6 }));
+    const feed = buildFeed({
+      items,
+      prefs: makePrefs({ dailyQuotaMin: 100 }),
+      progress: emptyProgress({
+        consumedMin: 60,
+        leanWeightSum: 36,
+        leanMinutesSum: 60,
+        leftMinutesSum: 0,
+        rightMinutesSum: 60,
+      }),
+      now: 100000,
+    });
+    const rightPicks = feed.filter((i) => (i.lean as number) > 0);
+    expect(rightPicks.length).toBeGreaterThan(0);
+    for (const i of rightPicks) {
+      expect(i.reason ?? "").not.toMatch(/balance your day/);
+      expect(i.reason ?? "").not.toMatch(/Counterweight/);
+      // Honestly described by its actual side.
+      expect(i.reason ?? "").toContain("right-leaning take");
+    }
+  });
+
+  it("labels center political picks as center, not as a leaning view", () => {
+    const items = Array.from({ length: 5 }, () => makeItem({ lean: 0, topic: "politics" }));
+    const feed = buildFeed({
+      items,
+      prefs: makePrefs({ dailyQuotaMin: 100 }),
+      progress: emptyProgress(),
+      now: 100000,
+    });
+    const centerPicks = feed.filter((i) => i.lean === 0);
+    expect(centerPicks.length).toBeGreaterThan(0);
+    for (const i of centerPicks) {
+      expect(i.reason ?? "").not.toMatch(/leaning view|leaning take|balance your day/);
+      expect(i.reason ?? "").toContain("center take");
+    }
+  });
+
+  it("reserves the 'balance your day' message for genuine leaning counterweights", () => {
+    // Drifting LEFT; both sides available. As the feed rebalances, the running
+    // tally can flip which side is under-consumed, so EITHER side may legitimately
+    // carry the balance message — but a CENTER pick never should.
+    const items = [
+      ...Array.from({ length: 6 }, () => makeItem({ lean: -0.6 })),
+      ...Array.from({ length: 6 }, () => makeItem({ lean: 0.6 })),
+      ...Array.from({ length: 4 }, () => makeItem({ lean: 0 })),
+    ];
+    const feed = buildFeed({
+      items,
+      prefs: makePrefs({ dailyQuotaMin: 200 }),
+      progress: emptyProgress({
+        consumedMin: 60,
+        leanWeightSum: -36,
+        leanMinutesSum: 60,
+        leftMinutesSum: 60,
+        rightMinutesSum: 0,
+      }),
+      now: 100000,
+    });
+    const balancing = feed.filter((i) => (i.reason ?? "").includes("balance your day"));
+    expect(balancing.length).toBeGreaterThan(0);
+    for (const i of balancing) {
+      // A counterweight is always a real left/right view, never a center item.
+      expect(i.lean as number).not.toBe(0);
+      expect(i.reason ?? "").toMatch(/(left|right)-leaning view/);
+    }
+  });
 });

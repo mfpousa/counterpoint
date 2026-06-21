@@ -197,6 +197,41 @@ export async function detectClickbait(
 
 // --- Pass 2: deep analysis ---------------------------------------------------
 
+/** Strip model scaffolding (``` fences, stray "json") and collapse whitespace. */
+function cleanField(s: string): string {
+  return s
+    .replace(/```+\s*json\b/gi, "")
+    .replace(/```+/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * True when a model free-text field is DEGENERATE output rather than real prose:
+ * long runs of repeated punctuation/ellipsis ("………", "??????"), or text that is
+ * mostly non-letters. Weak local models sometimes emit these loops, which would
+ * otherwise be stored and shown in the summary / lean rationale.
+ */
+export function looksDegenerate(s: string): boolean {
+  // The same non-word char repeated 4+ times (e.g. "………", "????", "!!!!").
+  if (/([^\p{L}\p{N}\s])\1{3,}/u.test(s)) return true;
+  // Any run of 6+ consecutive non-word chars (mixed punctuation soup).
+  if (/[^\p{L}\p{N}\s]{6,}/u.test(s)) return true;
+  const nonSpace = s.replace(/\s/g, "");
+  if (!nonSpace) return true;
+  const letters = (s.match(/\p{L}/gu) ?? []).length;
+  // Real prose is letter-dominated; junk skews to symbols/digits.
+  return letters / nonSpace.length < 0.4;
+}
+
+/** Sanitize a model free-text field: blank it when degenerate, else clean it. */
+export function sanitizeModelText(raw: unknown): string {
+  if (typeof raw !== "string") return "";
+  const s = raw.trim();
+  if (!s || looksDegenerate(s)) return "";
+  return cleanField(s);
+}
+
 export function coerceAnalysis(raw: Record<string, unknown>, fallback: FeedItem): ItemAnalysis {
   const topicRaw = String(raw["topic"] ?? "").toLowerCase();
   const topic = (VALID_TOPICS.has(topicRaw) ? topicRaw : fallback.topic) as Topic;
@@ -211,16 +246,15 @@ export function coerceAnalysis(raw: Record<string, unknown>, fallback: FeedItem)
     // The model gave a usable numeric lean for this item (not a null fallback).
     leanRefined = !Number.isNaN(Number(lv));
   }
-  const leanRationale =
-    typeof raw["leanRationale"] === "string" ? (raw["leanRationale"] as string).trim() : "";
+  const leanRationale = sanitizeModelText(raw["leanRationale"]);
 
   const importance = clampNum(raw["importance"], 0, 1, 0.5);
-  const summary = typeof raw["summary"] === "string" ? (raw["summary"] as string).trim() : "";
+  const summary = sanitizeModelText(raw["summary"]);
   const keywords = Array.isArray(raw["keywords"])
     ? (raw["keywords"] as unknown[])
         .filter((k): k is string => typeof k === "string")
         .map((k) => k.toLowerCase().trim())
-        .filter(Boolean)
+        .filter((k) => k && !looksDegenerate(k))
         .slice(0, 10)
     : [];
 

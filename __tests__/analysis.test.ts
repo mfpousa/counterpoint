@@ -1,4 +1,4 @@
-import { coerceAnalysis } from "../server/analysis";
+import { coerceAnalysis, looksDegenerate, sanitizeModelText } from "../server/analysis";
 import type { FeedItem } from "../src/types";
 
 function fallback(over: Partial<FeedItem> = {}): FeedItem {
@@ -66,5 +66,54 @@ describe("coerceAnalysis — lean provenance + rationale", () => {
     expect(a.lean).toBeNull();
     expect(a.leanRefined).toBe(false);
     expect(a.leanRationale).toBe("");
+  });
+
+  it("blanks degenerate summary/rationale (model repetition loops)", () => {
+    const a = coerceAnalysis(
+      {
+        id: "1",
+        topic: "politics",
+        lean: 0.3,
+        leanRationale: "We……………………………………………JSON…………...",
+        importance: 0.5,
+        summary: "...???…??..………………………………………………………",
+        keywords: ["budget", "…..……", "tax"],
+      },
+      fallback(),
+    );
+    expect(a.summary).toBe("");
+    expect(a.leanRationale).toBe("");
+    // Degenerate keyword dropped, real ones kept.
+    expect(a.keywords).toEqual(["budget", "tax"]);
+    // The numeric lean itself is still usable.
+    expect(a.lean).toBeCloseTo(0.3, 5);
+  });
+});
+
+describe("looksDegenerate / sanitizeModelText", () => {
+  it("flags repeated-punctuation and symbol-soup runs from the logs", () => {
+    expect(looksDegenerate("...???…??..………………………………………………………")).toBe(true);
+    expect(looksDegenerate("We……………………………………………JSON…………...")).toBe(true);
+    expect(looksDegenerate("Weird …..……………………………………??………a…………………………………………?")).toBe(true);
+    expect(looksDegenerate("…………")).toBe(true);
+  });
+
+  it("keeps legitimate prose", () => {
+    const ok = "Frames tax cuts as growth-boosting while downplaying the deficit.";
+    expect(looksDegenerate(ok)).toBe(false);
+    expect(sanitizeModelText(ok)).toBe(ok);
+  });
+
+  it("keeps a normal summary with ordinary punctuation", () => {
+    const s = "EU AI Act explained: its impact on startups and what comes next.";
+    expect(sanitizeModelText(s)).toBe(s);
+  });
+
+  it("strips fences/whitespace and returns '' for non-strings or degenerate input", () => {
+    expect(sanitizeModelText("```json The cabinet approved the long-delayed budget today.```")).toBe(
+      "The cabinet approved the long-delayed budget today.",
+    );
+    expect(sanitizeModelText(undefined)).toBe("");
+    expect(sanitizeModelText("?????????")).toBe("");
   });
 });
