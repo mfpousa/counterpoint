@@ -35,12 +35,13 @@ export function StoryCard({
   const developing = !!story.developing;
   const events = story.timeline?.length ?? 0;
   return (
-    <Pressable
-      style={[styles.card, developing && styles.cardDeveloping]}
-      onPress={() => onOpen(story)}
-      accessibilityRole="button"
-      accessibilityLabel={`Open ${developing ? "developing issue" : "story"}: ${story.title}`}
-    >
+    <View style={[styles.card, developing && styles.cardDeveloping]}>
+      <Pressable
+        style={styles.body}
+        onPress={() => onOpen(story)}
+        accessibilityRole="button"
+        accessibilityLabel={`Open ${developing ? "developing issue" : "story"}: ${story.title}`}
+      >
       <View style={styles.headRow}>
         <View style={[styles.topicPill, { backgroundColor: m.color + "22" }]}>
           <Ionicons name={m.icon} size={12} color={m.color} />
@@ -66,10 +67,6 @@ export function StoryCard({
         <Text style={styles.summary} numberOfLines={3}>
           {story.summary}
         </Text>
-      )}
-
-      {issue && onOpenIssue && (
-        <IssueTag title={issue.title} severity={issue.severity} onPress={() => onOpenIssue(issue.id)} />
       )}
 
       <View style={styles.footer}>
@@ -100,7 +97,12 @@ export function StoryCard({
           <Text style={styles.degraded}>limited</Text>
         )}
       </View>
-    </Pressable>
+      </Pressable>
+
+      {issue && onOpenIssue && (
+        <IssueTag title={issue.title} severity={issue.severity} onPress={() => onOpenIssue(issue.id)} />
+      )}
+    </View>
   );
 }
 
@@ -114,6 +116,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   cardDeveloping: { borderColor: colors.warn + "66", borderLeftWidth: 3, borderLeftColor: colors.warn },
+  body: { gap: spacing.sm },
   developingTag: {
     flexDirection: "row",
     alignItems: "center",
