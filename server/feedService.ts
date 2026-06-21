@@ -12,17 +12,26 @@
 //    no new model calls.
 
 import { fetchAll } from "../src/lib/rss";
-import type { AnalysisStatus, Briefing, FeedItem } from "../src/types";
+import type { AnalysisStatus, Briefing, FeedItem, Story } from "../src/types";
 import { DEFAULT_WORLD_ID, worldSources } from "../src/data/worlds";
-import { aiReachable } from "./ai";
+import { aiReachable, withConcurrency } from "./ai";
 import { analyzeItems, detectClickbait } from "./analysis";
 import { generateBriefing } from "./briefing";
+import {
+  clusterItems,
+  distinctSources,
+  jaccard,
+  rankClusters,
+  titleTokens,
+  type ClusterInput,
+} from "./cluster";
 import { config } from "./config";
-import { embedQuery, embedTexts, itemEmbedText } from "./embeddings";
+import { cosineSim, embedQuery, embedTexts, itemEmbedText } from "./embeddings";
 import { interestTokens, partitionByExclusion, toFeedItem } from "./personalize";
 import { interpretQuery, type ParsedQuery } from "./query";
 import { rankItems } from "./rank";
 import { getStore, type StoredItem } from "./store";
+import { buildStory } from "./synthesize";
 import { fetchTranscripts } from "./transcripts";
 
 export interface FeedResult {
@@ -55,6 +64,9 @@ interface WorldState {
   viewCache: Map<string, { builtAt: number; result: FeedResult }>;
   briefingCache: Map<string, { builtAt: number; briefing: Briefing | null }>;
   briefingInFlight: Map<string, Promise<Briefing | null>>;
+  /** Synthesized cross-source stories (valid while builtAt === lastBuildAt). */
+  storiesCache: { builtAt: number; stories: Story[] } | null;
+  storiesInFlight: Promise<Story[]> | null;
   buildInFlight: Promise<void> | null;
   analyzeInFlight: Promise<{ remaining: number; progressed: number }> | null;
   embedInFlight: Promise<{ remaining: number; progressed: number }> | null;
@@ -73,6 +85,8 @@ function ws(worldId: string): WorldState {
       viewCache: new Map(),
       briefingCache: new Map(),
       briefingInFlight: new Map(),
+      storiesCache: null,
+      storiesInFlight: null,
       buildInFlight: null,
       analyzeInFlight: null,
       embedInFlight: null,
@@ -577,6 +591,129 @@ export async function getBriefing(
   return p;
 }
 
+/** The recent, analyzed pool eligible to be clustered into stories. */
+function storyEligible(worldId: string, now = Date.now()): StoredItem[] {
+  return getStore(worldId)
+    .all()
+    .filter(
+      (s) =>
+        !s.clickbait &&
+        s.analyzed &&
+        now - s.item.publishedAt <= config.feed.retentionMs &&
+        now - s.item.publishedAt <= config.stories.windowMs,
+    );
+}
+
+/** Fill each story's relatedIds from cluster proximity (centroid cosine, else
+ *  shared-token Jaccard). Mutates the stories in place. */
+function linkRelated(
+  built: { story: Story; centroid: number[] | null; tokens: Set<string> }[],
+): void {
+  for (let i = 0; i < built.length; i++) {
+    const scores: { id: string; score: number }[] = [];
+    for (let j = 0; j < built.length; j++) {
+      if (i === j) continue;
+      const a = built[i];
+      const b = built[j];
+      const score =
+        a.centroid && b.centroid
+          ? cosineSim(a.centroid, b.centroid)
+          : jaccard(a.tokens, b.tokens);
+      if (score > 0) scores.push({ id: b.story.id, score });
+    }
+    scores.sort((x, y) => y.score - x.score);
+    built[i].story.relatedIds = scores.slice(0, config.stories.relatedCount).map((s) => s.id);
+  }
+}
+
+/**
+ * Build (and cache) the synthesized cross-source stories for a world. Clusters
+ * the recent analyzed pool by same-event similarity, keeps clusters spanning
+ * >= minSources outlets, and synthesizes the top maxStories. Interest-independent
+ * (one set per world), cached until the pool rebuilds. Lazy: the (expensive)
+ * synthesis only runs on the first /api/stories request after a rebuild.
+ */
+export async function getStories(
+  worldId: string = DEFAULT_WORLD_ID,
+  force = false,
+): Promise<{ stories: Story[]; busyWith: string | null }> {
+  const { busyWith } = await ensurePool(worldId, force);
+  if (!config.stories.enabled) return { stories: [], busyWith };
+
+  const state = ws(worldId);
+  if (state.storiesCache && state.storiesCache.builtAt === state.lastBuildAt) {
+    return { stories: state.storiesCache.stories, busyWith };
+  }
+  if (state.storiesInFlight) return { stories: await state.storiesInFlight, busyWith };
+
+  const builtAtSnapshot = state.lastBuildAt;
+  const p = (async (): Promise<Story[]> => {
+    const eligible = storyEligible(worldId);
+    const byId = new Map(eligible.map((s) => [s.item.id, s]));
+    const inputs: ClusterInput[] = eligible.map((s) => ({
+      id: s.item.id,
+      sourceId: s.item.sourceId,
+      publishedAt: s.item.publishedAt,
+      topic: s.topic,
+      importance: s.importance,
+      title: s.item.title,
+      keywords: s.keywords,
+      embedding: s.embedding,
+    }));
+
+    const clusters = clusterItems(inputs, {
+      simThreshold: config.stories.simThreshold,
+      textSimThreshold: config.stories.textSimThreshold,
+      windowMs: config.stories.windowMs,
+    });
+    const multi = clusters.filter((c) => distinctSources(c.members) >= config.stories.minSources);
+    const top = rankClusters(multi).slice(0, config.stories.maxStories);
+    console.log(
+      `[stories:${worldId}] ${eligible.length} eligible -> ${clusters.length} clusters, ` +
+        `${multi.length} multi-source; synthesizing top ${top.length}…`,
+    );
+    if (top.length === 0) return [];
+
+    const started = Date.now();
+    const stories = await withConcurrency(
+      top.map((c) => async () => {
+        const members = c.members.map((m) => byId.get(m.id)!).filter(Boolean);
+        const story = await buildStory(members);
+        return { story, centroid: c.centroid, members: c.members };
+      }),
+      config.ai.concurrency,
+    );
+
+    const built = stories.map((s) => {
+      const tokens = new Set<string>();
+      for (const m of s.members) for (const t of titleTokens(m.title, m.keywords)) tokens.add(t);
+      return { story: s.story, centroid: s.centroid, tokens };
+    });
+    linkRelated(built);
+    const result = built.map((b) => b.story);
+    console.log(
+      `[stories:${worldId}] synthesized ${result.length} stor${result.length === 1 ? "y" : "ies"}` +
+        ` in ${((Date.now() - started) / 1000).toFixed(0)}s`,
+    );
+    state.storiesCache = { builtAt: builtAtSnapshot, stories: result };
+    return result;
+  })().finally(() => {
+    state.storiesInFlight = null;
+  });
+
+  state.storiesInFlight = p;
+  return { stories: await p, busyWith };
+}
+
+/** A single synthesized story by id (builds the set if needed). Null if gone. */
+export async function getStory(
+  worldId: string = DEFAULT_WORLD_ID,
+  id: string,
+): Promise<Story | null> {
+  const { stories } = await getStories(worldId);
+  return stories.find((s) => s.id === id) ?? null;
+}
+
 /**
  * Invalidate the freshness so the next request rebuilds (re-fetch + analyze new
  * items). The persisted analysis store is intentionally KEPT so we don't re-pay
@@ -587,4 +724,5 @@ export function clearCaches(worldId: string = DEFAULT_WORLD_ID): void {
   state.lastBuildAt = 0;
   state.viewCache.clear();
   state.briefingCache.clear();
+  state.storiesCache = null;
 }

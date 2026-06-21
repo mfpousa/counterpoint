@@ -25,6 +25,13 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="stories"
+        options={{
+          title: "Stories",
+          tabBarIcon: ({ color, size }) => <Ionicons name="git-merge-outline" size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="balance"
         options={{
           title: "Balance",

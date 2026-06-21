@@ -153,6 +153,30 @@ export const config = {
     // READER_DEGRADED_OFF=1 to show the plain error + "Open original" instead.
     degradedFallback: !bool("READER_DEGRADED_OFF"),
   },
+  stories: {
+    // Synthesized cross-source "Stories": cluster same-event articles across
+    // outlets (dedupe), then write ONE neutral synthesis citing each source plus
+    // a per-outlet framing breakdown and contradictions. Disable with STORIES_OFF=1.
+    enabled: !bool("STORIES_OFF"),
+    // Cosine-similarity threshold for two articles to be considered the same
+    // event (when embeddings are available). Higher = tighter clusters.
+    simThreshold: num("STORIES_SIM_THRESHOLD", 0.82),
+    // Title/keyword Jaccard threshold used as a fallback when embeddings are off.
+    textSimThreshold: num("STORIES_TEXT_SIM_THRESHOLD", 0.3),
+    // Two articles only cluster if published within this window of each other.
+    windowMs: num("STORIES_WINDOW_MS", 3 * 24 * 60 * 60 * 1000),
+    // A cluster must reach this many distinct sources to become a synthesized
+    // Story (the cross-outlet comparison needs more than one outlet).
+    minSources: num("STORIES_MIN_SOURCES", 2),
+    // Most synthesized stories to produce per world (bounds LLM cost).
+    maxStories: num("STORIES_MAX", 12),
+    // Cap on source articles fed into a single synthesis prompt (keeps it in budget).
+    maxClusterSources: num("STORIES_MAX_SOURCES", 6),
+    // How many related stories to cross-link from each story.
+    relatedCount: num("STORIES_RELATED", 4),
+    // Cap on the synthesis reply length (constrained decoding stops earlier).
+    maxTokens: num("STORIES_MAX_TOKENS", 1400),
+  },
   transcripts: {
     // Fetch YouTube caption transcripts (via yt-dlp) so the model understands a
     // video's actual content, not just its description. On by default; degrades

@@ -11,7 +11,7 @@ import cors from "cors";
 import express from "express";
 import { aiReachable } from "./ai";
 import { config } from "./config";
-import { clearCaches, getBriefing, getFeed, getStatus } from "./feedService";
+import { clearCaches, getBriefing, getFeed, getStatus, getStories, getStory } from "./feedService";
 import { gradeSummary } from "./grade";
 import { runStartupHealthcheck } from "./healthcheck";
 import { generateKnowledgeInsight, type KnowledgeCandidate } from "./knowledge";
@@ -83,6 +83,36 @@ app.get("/api/briefing", async (req, res) => {
   } catch (e) {
     console.error("[api] /api/briefing failed:", e);
     res.status(500).json({ briefing: null, error: e instanceof Error ? e.message : "failed" });
+  }
+});
+
+app.get("/api/stories", async (req, res) => {
+  try {
+    const force = req.query.force === "1" || req.query.force === "true";
+    const { stories, busyWith } = await getStories(readWorld(req.query.world), force);
+    res.json({ stories, busyWith });
+  } catch (e) {
+    console.error("[api] /api/stories failed:", e);
+    res.status(500).json({ stories: [], error: e instanceof Error ? e.message : "failed" });
+  }
+});
+
+app.get("/api/story", async (req, res) => {
+  const id = typeof req.query.id === "string" ? req.query.id : "";
+  if (!id) {
+    res.status(400).json({ error: "missing story id" });
+    return;
+  }
+  try {
+    const story = await getStory(readWorld(req.query.world), id);
+    if (!story) {
+      res.status(404).json({ error: "story not found (it may have aged out)" });
+      return;
+    }
+    res.json({ story });
+  } catch (e) {
+    console.error("[api] /api/story failed:", e);
+    res.status(500).json({ error: e instanceof Error ? e.message : "failed" });
   }
 });
 

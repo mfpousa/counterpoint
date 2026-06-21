@@ -1,0 +1,217 @@
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  ActivityIndicator,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useApp } from "../../src/store/AppContext";
+import { fetchStories } from "../../src/lib/api";
+import { StoryCard } from "../../src/components/StoryCard";
+import { StoryReader } from "../../src/components/StoryReader";
+import { WorldSwitcher } from "../../src/components/WorldSwitcher";
+import { AnalysisProgress } from "../../src/components/AnalysisProgress";
+import { worldById } from "../../src/data/worlds";
+import { colors, font, radius, spacing } from "../../src/theme";
+import type { Story } from "../../src/types";
+
+const MAX_CONTENT_WIDTH = 1180;
+const H_PAD = spacing.lg;
+
+function columnsFor(contentWidth: number): number {
+  if (contentWidth >= 1040) return 3;
+  if (contentWidth >= 680) return 2;
+  return 1;
+}
+
+export default function StoriesScreen() {
+  const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const { worldId, busyWorld, setWorld, status } = useApp();
+
+  const [stories, setStories] = useState<Story[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const load = useCallback(
+    async (force = false) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetchStories({ world: worldId, force });
+        setStories(res.stories);
+        setBusy(res.busyWith ?? null);
+        if (res.stories.length === 0 && !res.busyWith) {
+          setError(
+            "No multi-source stories yet. Once the backend has analyzed enough overlapping " +
+              "coverage, synthesized stories will appear here.",
+          );
+        }
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Failed to load stories.");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [worldId],
+  );
+
+  // Load on mount and whenever the world changes.
+  useEffect(() => {
+    setStories([]);
+    setSelectedId(null);
+    void load();
+  }, [load]);
+
+  const byId = useMemo(() => {
+    const m = new Map<string, Story>();
+    for (const s of stories) m.set(s.id, s);
+    return m;
+  }, [stories]);
+
+  const selected = selectedId ? byId.get(selectedId) ?? null : null;
+  const related = useMemo(
+    () => (selected ? selected.relatedIds.map((id) => byId.get(id)).filter((s): s is Story => !!s) : []),
+    [selected, byId],
+  );
+
+  const contentW = Math.min(width, MAX_CONTENT_WIDTH) - H_PAD * 2;
+  const cols = columnsFor(contentW);
+  const GAP = spacing.lg;
+  const cardW = cols === 1 ? contentW : Math.floor((contentW - GAP * (cols - 1)) / cols);
+
+  return (
+    <>
+      <ScrollView
+        style={{ flex: 1, backgroundColor: colors.bg }}
+        contentContainerStyle={{
+          paddingTop: insets.top + spacing.md,
+          paddingBottom: spacing.xxl,
+          paddingHorizontal: H_PAD,
+          alignItems: "center",
+        }}
+        refreshControl={
+          <RefreshControl refreshing={loading} onRefresh={() => load(true)} tintColor={colors.accent} />
+        }
+      >
+        <View style={{ width: contentW, gap: spacing.md }}>
+          <WorldSwitcher worldId={worldId} busyWorld={busyWorld} onSelect={setWorld} />
+
+          <View style={styles.headerRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.title}>Stories</Text>
+              <Text style={styles.subtitle}>
+                One neutral synthesis per event — deduped across outlets, with each side's framing.
+              </Text>
+            </View>
+            <Pressable
+              onPress={() => load(true)}
+              style={styles.refreshBtn}
+              accessibilityRole="button"
+              disabled={loading}
+            >
+              <Ionicons name="refresh" size={16} color={loading ? colors.textFaint : colors.accent} />
+              <Text style={[styles.refreshText, loading && { color: colors.textFaint }]}>Refresh</Text>
+            </Pressable>
+          </View>
+
+          <AnalysisProgress status={status} />
+
+          {busy && busy !== worldId && stories.length === 0 && (
+            <View style={styles.busyBanner}>
+              <ActivityIndicator size="small" color={colors.warn} />
+              <Text style={styles.busyText}>
+                “{worldById(busy).title}” is still refreshing. Only one world refreshes at a time —
+                stories here will build once it’s free.
+              </Text>
+            </View>
+          )}
+
+          {error && stories.length === 0 && (
+            <View style={styles.errorBanner}>
+              <Ionicons name="information-circle-outline" size={16} color={colors.textDim} />
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          )}
+
+          {stories.length === 0 ? (
+            loading ? (
+              <View style={styles.empty}>
+                <ActivityIndicator color={colors.accent} />
+                <Text style={styles.emptySub}>
+                  Clustering coverage and synthesizing stories… the first build can take a moment.
+                </Text>
+              </View>
+            ) : null
+          ) : (
+            <View style={[styles.grid, { gap: GAP }]}>
+              {stories.map((s) => (
+                <View key={s.id} style={{ width: cardW }}>
+                  <StoryCard story={s} onOpen={(st) => setSelectedId(st.id)} />
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+      </ScrollView>
+
+      <StoryReader
+        story={selected}
+        related={related}
+        onOpenRelated={(id) => setSelectedId(id)}
+        onClose={() => setSelectedId(null)}
+      />
+    </>
+  );
+}
+
+const styles = StyleSheet.create({
+  headerRow: { flexDirection: "row", alignItems: "flex-start", gap: spacing.md },
+  title: { color: colors.text, fontSize: font.h1, fontWeight: "800" },
+  subtitle: { color: colors.textDim, fontSize: font.small, marginTop: 2, lineHeight: font.small * 1.4 },
+  refreshBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  refreshText: { color: colors.accent, fontSize: font.small, fontWeight: "700" },
+  grid: { flexDirection: "row", flexWrap: "wrap" },
+  busyBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.warn + "55",
+    backgroundColor: colors.warn + "14",
+  },
+  busyText: { color: colors.textDim, fontSize: font.small, flex: 1, lineHeight: 18 },
+  errorBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  errorText: { color: colors.textDim, fontSize: font.small, flex: 1, lineHeight: 18 },
+  empty: { padding: spacing.xl, alignItems: "center", gap: spacing.sm, marginTop: spacing.xl },
+  emptySub: { color: colors.textDim, fontSize: font.small, textAlign: "center", lineHeight: font.small * 1.5 },
+});

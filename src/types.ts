@@ -138,6 +138,69 @@ export interface Briefing {
   basedOn: number;
 }
 
+/** One source article that contributed to a synthesized story. */
+export interface StorySource {
+  /** FeedItem id (so the reader can open the AI-rewrite or original). */
+  id: string;
+  title: string;
+  sourceTitle: string;
+  url: string;
+  /** This source's effective lean, for coloring & balance display. */
+  lean: Lean;
+  leanSource: LeanSource;
+  publishedAt: number;
+}
+
+/**
+ * How one outlet framed the shared story differently — the heart of the
+ * cross-source comparison (what each outlet emphasized or downplayed).
+ */
+export interface StoryAngle {
+  /** The outlet (sourceTitle) this framing describes. */
+  outlet: string;
+  /** That outlet's lean, for coloring. */
+  lean: Lean;
+  /** One sentence on how this outlet framed/emphasized the story. */
+  framing: string;
+}
+
+/**
+ * An AI-synthesized story aggregating multiple outlets' coverage of ONE event.
+ * The synthesis is neutral and cites every contributing source; `angles` and
+ * `contradictions` surface HOW the reporting differs across outlets.
+ */
+export interface Story {
+  /** Stable id derived from the contributing article ids. */
+  id: string;
+  /** Neutral synthesized headline. */
+  title: string;
+  /** One-line dek summarizing the event. */
+  summary: string;
+  /** The neutral synthesized article, one entry per paragraph. */
+  synthesis: string[];
+  topic: Topic;
+  /** Importance-weighted aggregate lean of the contributing coverage, or null. */
+  lean: Lean;
+  /** The deduped source articles that fed the synthesis. */
+  sources: StorySource[];
+  /** Per-outlet framing differences. */
+  angles: StoryAngle[];
+  /** Notable factual contradictions/disagreements across outlets. */
+  contradictions: string[];
+  /** Ids of related stories (other clusters), for cross-linking. */
+  relatedIds: string[];
+  /** Most recent contributing article time (epoch ms). */
+  updatedAt: number;
+  /** When this story was synthesized (epoch ms). */
+  generatedAt: number;
+  /**
+   * True when synthesis is a graceful FALLBACK (model offline/failed): built
+   * from the source one-line summaries without cross-outlet analysis. The UI
+   * surfaces this so the distinction is never hidden.
+   */
+  degraded?: boolean;
+}
+
 /**
  * An article rewritten by the AI into clean, readable prose for in-app reading.
  * Produced on demand by the backend from the original article (or, for videos,

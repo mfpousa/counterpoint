@@ -12,6 +12,7 @@ import type {
   KnowledgeInsight,
   KnowledgeProfile,
   RewrittenArticle,
+  Story,
   SummaryGrade,
 } from "../types";
 
@@ -158,6 +159,50 @@ export async function fetchKnowledgeInsight(
   } catch {
     return null;
   }
+}
+
+export interface StoriesResponse {
+  stories: Story[];
+  busyWith?: string | null;
+}
+
+/**
+ * Fetch the synthesized cross-source stories for a world. The first call after a
+ * pool rebuild triggers the (slow) synthesis on the backend; subsequent calls are
+ * cached. Returns an empty list on failure (the Stories tab shows its own empty
+ * state) — never throws.
+ */
+export async function fetchStories(
+  opts: { world?: string; force?: boolean } = {},
+): Promise<StoriesResponse> {
+  const world = (opts.world ?? "").trim();
+  const params = new URLSearchParams();
+  if (world) params.set("world", world);
+  if (opts.force) params.set("force", "1");
+  const qs = params.toString();
+  try {
+    const res = await fetch(`${apiBaseUrl()}/api/stories${qs ? `?${qs}` : ""}`, { method: "GET" });
+    if (!res.ok) return { stories: [], busyWith: null };
+    const data = (await res.json()) as StoriesResponse;
+    return { stories: Array.isArray(data.stories) ? data.stories : [], busyWith: data.busyWith ?? null };
+  } catch {
+    return { stories: [], busyWith: null };
+  }
+}
+
+/**
+ * Fetch a single synthesized story by id. Throws with a clear message on failure
+ * (aged out / model offline) so the detail view can surface it.
+ */
+export async function fetchStory(id: string, world?: string): Promise<Story> {
+  const params = new URLSearchParams({ id });
+  if (world) params.set("world", world);
+  const res = await fetch(`${apiBaseUrl()}/api/story?${params.toString()}`, { method: "GET" });
+  const data = (await res.json().catch(() => null)) as { story?: Story; error?: string } | null;
+  if (!res.ok || !data?.story) {
+    throw new Error(data?.error ?? `Story fetch failed (HTTP ${res.status}).`);
+  }
+  return data.story;
 }
 
 /**
