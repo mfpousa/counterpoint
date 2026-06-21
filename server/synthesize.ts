@@ -12,6 +12,7 @@ import type {
   Story,
   StoryAngle,
   StoryMilestone,
+  StorySide,
   StorySource,
   StorySpectrum,
   Topic,
@@ -21,6 +22,7 @@ import { sanitizeModelText } from "./analysis";
 import { config } from "./config";
 import { langDirective } from "./lang";
 import { decodeEntities } from "../src/lib/rss";
+import { zoneLabel } from "../src/data/zones";
 import type { StoredItem } from "./store";
 
 const SYNTH_SCHEMA: JsonSchema = {
@@ -40,9 +42,22 @@ const SYNTH_SCHEMA: JsonSchema = {
           additionalProperties: false,
         },
       },
+      sides: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            label: { type: "string" },
+            outlets: { type: "array", items: { type: "string" } },
+            framing: { type: "string" },
+          },
+          required: ["label", "outlets", "framing"],
+          additionalProperties: false,
+        },
+      },
       contradictions: { type: "array", items: { type: "string" } },
     },
-    required: ["title", "summary", "synthesis", "angles", "contradictions"],
+    required: ["title", "summary", "synthesis", "angles", "sides", "contradictions"],
     additionalProperties: false,
   },
 };
@@ -57,10 +72,15 @@ const SYNTH_RULES =
   '  "summary": "ONE neutral sentence (<= 30 words) capturing the event",\n' +
   '  "synthesis": ["3 to 5 short neutral paragraphs combining what the outlets agree on and report"],\n' +
   '  "angles": [ { "outlet": "<exact outlet name>", "framing": "ONE sentence on how THIS outlet framed/emphasized it" } ],\n' +
+  '  "sides": [ { "label": "<short side label, e.g. \'Western media\', \'Russian media\', \'Ukrainian media\'>", "outlets": ["<exact outlet names on this side>"], "framing": "1-2 sentences on how THIS side frames/emphasizes the story" } ],\n' +
   '  "contradictions": ["specific points where the outlets disagree or report differently; [] if none are evident"]\n' +
   "}\n" +
-  "Base 'angles' and 'contradictions' only on differences evident across the provided reports. " +
-  "If the reports are consistent, return an empty contradictions array. No prose outside the JSON.";
+  "Each outlet has a geographic/affiliation 'zone'. For 'sides', GROUP the outlets into the " +
+  "opposing vantage points actually PRESENT (by zone) and describe how each side frames the story " +
+  "\u2014 e.g. Western vs Ukrainian vs Russian media. Do NOT invent sides: use only zones present in " +
+  "the reports, and return [] when all outlets share one vantage point. " +
+  "Base 'angles', 'sides', and 'contradictions' only on differences evident across the provided " +
+  "reports. If the reports are consistent, return an empty contradictions array. No prose outside the JSON.";
 
 /** Short human label for a lean value, for the model payload. */
 function leanLabel(lean: Lean): string {
@@ -135,6 +155,7 @@ function toSources(members: StoredItem[]): StorySource[] {
       lean: m.lean,
       leanSource: m.leanSource ?? "source",
       publishedAt: m.item.publishedAt,
+      ...(m.item.zone ? { zone: m.item.zone } : {}),
     }));
 }
 
@@ -149,18 +170,70 @@ function coerceStringArray(raw: unknown, max: number): string[] {
   return out;
 }
 
-/** Resolve an outlet name the model returned back to a member's lean. */
-function leanForOutlet(outlet: string, members: StoredItem[]): Lean {
+/** Resolve an outlet name the model returned back to a contributing member. */
+function findMember(outlet: string, members: StoredItem[]): StoredItem | undefined {
   const want = outlet.trim().toLowerCase();
-  const hit = members.find((m) => m.item.sourceTitle.toLowerCase() === want);
-  if (hit) return hit.lean;
+  if (!want) return undefined;
+  const exact = members.find((m) => m.item.sourceTitle.toLowerCase() === want);
+  if (exact) return exact;
   // Loose contains-match (model may abbreviate "The Guardian — World" -> "The Guardian").
-  const loose = members.find(
+  return members.find(
     (m) =>
       m.item.sourceTitle.toLowerCase().includes(want) ||
       want.includes(m.item.sourceTitle.toLowerCase()),
   );
-  return loose ? loose.lean : null;
+}
+
+/** Resolve an outlet name the model returned back to a member's lean. */
+function leanForOutlet(outlet: string, members: StoredItem[]): Lean {
+  return findMember(outlet, members)?.lean ?? null;
+}
+
+/**
+ * Parse the model's conflict SIDES, resolving each side's outlets back to the
+ * contributing members and deriving the geographic zones present on that side.
+ * Sides are only meaningful when the coverage actually spans opposing zones —
+ * `finalizeSides` gates that.
+ */
+function coerceSides(raw: unknown, members: StoredItem[], max = 5): StorySide[] {
+  if (!Array.isArray(raw)) return [];
+  const out: StorySide[] = [];
+  for (const row of raw) {
+    if (!row || typeof row !== "object") continue;
+    const r = row as Record<string, unknown>;
+    const label = sanitizeModelText(r["label"]);
+    const framing = sanitizeModelText(r["framing"]);
+    if (!label || !framing) continue;
+    const outletsRaw = Array.isArray(r["outlets"]) ? r["outlets"] : [];
+    const outlets = new Set<string>();
+    const zones = new Set<string>();
+    for (const o of outletsRaw) {
+      const name = sanitizeModelText(o);
+      if (!name) continue;
+      const m = findMember(name, members);
+      if (m) {
+        outlets.add(m.item.sourceTitle);
+        zones.add(m.item.zone ?? "international");
+      } else {
+        outlets.add(name);
+      }
+    }
+    if (outlets.size === 0) continue;
+    out.push({ label, zones: [...zones], framing, outlets: [...outlets] });
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
+/**
+ * Keep parsed sides only when there's a genuine cross-zone divide to show: at
+ * least one contributing outlet is from a reactive foreign zone AND the model
+ * resolved two or more distinct sides. Otherwise return undefined (no section).
+ */
+function finalizeSides(sides: StorySide[], members: StoredItem[]): StorySide[] | undefined {
+  const hasForeignZone = members.some((m) => !!m.item.zone);
+  if (!hasForeignZone || sides.length < 2) return undefined;
+  return sides;
 }
 
 function coerceAngles(raw: unknown, members: StoredItem[], max: number): StoryAngle[] {
@@ -223,6 +296,7 @@ export async function buildStory(members: StoredItem[], lang: Lang = "en"): Prom
   const chosen = ranked.slice(0, config.stories.maxClusterSources);
   const payload = chosen.map((m) => ({
     outlet: m.item.sourceTitle,
+    zone: zoneLabel(m.item.zone),
     lean: leanLabel(m.lean),
     title: m.item.title,
     summary: (m.summary || m.item.summary || "").slice(0, 300),
@@ -238,6 +312,7 @@ export async function buildStory(members: StoredItem[], lang: Lang = "en"): Prom
   const summary = sanitizeModelText(obj["summary"]);
   const synthesis = coerceStringArray(obj["synthesis"], 8);
   const angles = coerceAngles(obj["angles"], members, config.stories.maxClusterSources);
+  const sides = finalizeSides(coerceSides(obj["sides"], members), members);
   const contradictions = coerceStringArray(obj["contradictions"], 6);
 
   // Nothing usable came back — fall back rather than ship an empty story.
@@ -254,6 +329,7 @@ export async function buildStory(members: StoredItem[], lang: Lang = "en"): Prom
     severity: severityOf(members),
     sources: toSources(members),
     angles,
+    ...(sides ? { sides } : {}),
     contradictions,
     relatedIds: [],
     updatedAt: Math.max(...members.map((m) => m.item.publishedAt)),
@@ -299,19 +375,33 @@ const DEVELOPING_SCHEMA: JsonSchema = {
         required: ["left", "center", "right"],
         additionalProperties: false,
       },
+      sides: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            label: { type: "string" },
+            outlets: { type: "array", items: { type: "string" } },
+            framing: { type: "string" },
+          },
+          required: ["label", "outlets", "framing"],
+          additionalProperties: false,
+        },
+      },
       contradictions: { type: "array", items: { type: "string" } },
     },
-    required: ["title", "summary", "status", "synthesis", "timeline", "spectrum", "contradictions"],
+    required: ["title", "summary", "status", "synthesis", "timeline", "spectrum", "sides", "contradictions"],
     additionalProperties: false,
   },
 };
 
 const DEVELOPING_RULES =
   "You are a neutral wire-service editor tracking an ONGOING ISSUE that has unfolded across " +
-  "several sub-events over time (each provided with an integer 'event' index, a date, the outlets " +
-  "covering it and their political lean, headlines, and a one-line summary). Synthesize the whole " +
-  "storyline neutrally. Use ONLY the provided facts; do NOT invent details, numbers, names, or " +
-  "quotes. Output ONLY a JSON object:\n" +
+  "several sub-events over time. You are given a JSON object with 'events' (each has an integer " +
+  "'event' index, a date, the outlets covering it and their political lean, headlines, and a " +
+  "one-line summary) and 'outlets' (the roster of contributing outlets, each with a geographic/" +
+  "affiliation 'zone'). Synthesize the whole storyline neutrally. Use ONLY the provided facts; do " +
+  "NOT invent details, numbers, names, or quotes. Output ONLY a JSON object:\n" +
   '{\n' +
   '  "title": "neutral storyline headline (<= 12 words)",\n' +
   '  "summary": "ONE neutral sentence (<= 30 words) on the issue and its current state",\n' +
@@ -319,10 +409,14 @@ const DEVELOPING_RULES =
   '  "synthesis": ["2 to 4 short neutral paragraphs giving the overall picture and trajectory"],\n' +
   '  "timeline": [ { "event": <the integer index>, "title": "<= 8 word milestone label", "detail": "ONE sentence on what changed" } ],\n' +
   '  "spectrum": { "left": "how left-leaning outlets frame it", "center": "how centrist outlets frame it", "right": "how right-leaning outlets frame it" },\n' +
+  '  "sides": [ { "label": "<short side label, e.g. \'Western media\', \'Russian media\', \'Ukrainian media\'>", "outlets": ["<exact outlet names on this side>"], "framing": "1-2 sentences on how THIS side frames the issue" } ],\n' +
   '  "contradictions": ["specific points where coverage disagrees; [] if none are evident"]\n' +
   "}\n" +
   "Provide ONE timeline entry per provided event, reusing its exact 'event' index. For any spectrum " +
-  "side with no outlets present, use an empty string. No prose outside the JSON.";
+  "side with no outlets present, use an empty string. For 'sides', GROUP the roster outlets into the " +
+  "opposing geographic/affiliation vantage points actually PRESENT (by 'zone') and describe how each " +
+  "frames the issue \u2014 e.g. Western vs Ukrainian vs Russian media. Use only zones present; return [] " +
+  "when all outlets share one vantage point. No prose outside the JSON.";
 
 function earliestAt(members: StoredItem[]): number {
   return Math.min(...members.map((m) => m.item.publishedAt));
@@ -412,7 +506,7 @@ export async function buildDevelopingStory(
     .sort((a, b) => a.at - b.at)
     .slice(-config.stories.maxIssueEvents);
 
-  const payload = ordered.map((ev, i) => {
+  const eventsPayload = ordered.map((ev, i) => {
     const ranked = ev.event.slice().sort((a, b) => b.importance - a.importance);
     return {
       event: i,
@@ -423,6 +517,11 @@ export async function buildDevelopingStory(
       summary: (ranked[0].summary || ranked[0].item.summary || "").slice(0, 220),
     };
   });
+  // Roster of contributing outlets with their zone, so the model can form SIDES.
+  const roster = [...new Map(members.map((m) => [m.item.sourceTitle, zoneLabel(m.item.zone)])).entries()]
+    .map(([outlet, zone]) => ({ outlet, zone }))
+    .slice(0, 40);
+  const payload = { events: eventsPayload, outlets: roster };
   const orderedEvents = ordered.map((e) => e.event);
 
   const obj = await chatJsonObject(DEVELOPING_RULES + langDirective(lang), payload, {
@@ -437,6 +536,7 @@ export async function buildDevelopingStory(
   const contradictions = coerceStringArray(obj["contradictions"], 6);
   const timeline = buildTimeline(orderedEvents, obj["timeline"]);
   const spectrum = coerceSpectrum(obj["spectrum"]);
+  const sides = finalizeSides(coerceSides(obj["sides"], members), members);
   const resolved = sanitizeModelText(obj["status"]).toLowerCase() === "resolved";
 
   if (!title && synthesis.length === 0) return fallbackDevelopingStory(orderedEvents);
@@ -460,5 +560,6 @@ export async function buildDevelopingStory(
     startedAt: earliestAt(members),
     timeline,
     spectrum,
+    ...(sides ? { sides } : {}),
   };
 }

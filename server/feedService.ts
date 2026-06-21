@@ -14,6 +14,8 @@
 import { fetchAll } from "../src/lib/rss";
 import type { AnalysisStatus, Briefing, FeedItem, Lang, Story } from "../src/types";
 import { DEFAULT_WORLD_ID, worldSources } from "../src/data/worlds";
+import { ZONES, ZONES_BY_ID } from "../src/data/zones";
+import { detectZones } from "../src/lib/zones";
 import { aiReachable, withConcurrency } from "./ai";
 import { analyzeItems, detectClickbait } from "./analysis";
 import { generateBriefing, generateBriefingStream } from "./briefing";
@@ -80,8 +82,10 @@ interface WorldState {
   buildInFlight: Promise<void> | null;
   analyzeInFlight: Promise<{ remaining: number; progressed: number }> | null;
   embedInFlight: Promise<{ remaining: number; progressed: number }> | null;
-  /** Story-driven YouTube augmentation pass (fire-and-forget, one per world). */
-  youtubeInFlight: Promise<void> | null;
+  /** Reactive augmentation pass — YouTube + intl zones (fire-and-forget, one per world). */
+  augmentInFlight: Promise<void> | null;
+  /** Per-zone last fetch time (epoch ms), for the reactive-load TTL. */
+  zoneFetchedAt: Map<string, number>;
   catchUpTimer: ReturnType<typeof setTimeout> | null;
 }
 
@@ -102,7 +106,8 @@ function ws(worldId: string): WorldState {
       buildInFlight: null,
       analyzeInFlight: null,
       embedInFlight: null,
-      youtubeInFlight: null,
+      augmentInFlight: null,
+      zoneFetchedAt: new Map(),
       catchUpTimer: null,
     };
     worldStates.set(worldId, s);
@@ -481,76 +486,190 @@ function youTubePendingItem(hit: YouTubeHit, src: StoredItem): StoredItem {
 }
 
 /**
- * Story-driven YouTube augmentation: search YouTube for the top current headlines
- * and, when a relevant longer-form news/podcast video turns up, add it to the pool
- * as a PENDING video article (channel name as the source, `youtubeSearch` tag).
- * The discovered videos then go through the SAME analysis as everything else —
- * transcript fetch + deep model analysis + embedding — so their summary, topic,
- * keywords, importance, and lean are the model's, not inherited placeholders.
- *
- * Discovery itself is bounded (maxQueries), per-query cached, and shared across
- * users. Fire-and-forget; guarded so only one runs per world at a time. To honor
- * the GLOBAL single-build invariant, the analysis of the new videos is run only
- * when the build lock is free (it's normally invoked right after this world
- * released it); otherwise the videos stay pending and the next build drains them.
+ * Story-driven YouTube discovery: search YouTube for the top current headlines
+ * and, when a relevant longer-form news/podcast video turns up, add it to the
+ * pool as a PENDING video article (channel name as the source, `youtubeSearch`
+ * tag). It then goes through the SAME analysis as everything else (transcript +
+ * model). Bounded (maxQueries) + per-query cached. Returns how many were queued;
+ * does NOT analyze (the orchestrator drains the backlog once for all sources).
  */
-function augmentWithYouTube(worldId: string): Promise<void> {
+async function addYouTubePending(worldId: string): Promise<number> {
+  if (!config.youtube.searchEnabled || youTubeSearchDisabled()) return 0;
+  const st = getStore(worldId);
+  const now = Date.now();
+  // Seed queries from the most important, recent, NON-youtube headlines.
+  const candidates = st
+    .all()
+    .filter(
+      (s) =>
+        s.analyzed &&
+        !s.clickbait &&
+        !s.item.youtubeSearch &&
+        s.importance >= config.youtube.minSourceImportance &&
+        now - s.item.publishedAt <= config.youtube.sourceMaxAgeMs,
+    )
+    .sort((a, b) => b.importance - a.importance || b.item.publishedAt - a.item.publishedAt);
+
+  // Dedupe near-identical headlines (same event covered by many outlets) by a
+  // sorted token signature so we don't spend several queries on one story.
+  const picked: { q: string; src: StoredItem }[] = [];
+  const seenSig = new Set<string>();
+  for (const s of candidates) {
+    if (picked.length >= config.youtube.maxQueries) break;
+    const q = cleanHeadlineQuery(s.item.title);
+    if (q.length < 8) continue;
+    const sig = tokenize(q).sort().slice(0, 8).join(" ");
+    if (!sig || seenSig.has(sig)) continue;
+    seenSig.add(sig);
+    picked.push({ q, src: s });
+  }
+  if (picked.length === 0) return 0;
+
+  let added = 0;
+  for (const { q, src } of picked) {
+    const hits = await searchYouTube(q);
+    const fresh = hits.filter((h) => !st.has(`ytsearch:${h.videoId}`));
+    if (fresh.length === 0) continue;
+    // Relevance gate (off-topic noise out); the embedding here only ranks
+    // candidates — the stored item is re-embedded properly post-analysis.
+    const best = await pickRelevantVideo(fresh, src);
+    if (!best) continue;
+    st.upsert(youTubePendingItem(best, src));
+    added += 1;
+  }
+  if (added > 0) console.log(`[youtube:${worldId}] queued ${added} searched video(s) for analysis`);
+  return added;
+}
+
+/** Salient content tokens of a fetched zone article, for relatedness scoring. */
+function articleTokens(title: string): Set<string> {
+  return titleTokens(title);
+}
+
+/**
+ * Reactive INTERNATIONAL coverage: detect which foreign zones the live stories
+ * involve (gazetteer over the top analyzed headlines), then for each involved
+ * zone fetch ONLY that zone's outlets, keep the articles related to the active
+ * stories, and add them as PENDING items tagged with their `zone`. They are then
+ * analyzed like any other item and cluster into the story, where the synthesis
+ * surfaces how each side frames it. Bounded (maxZonesPerBuild) + per-zone TTL.
+ * Returns how many articles were queued; does NOT analyze.
+ */
+async function addZonePending(worldId: string): Promise<number> {
+  if (!config.zones.enabled) return 0;
+  const st = getStore(worldId);
+  const now = Date.now();
+  const cutoff = analyzeCutoff();
   const state = ws(worldId);
-  if (!config.youtube.searchEnabled || youTubeSearchDisabled()) return Promise.resolve();
-  if (state.youtubeInFlight) return state.youtubeInFlight;
 
-  state.youtubeInFlight = (async () => {
-    const st = getStore(worldId);
-    const now = Date.now();
-    // Seed queries from the most important, recent, NON-youtube headlines.
-    const candidates = st
-      .all()
-      .filter(
-        (s) =>
-          s.analyzed &&
-          !s.clickbait &&
-          !s.item.youtubeSearch &&
-          s.importance >= config.youtube.minSourceImportance &&
-          now - s.item.publishedAt <= config.youtube.sourceMaxAgeMs,
-      )
-      .sort((a, b) => b.importance - a.importance || b.item.publishedAt - a.item.publishedAt);
+  // Seeds: the most important, recent, NON-reactive analyzed items (the stories
+  // currently in play). Reactive (already-zoned) items don't seed new fetches.
+  const seeds = st
+    .all()
+    .filter(
+      (s) =>
+        s.analyzed &&
+        !s.clickbait &&
+        !s.item.zone &&
+        s.importance >= config.zones.minSeedImportance &&
+        now - s.item.publishedAt <= config.zones.sourceMaxAgeMs,
+    )
+    .sort((a, b) => b.importance - a.importance || b.item.publishedAt - a.item.publishedAt)
+    .slice(0, config.zones.seedItems);
+  if (seeds.length === 0) return 0;
 
-    // Dedupe near-identical headlines (same event covered by many outlets) by a
-    // sorted token signature so we don't spend several queries on one story.
-    const picked: { q: string; src: StoredItem }[] = [];
-    const seenSig = new Set<string>();
-    for (const s of candidates) {
-      if (picked.length >= config.youtube.maxQueries) break;
-      const q = cleanHeadlineQuery(s.item.title);
-      if (q.length < 8) continue;
-      const sig = tokenize(q).sort().slice(0, 8).join(" ");
-      if (!sig || seenSig.has(sig)) continue;
-      seenSig.add(sig);
-      picked.push({ q, src: s });
+  // Accumulate involved zones + the salient tokens of the stories that triggered
+  // each (used to keep only RELATED foreign coverage, not a region's whole feed).
+  const involved = new Map<string, { score: number; tokens: Set<string> }>();
+  for (const s of seeds) {
+    const text = `${s.item.title} ${s.summary} ${s.keywords.join(" ")}`;
+    const zoneIds = detectZones(text, ZONES, config.zones.minAliasHits);
+    if (zoneIds.length === 0) continue;
+    const seedToks = titleTokens(s.item.title, s.keywords);
+    for (const id of zoneIds) {
+      const cur = involved.get(id) ?? { score: 0, tokens: new Set<string>() };
+      cur.score += 1;
+      for (const t of seedToks) cur.tokens.add(t);
+      involved.set(id, cur);
     }
-    if (picked.length === 0) return;
+  }
+  if (involved.size === 0) return 0;
 
-    let added = 0;
-    for (const { q, src } of picked) {
-      const hits = await searchYouTube(q);
-      const fresh = hits.filter((h) => !st.has(`ytsearch:${h.videoId}`));
-      if (fresh.length === 0) continue;
-      // Relevance gate (off-topic noise out); the embedding here is only used to
-      // rank candidates — the stored item is re-embedded properly post-analysis.
-      const best = await pickRelevantVideo(fresh, src);
-      if (!best) continue;
-      st.upsert(youTubePendingItem(best, src));
+  // Strongest zones first, skipping any fetched within the TTL, capped per build.
+  const chosen = [...involved.entries()]
+    .sort((a, b) => b[1].score - a[1].score)
+    .filter(([id]) => now - (state.zoneFetchedAt.get(id) ?? 0) >= config.zones.zoneTtlMs)
+    .slice(0, config.zones.maxZonesPerBuild);
+  if (chosen.length === 0) return 0;
+
+  let added = 0;
+  for (const [zoneId, { tokens }] of chosen) {
+    const zone = ZONES_BY_ID[zoneId];
+    if (!zone || zone.sources.length === 0) continue;
+    state.zoneFetchedAt.set(zoneId, now);
+    let raw: FeedItem[];
+    try {
+      raw = await fetchAll(zone.sources);
+    } catch (e) {
+      console.warn(`[zones:${worldId}] fetch failed for "${zoneId}":`, e);
+      continue;
+    }
+    // Keep only NEW, recent articles RELATED to the triggering stories (shared
+    // salient tokens) — we want this zone's take on THESE stories, not all its news.
+    const related = raw
+      .filter((it) => !st.has(it.id) && it.publishedAt >= cutoff)
+      .map((it) => {
+        let shared = 0;
+        for (const t of articleTokens(it.title)) if (tokens.has(t)) shared += 1;
+        return { it, shared };
+      })
+      .filter((x) => x.shared >= config.zones.minSharedTokens)
+      .sort((a, b) => b.shared - a.shared || b.it.publishedAt - a.it.publishedAt)
+      .slice(0, config.zones.perZoneItemCap);
+
+    for (const { it } of related) {
+      st.upsert({
+        item: it, // carries `zone` from the source (set in rss.normalize)
+        clickbait: false,
+        analyzed: false, // full analysis pending, same as any item
+        topic: it.topic,
+        lean: it.lean,
+        importance: 0,
+        summary: "",
+        keywords: [],
+        analyzedAt: 0,
+      });
       added += 1;
     }
+    if (related.length > 0) {
+      console.log(`[zones:${worldId}] queued ${related.length} "${zone.label}" article(s) for analysis`);
+    }
+  }
+  return added;
+}
+
+/**
+ * Run the reactive augmentations (YouTube discovery + international zones): add
+ * their candidate articles as PENDING, then drain the backlog ONCE through the
+ * normal analysis pipeline. Fire-and-forget; guarded so only one runs per world.
+ * To honor the GLOBAL single-build invariant, analysis runs only when the build
+ * lock is free (it's invoked right after this world released it); otherwise the
+ * new items stay pending and the next build drains them.
+ */
+function augmentReactively(worldId: string): Promise<void> {
+  const state = ws(worldId);
+  if (state.augmentInFlight) return state.augmentInFlight;
+
+  state.augmentInFlight = (async () => {
+    let added = 0;
+    added += await addYouTubePending(worldId);
+    added += await addZonePending(worldId);
     if (added === 0) return;
 
-    st.save();
-    console.log(`[youtube:${worldId}] queued ${added} searched video(s) for analysis`);
+    getStore(worldId).save();
 
-    // Analyze the new videos exactly like any other pending item. Only do so if
-    // the global build lock is free (we acquire it, mirroring buildPool); if a
-    // different world is building, leave them pending for the next drain.
-    if (buildingWorld) return;
+    // Analyze the new items exactly like any other pending item, under the lock.
+    if (buildingWorld) return; // busy elsewhere; the next drain will pick them up
     buildingWorld = worldId;
     try {
       const a = await analyzePending(worldId);
@@ -565,12 +684,12 @@ function augmentWithYouTube(worldId: string): Promise<void> {
     }
   })()
     .catch((e) => {
-      console.warn(`[youtube:${worldId}] augmentation failed:`, e);
+      console.warn(`[augment:${worldId}] reactive augmentation failed:`, e);
     })
     .finally(() => {
-      state.youtubeInFlight = null;
+      state.augmentInFlight = null;
     });
-  return state.youtubeInFlight;
+  return state.augmentInFlight;
 }
 
 /** Schedule a background chunk to keep chewing through a world's analysis +
@@ -595,9 +714,9 @@ function scheduleCatchUp(worldId: string): void {
           // Backlog drained (or stalled) — release the global build lock so
           // another world may refresh.
           if (buildingWorld === worldId) buildingWorld = null;
-          // The pool is now fully analyzed — extend the stories with relevant
-          // YouTube videos (background, no model cost).
-          void augmentWithYouTube(worldId);
+          // The pool is now fully analyzed — reactively extend the stories with
+          // relevant YouTube videos and international (per-zone) coverage.
+          void augmentReactively(worldId);
         }
       } catch (err) {
         console.warn(`[feed:${worldId}] catch-up failed:`, err);
@@ -625,8 +744,8 @@ async function buildPool(worldId: string): Promise<void> {
   } else if (buildingWorld === worldId) {
     // No background work scheduled — release the lock now.
     buildingWorld = null;
-    // Pool fully analyzed in one pass — augment with YouTube in the background.
-    void augmentWithYouTube(worldId);
+    // Pool fully analyzed in one pass — run reactive augmentation in the background.
+    void augmentReactively(worldId);
   }
 }
 

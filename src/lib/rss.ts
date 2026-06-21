@@ -220,6 +220,9 @@ export function normalize(source: Source, raw: RawEntry[]): FeedItem[] {
         durationRaw: r.durationRaw,
         summary: r.summary,
       }),
+      // Carry the outlet's geographic/affiliation zone (reactive intl sources)
+      // so coverage can be grouped into conflict sides; absent for default feeds.
+      ...(source.zone ? { zone: source.zone } : {}),
     }));
 }
 

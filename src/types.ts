@@ -53,6 +53,33 @@ export interface Source {
   leanRationale: string;
   /** Relative sampling weight (higher = drawn more often). Default 1. */
   weight?: number;
+  /**
+   * Geographic / affiliation ZONE this outlet belongs to (e.g. "russia",
+   * "ukraine", "china"). Set ONLY on reactive international sources — outlets
+   * fetched on demand when a story involves their zone (see src/data/zones.ts).
+   * Absent for the default front-page sources (treated as "international").
+   */
+  zone?: string;
+}
+
+/**
+ * A geographic / affiliation ZONE of reporting (e.g. Russia, Ukraine, China).
+ * Its `sources` are NOT fetched by default; the server loads them REACTIVELY
+ * only when a live story is detected to involve the zone (its `aliases` appear
+ * in the coverage). This lets us reach toward "the whole world" of outlets
+ * without paying to fetch every region on every build.
+ */
+export interface Zone {
+  id: string;
+  /** Display label, e.g. "Russia". */
+  label: string;
+  /**
+   * Lowercase signal tokens (country, capital, leaders, demonyms, key terms)
+   * whose presence in a story's text marks the zone as involved.
+   */
+  aliases: string[];
+  /** Reactive RSS/Atom sources for this zone (fetched only when involved). */
+  sources: Source[];
 }
 
 /**
@@ -123,6 +150,12 @@ export interface FeedItem {
    * never confused with traditional articles.
    */
   youtubeSearch?: boolean;
+  /**
+   * Geographic / affiliation zone this item's outlet belongs to (from a reactive
+   * international source — see Source.zone). Absent for default front-page items.
+   * Used to group coverage into conflict SIDES inside a story.
+   */
+  zone?: string;
 }
 
 /** One storyline within the daily briefing. */
@@ -162,6 +195,25 @@ export interface StorySource {
   lean: Lean;
   leanSource: LeanSource;
   publishedAt: number;
+  /** Geographic/affiliation zone of the outlet, when known (reactive sources). */
+  zone?: string;
+}
+
+/**
+ * One SIDE of a conflict as identified by the model on a case-by-case basis —
+ * NOT a pre-set category. Groups the outlets reporting from a shared geographic /
+ * affiliation vantage point and captures how that side frames the story, so the
+ * reader can compare e.g. Western vs Ukrainian vs Russian coverage of one event.
+ */
+export interface StorySide {
+  /** AI-written label, e.g. "Western media", "Russian media", "Ukrainian media". */
+  label: string;
+  /** Zone ids that compose this side (from the contributing items' tags). */
+  zones: string[];
+  /** One to two sentences: how THIS side frames / emphasizes the story. */
+  framing: string;
+  /** Contributing outlet names on this side (for display). */
+  outlets: string[];
 }
 
 /**
@@ -249,6 +301,13 @@ export interface Story {
   timeline?: StoryMilestone[];
   /** Left/center/right framing comparison for a developing issue. */
   spectrum?: StorySpectrum;
+  /**
+   * AI-detected conflict SIDES (geographic/affiliation vantage points) and how
+   * each frames the story — populated case-by-case when the coverage spans
+   * opposing zones (e.g. Western vs Ukrainian vs Russian media). Absent when the
+   * story isn't a multi-side conflict or no foreign coverage was gathered.
+   */
+  sides?: StorySide[];
   /**
    * True when synthesis is a graceful FALLBACK (model offline/failed): built
    * from the source one-line summaries without cross-outlet analysis. The UI

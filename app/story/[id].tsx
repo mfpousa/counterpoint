@@ -14,6 +14,7 @@ import { fetchStory } from "../../src/lib/api";
 import { cacheStories, getCachedStories, getCachedStory } from "../../src/lib/storyCache";
 import { goBack, openNews, openStory } from "../../src/lib/nav";
 import { topicMeta } from "../../src/lib/topics";
+import { zoneLabel } from "../../src/data/zones";
 import { storyChange, milestoneIsNew } from "../../src/lib/storyUpdates";
 import { leanColor } from "../../src/components/ui";
 import { TypewriterParagraphs } from "../../src/components/anim";
@@ -259,6 +260,34 @@ export default function StoryPanel() {
               </View>
             )}
 
+            {story.sides && story.sides.length > 0 && (
+              <View style={styles.section}>
+                <SectionHeader icon="git-compare-outline" label={t("storyPanel.sides")} />
+                <Text style={styles.sidesHint}>{t("storyPanel.sidesHint")}</Text>
+                {story.sides.map((side, i) => (
+                  <View key={i} style={styles.sideCard}>
+                    <View style={styles.sideHeadRow}>
+                      <Ionicons name="flag-outline" size={13} color={colors.accent} />
+                      <Text style={styles.sideLabel}>{side.label}</Text>
+                    </View>
+                    {side.zones.length > 0 && (
+                      <View style={styles.zoneRow}>
+                        {side.zones.map((z) => (
+                          <View key={z} style={styles.zoneChip}>
+                            <Text style={styles.zoneChipText}>{zoneLabel(z)}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    )}
+                    <Text style={styles.sideFraming}>{side.framing}</Text>
+                    {side.outlets.length > 0 && (
+                      <Text style={styles.sideOutlets}>{side.outlets.join("  \u00b7  ")}</Text>
+                    )}
+                  </View>
+                ))}
+              </View>
+            )}
+
             {story.spectrum &&
               (story.spectrum.left || story.spectrum.center || story.spectrum.right) && (
                 <View style={styles.section}>
@@ -319,7 +348,15 @@ export default function StoryPanel() {
                 >
                   <View style={[styles.leanDot, { backgroundColor: leanColor(s.lean), marginTop: 5 }]} />
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.sourceOutlet}>{s.sourceTitle}</Text>
+                    <View style={styles.sourceOutletRow}>
+                      <Text style={styles.sourceOutlet}>{s.sourceTitle}</Text>
+                      {s.zone && (
+                        <View style={styles.srcZone}>
+                          <Ionicons name="earth" size={9} color={colors.accent} />
+                          <Text style={styles.srcZoneText}>{zoneLabel(s.zone)}</Text>
+                        </View>
+                      )}
+                    </View>
                     <Text style={styles.sourceTitle} numberOfLines={2}>
                       {s.title}
                     </Text>
@@ -522,8 +559,42 @@ const styles = StyleSheet.create({
   bullet: { fontSize: font.body, fontWeight: "800", lineHeight: font.small * 1.5 },
   bulletText: { flex: 1, color: colors.textDim, fontSize: font.small, lineHeight: font.small * 1.5 },
   sourceRow: { flexDirection: "row", alignItems: "flex-start", gap: spacing.sm, paddingVertical: spacing.xs },
+  sourceOutletRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs, flexWrap: "wrap" },
   sourceOutlet: { color: colors.text, fontSize: font.small, fontWeight: "700" },
   sourceTitle: { color: colors.textDim, fontSize: font.small, lineHeight: font.small * 1.4, marginTop: 1 },
+  srcZone: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 1,
+    borderRadius: radius.pill,
+    backgroundColor: colors.accent + "18",
+  },
+  srcZoneText: { color: colors.accent, fontSize: font.tiny, fontWeight: "700" },
+  sidesHint: { color: colors.textDim, fontSize: font.small, lineHeight: font.small * 1.4, marginBottom: spacing.xs },
+  sideCard: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    gap: spacing.xs,
+    backgroundColor: colors.surface,
+  },
+  sideHeadRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
+  sideLabel: { color: colors.text, fontSize: font.body, fontWeight: "800" },
+  zoneRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.xs },
+  zoneChip: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 1,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.accent + "55",
+    backgroundColor: colors.accent + "14",
+  },
+  zoneChipText: { color: colors.accent, fontSize: font.tiny, fontWeight: "800" },
+  sideFraming: { color: colors.textDim, fontSize: font.small, lineHeight: font.small * 1.5 },
+  sideOutlets: { color: colors.textFaint, fontSize: font.tiny, fontWeight: "600" },
   relatedRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs, paddingVertical: spacing.xs },
   relatedText: { flex: 1, color: colors.accent, fontSize: font.small, fontWeight: "600" },
   disclaimer: { color: colors.textFaint, fontSize: font.tiny, fontStyle: "italic", marginTop: spacing.lg },
