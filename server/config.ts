@@ -191,6 +191,15 @@ export const config = {
     issueMinEvents: num("STORIES_ISSUE_MIN_EVENTS", 2),
     issueMinSources: num("STORIES_ISSUE_MIN_SOURCES", 3),
     issueActiveMs: num("STORIES_ISSUE_ACTIVE_MS", 36 * 60 * 60 * 1000),
+    // Persisted, INCREMENTAL synthesis: synthesized stories are cached on disk
+    // (like analyzed articles) and reused across refreshes/restarts. On rebuild
+    // we only (re)synthesize stories whose article membership CHANGED; unchanged
+    // ones are reused as-is, so a refresh never re-computes everything.
+    storePath: str("STORIES_STORE_PATH", ".cache/story-store.json"),
+    // A new cluster/issue is treated as the SAME story as a cached one when their
+    // article sets overlap by at least this Jaccard ratio (so a development that
+    // gains an article keeps its identity instead of becoming a brand-new story).
+    matchThreshold: num("STORIES_MATCH_THRESHOLD", 0.5),
     // Most developing-issue stories to synthesize per world.
     maxIssues: num("STORIES_MAX_ISSUES", 6),
     // Cap on sub-events (timeline milestones) fed into an issue synthesis prompt.

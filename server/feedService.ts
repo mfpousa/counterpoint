@@ -33,6 +33,7 @@ import { interestTokens, partitionByExclusion, toFeedItem } from "./personalize"
 import { interpretQuery, type ParsedQuery } from "./query";
 import { rankItems } from "./rank";
 import { getStore, type StoredItem } from "./store";
+import { getStoryStore, type StoryKind } from "./storyStore";
 import { buildDevelopingStory, buildStory } from "./synthesize";
 import { fetchTranscripts } from "./transcripts";
 
@@ -617,6 +618,15 @@ function storyEligible(worldId: string, now = Date.now()): StoredItem[] {
     );
 }
 
+/** Token set for a synthesized story (from its title + source headlines), used
+ *  to relate cached stories that have no centroid handy. */
+function storyTokens(story: Story): Set<string> {
+  const t = new Set<string>();
+  for (const tok of titleTokens(story.title)) t.add(tok);
+  for (const src of story.sources) for (const tok of titleTokens(src.title)) t.add(tok);
+  return t;
+}
+
 /** Fill each story's relatedIds from cluster proximity (centroid cosine, else
  *  shared-token Jaccard). Mutates the stories in place. */
 function linkRelated(
@@ -682,11 +692,6 @@ export async function getStories(
     });
     const toStored = (members: ClusterInput[]): StoredItem[] =>
       members.map((m) => byId.get(m.id)).filter((s): s is StoredItem => !!s);
-    const tokensOf = (members: ClusterInput[]): Set<string> => {
-      const t = new Set<string>();
-      for (const m of members) for (const tok of titleTokens(m.title, m.keywords)) t.add(tok);
-      return t;
-    };
 
     // Level 2: group event clusters into broader ongoing issues, then keep only
     // those the heuristic flags as DEVELOPING (an LLM later confirms).
@@ -722,33 +727,80 @@ export async function getStories(
     const remainingSlots = Math.max(0, config.stories.maxStories - developing.length);
     const topEvents = rankClusters(eventCandidates).slice(0, remainingSlots);
 
+    // Target story specs (deterministic; no model calls yet).
+    type Spec = {
+      kind: StoryKind;
+      members: StoredItem[];
+      /** Sub-events (for an issue's timeline); undefined for event stories. */
+      events?: StoredItem[][];
+      centroid: number[] | null;
+    };
+    const specs: Spec[] = [
+      ...developing.map((iss): Spec => ({
+        kind: "issue",
+        members: toStored(iss.members),
+        events: iss.clusters.map((c) => toStored(c.members)).filter((e) => e.length > 0),
+        centroid: iss.centroid,
+      })),
+      ...topEvents.map((c): Spec => ({ kind: "event", members: toStored(c.members), centroid: c.centroid })),
+    ].filter((s) => s.members.length > 0);
+
     console.log(
       `[stories:${worldId}] ${eligible.length} eligible -> ${clusters.length} clusters, ` +
-        `${issues.length} issues; ${developing.length} developing + ${topEvents.length} event stories…`,
+        `${issues.length} issues; ${developing.length} developing + ${topEvents.length} event spec(s)`,
     );
-    if (developing.length === 0 && topEvents.length === 0) return [];
+    if (specs.length === 0) {
+      state.storiesCache = { builtAt: builtAtSnapshot, stories: [] };
+      return [];
+    }
+
+    // INCREMENTAL: reuse cached stories whose article set is unchanged; only
+    // (re)synthesize new or changed ones, preserving a development's id when it
+    // merely gained/lost coverage. This is what stops a refresh re-computing all.
+    const store = getStoryStore(worldId);
+    type Built = { story: Story; centroid: number[] | null; tokens: Set<string> };
+    const used = new Set<string>();
+    const reused: Built[] = [];
+    const toSynth: { spec: Spec; memberIds: string[]; reuseId?: string }[] = [];
+    for (const spec of specs) {
+      const memberIds = spec.members.map((s) => s.item.id).sort();
+      const match = store.bestMatch(spec.kind, memberIds, used, config.stories.matchThreshold);
+      if (match) used.add(match.entry.id);
+      if (match && match.equal) {
+        reused.push({ story: match.entry.story, centroid: null, tokens: storyTokens(match.entry.story) });
+      } else {
+        toSynth.push({ spec, memberIds, reuseId: match?.entry.id });
+      }
+    }
 
     const started = Date.now();
-    type Built = { story: Story; centroid: number[] | null; tokens: Set<string> };
-    const tasks: (() => Promise<Built>)[] = [];
-    for (const iss of developing) {
-      tasks.push(async () => {
-        const events = iss.clusters
-          .map((c) => toStored(c.members))
-          .filter((e) => e.length > 0);
-        const story = await buildDevelopingStory(events);
-        return { story, centroid: iss.centroid, tokens: tokensOf(iss.members) };
-      });
-    }
-    for (const c of topEvents) {
-      tasks.push(async () => {
-        const story = await buildStory(toStored(c.members));
-        return { story, centroid: c.centroid, tokens: tokensOf(c.members) };
-      });
-    }
+    console.log(`[stories:${worldId}] ${reused.length} reused, ${toSynth.length} (re)synthesizing…`);
+    const synthed = await withConcurrency(
+      toSynth.map((t) => async (): Promise<Built> => {
+        const story =
+          t.spec.kind === "issue"
+            ? await buildDevelopingStory(t.spec.events ?? [t.spec.members])
+            : await buildStory(t.spec.members);
+        // Keep the development's identity across membership changes.
+        if (t.reuseId) story.id = t.reuseId;
+        store.upsert({
+          id: story.id,
+          kind: t.spec.kind,
+          memberIds: t.memberIds,
+          story,
+          builtAt: Date.now(),
+          updatedAt: story.updatedAt,
+        });
+        return { story, centroid: t.spec.centroid, tokens: storyTokens(story) };
+      }),
+      config.ai.concurrency,
+    );
 
-    const built = await withConcurrency(tasks, config.ai.concurrency);
+    const built = [...reused, ...synthed];
     linkRelated(built);
+    store.prune(used);
+    store.save();
+
     // Developing issues surface first (highlighted), then most-recent stories.
     const result = built
       .map((b) => b.story)
@@ -759,8 +811,8 @@ export async function getStories(
         return b.updatedAt - a.updatedAt;
       });
     console.log(
-      `[stories:${worldId}] synthesized ${result.length} stor${result.length === 1 ? "y" : "ies"}` +
-        ` in ${((Date.now() - started) / 1000).toFixed(0)}s`,
+      `[stories:${worldId}] ${result.length} stor${result.length === 1 ? "y" : "ies"} ` +
+        `(${synthed.length} synthesized in ${((Date.now() - started) / 1000).toFixed(0)}s, ${reused.length} cached)`,
     );
     state.storiesCache = { builtAt: builtAtSnapshot, stories: result };
     return result;
