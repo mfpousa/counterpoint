@@ -22,6 +22,7 @@ import { BriefingCard } from "../../src/components/BriefingCard";
 import { AnalysisProgress } from "../../src/components/AnalysisProgress";
 import { WorldSwitcher } from "../../src/components/WorldSwitcher";
 import { fetchStories } from "../../src/lib/api";
+import { cacheStories } from "../../src/lib/storyCache";
 import { openNews, openStory } from "../../src/lib/nav";
 import { worldById } from "../../src/data/worlds";
 import { LeanDial, QuotaMeter } from "../../src/components/meters";
@@ -63,15 +64,27 @@ export default function FeedScreen() {
   // interest-independent and built from the full pool, so we fetch them
   // alongside the feed and merge them in below.
   const [stories, setStories] = useState<Story[]>([]);
+  const [loadingStories, setLoadingStories] = useState(false);
+  const storiesLoadedOnce = useRef(false);
   const loadStories = useCallback(
     async (force = false) => {
-      const res = await fetchStories({ world: worldId, force });
-      setStories(res.stories);
+      setLoadingStories(true);
+      try {
+        const res = await fetchStories({ world: worldId, force });
+        setStories(res.stories);
+        // Share with the routed story panel so opening a listed story is instant
+        // and never dead-ends on an id that changed during a rebuild.
+        cacheStories(res.stories);
+        storiesLoadedOnce.current = true;
+      } finally {
+        setLoadingStories(false);
+      }
     },
     [worldId],
   );
   useEffect(() => {
     setStories([]);
+    storiesLoadedOnce.current = false;
     void loadStories();
   }, [loadStories]);
 
@@ -370,6 +383,17 @@ export default function FeedScreen() {
           </ScrollView>
         )}
 
+        {/* First-build indicator: stories are synthesized lazily (an LLM call per
+            story), so surface that work instead of showing nothing. */}
+        {loadingStories && !storiesLoadedOnce.current && (
+          <View style={styles.busyBanner}>
+            <ActivityIndicator size="small" color={colors.warn} />
+            <Text style={styles.busyText}>
+              Synthesizing stories from the latest coverage… this can take a moment.
+            </Text>
+          </View>
+        )}
+
         {/* Developing issues — highlighted band of ongoing storylines. */}
         {visibleDeveloping.length > 0 && (
           <View style={{ gap: spacing.md }}>
@@ -379,6 +403,7 @@ export default function FeedScreen() {
               </View>
               <Text style={styles.sectionTitle}>Developing</Text>
               <Text style={styles.sectionCount}>{visibleDeveloping.length}</Text>
+              {loadingStories && <ActivityIndicator size="small" color={colors.warn} />}
             </View>
             <View style={[styles.grid, { gap: GAP }]}>
               {visibleDeveloping.map((story) => (

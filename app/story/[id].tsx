@@ -10,7 +10,8 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { fetchStories } from "../../src/lib/api";
+import { fetchStory } from "../../src/lib/api";
+import { cacheStories, getCachedStories, getCachedStory } from "../../src/lib/storyCache";
 import { goBack, openNews, openStory } from "../../src/lib/nav";
 import { topicMeta } from "../../src/lib/topics";
 import { leanColor } from "../../src/components/ui";
@@ -55,20 +56,36 @@ export default function StoryPanel() {
   const insets = useSafeAreaInsets();
   const { worldId } = useApp();
 
-  const [stories, setStories] = useState<Story[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Seed from the shared cache so a story opened from the feed renders INSTANTLY
+  // (no /api/stories rebuild wait, and immune to ids that changed in a rebuild).
+  const [story, setStory] = useState<Story | null>(() => (id ? getCachedStory(id) ?? null : null));
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!id) return;
+    const cached = getCachedStory(id);
+    if (cached) {
+      setStory(cached);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+    // Not cached (deep link, or opened after the list moved on): fetch just this
+    // one story. This can still take a moment if the set needs (re)building, but
+    // it resolves — no indefinite spinner — and 404s cleanly if it aged out.
     let cancelled = false;
+    setStory(null);
     setLoading(true);
     setError(null);
-    fetchStories({ world: worldId })
-      .then((res) => {
-        if (!cancelled) setStories(res.stories);
+    fetchStory(id, worldId)
+      .then((s) => {
+        if (cancelled) return;
+        cacheStories([s]);
+        setStory(s);
       })
-      .catch(() => {
-        if (!cancelled) setError("Couldn't load this story.");
+      .catch((e: unknown) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : "Couldn't load this story.");
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -76,18 +93,14 @@ export default function StoryPanel() {
     return () => {
       cancelled = true;
     };
-  }, [worldId]);
+  }, [id, worldId]);
 
-  const byId = useMemo(() => {
-    const m = new Map<string, Story>();
-    for (const s of stories) m.set(s.id, s);
-    return m;
-  }, [stories]);
-
-  const story = id ? byId.get(id) ?? null : null;
-  const related = story
-    ? story.relatedIds.map((rid) => byId.get(rid)).filter((s): s is Story => !!s)
-    : [];
+  // Related stories resolve from whatever's cached (siblings loaded with it).
+  const related = useMemo(() => {
+    if (!story) return [];
+    const pool = new Map(getCachedStories().map((s) => [s.id, s]));
+    return story.relatedIds.map((rid) => pool.get(rid)).filter((s): s is Story => !!s);
+  }, [story]);
   const m = story ? topicMeta(story.topic) : null;
 
   return (
@@ -107,19 +120,26 @@ export default function StoryPanel() {
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xxl }]}
         showsVerticalScrollIndicator={false}
       >
-        {loading && (
+        {loading && !story && (
           <View style={styles.center}>
             <ActivityIndicator size="large" color={colors.accent} />
-            <Text style={styles.centerText}>Loading the story…</Text>
+            <Text style={styles.centerText}>Synthesizing this story…</Text>
+            <Text style={styles.centerHint}>
+              Combining the latest coverage across outlets. This can take a moment on a cold start.
+            </Text>
           </View>
         )}
 
         {!loading && (error || !story) && (
           <View style={styles.center}>
-            <Ionicons name="alert-circle-outline" size={28} color={colors.danger} />
+            <Ionicons name="time-outline" size={28} color={colors.textDim} />
             <Text style={styles.centerText}>
-              {error ?? "This story is no longer available (it may have aged out)."}
+              {error ?? "This story has moved on or aged out."}
             </Text>
+            <Pressable onPress={goBack} style={styles.backToFeedBtn} accessibilityRole="button">
+              <Ionicons name="arrow-back" size={16} color={colors.bg} />
+              <Text style={styles.backToFeedText}>Back to the latest</Text>
+            </Pressable>
           </View>
         )}
 
@@ -337,7 +357,19 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   center: { alignItems: "center", gap: spacing.md, paddingVertical: spacing.xxl },
-  centerText: { color: colors.textDim, fontSize: font.body, textAlign: "center" },
+  centerText: { color: colors.text, fontSize: font.body, textAlign: "center", fontWeight: "600" },
+  centerHint: { color: colors.textDim, fontSize: font.small, textAlign: "center", lineHeight: font.small * 1.5, maxWidth: 360 },
+  backToFeedBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    backgroundColor: colors.accent,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  backToFeedText: { color: colors.bg, fontSize: font.body, fontWeight: "700" },
   topicPill: {
     flexDirection: "row",
     alignItems: "center",
