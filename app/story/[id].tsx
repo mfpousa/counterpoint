@@ -46,9 +46,14 @@ function age(ms: number): string {
   return `${Math.round(h / 24)}d ago`;
 }
 
-/** Short absolute date for a timeline milestone, e.g. "Jun 18". */
+/** Date + time for a timeline milestone, e.g. "Jun 18, 14:05". */
 function tlDate(ms: number): string {
-  return new Date(ms).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return new Date(ms).toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 export default function StoryPanel() {

@@ -58,11 +58,43 @@ function text(node: unknown): string {
   return "";
 }
 
-/** Strip HTML tags + collapse whitespace for summaries. */
-function stripHtml(s: string): string {
+const NAMED_ENTITIES: Record<string, string> = {
+  amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ",
+  hellip: "…", mdash: "—", ndash: "–", rsquo: "’", lsquo: "‘",
+  rdquo: "”", ldquo: "“", laquo: "«", raquo: "»", deg: "°", eacute: "é",
+};
+
+/** Decode HTML entities ONCE: numeric (&#039; / &#x27;) and common named ones. */
+function decodeOnce(s: string): string {
   return s
-    .replace(/<[^>]*>/g, " ")
-    .replace(/&[a-z]+;/gi, " ")
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => safeCodePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, d) => safeCodePoint(parseInt(d, 10)))
+    .replace(/&([a-z][a-z0-9]*);/gi, (m, name) => NAMED_ENTITIES[name.toLowerCase()] ?? m);
+}
+
+function safeCodePoint(n: number): string {
+  try {
+    return Number.isFinite(n) && n > 0 ? String.fromCodePoint(n) : "";
+  } catch {
+    return "";
+  }
+}
+
+/** Fully decode entities, handling DOUBLE-encoding (e.g. `&amp;#039;`) by
+ *  iterating until stable (bounded). */
+export function decodeEntities(input: string): string {
+  let s = input;
+  for (let i = 0; i < 3; i++) {
+    const next = decodeOnce(s);
+    if (next === s) break;
+    s = next;
+  }
+  return s;
+}
+
+/** Strip HTML tags, decode entities, and collapse whitespace. */
+function stripHtml(s: string): string {
+  return decodeEntities(s.replace(/<[^>]*>/g, " "))
     .replace(/\s+/g, " ")
     .trim();
 }

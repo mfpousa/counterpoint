@@ -250,6 +250,7 @@ function parsePlainArticle(
 export async function rewriteArticleStream(
   stored: StoredItem,
   onDelta: (delta: string) => void,
+  onReasoning?: (delta: string) => void,
 ): Promise<RewrittenArticle | null> {
   const { item } = stored;
 
@@ -278,7 +279,7 @@ export async function rewriteArticleStream(
     payload = { headline: item.title, sourceTitle: item.sourceTitle, feedSummary: summary, keywords };
   }
 
-  const full = await chatRaw(system, payload, { maxTokens: config.reader.maxTokens, onDelta });
+  const full = await chatRaw(system, payload, { maxTokens: config.reader.maxTokens, onDelta, onReasoning });
   const parsed = parsePlainArticle(full, src?.fallbackTitle || item.title);
   if (!parsed) return null;
 

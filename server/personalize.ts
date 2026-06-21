@@ -9,6 +9,7 @@
 
 import type { FeedItem } from "../src/types";
 import { cosineSim } from "./embeddings";
+import { decodeEntities } from "../src/lib/rss";
 import type { StoredItem } from "./store";
 
 const STOPWORDS = new Set([
@@ -199,6 +200,10 @@ export function toFeedItem(
   const relevance = personalizedRelevance(s.importance, match, hasInterest);
   return {
     ...s.item,
+    // Decode any leftover HTML entities (e.g. `&#039;`) so titles/summaries read
+    // cleanly even for items analyzed before the parser fix.
+    title: decodeEntities(s.item.title),
+    summary: s.item.summary ? decodeEntities(s.item.summary) : s.item.summary,
     // Full article HTML is a server-only rewrite fallback; never ship it to
     // clients (it would bloat every /api/feed response).
     content: undefined,

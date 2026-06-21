@@ -117,6 +117,8 @@ export async function fetchRewrite(id: string): Promise<RewrittenArticle> {
 export interface RewriteStreamHandlers {
   /** A chunk of generated text (append to what's shown). */
   onDelta: (delta: string) => void;
+  /** A chunk of REASONING text (the model is "thinking" before it writes). */
+  onReasoning?: (delta: string) => void;
   /** The final, cleaned article (replaces the streamed text). */
   onDone: (article: RewrittenArticle) => void;
   /** A failure (or that streaming is unsupported here) — caller may fall back. */
@@ -153,6 +155,7 @@ export function streamRewrite(id: string, h: RewriteStreamHandlers): { cancel: (
       return;
     }
     if (event === "delta" && typeof payload === "string") h.onDelta(payload);
+    else if (event === "reasoning" && typeof payload === "string") h.onReasoning?.(payload);
     else if (event === "done") h.onDone(payload as RewrittenArticle);
     else if (event === "error") h.onError(typeof payload === "string" ? payload : "rewrite failed");
   };

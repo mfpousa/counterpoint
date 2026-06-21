@@ -18,6 +18,7 @@ import type {
 import { chatJsonObject, type JsonSchema } from "./ai";
 import { sanitizeModelText } from "./analysis";
 import { config } from "./config";
+import { decodeEntities } from "../src/lib/rss";
 import type { StoredItem } from "./store";
 
 const SYNTH_SCHEMA: JsonSchema = {
@@ -126,7 +127,7 @@ function toSources(members: StoredItem[]): StorySource[] {
     .sort((a, b) => b.item.publishedAt - a.item.publishedAt)
     .map((m) => ({
       id: m.item.id,
-      title: m.item.title,
+      title: decodeEntities(m.item.title),
       sourceTitle: m.item.sourceTitle,
       url: m.item.url,
       lean: m.lean,
@@ -190,8 +191,8 @@ function fallbackStory(members: StoredItem[]): Story {
   }
   return {
     id: storyId(members.map((m) => m.item.id)),
-    title: byImportance[0].item.title,
-    summary: sanitizeModelText(byImportance[0].summary) || byImportance[0].item.title,
+    title: decodeEntities(byImportance[0].item.title),
+    summary: sanitizeModelText(byImportance[0].summary) || decodeEntities(byImportance[0].item.title),
     synthesis: paragraphs.length > 0 ? paragraphs : [byImportance[0].item.title],
     topic: majorityTopic(members),
     lean: aggregateLean(members),
@@ -243,7 +244,7 @@ export async function buildStory(members: StoredItem[]): Promise<Story> {
   const byImportance = members.slice().sort((a, b) => b.importance - a.importance);
   return {
     id: storyId(members.map((m) => m.item.id)),
-    title: title || byImportance[0].item.title,
+    title: title || decodeEntities(byImportance[0].item.title),
     summary: summary || sanitizeModelText(byImportance[0].summary) || byImportance[0].item.title,
     synthesis: synthesis.length > 0 ? synthesis : [byImportance[0].item.title],
     topic: majorityTopic(members),
@@ -339,7 +340,7 @@ function fallbackMilestone(event: StoredItem[]): StoryMilestone {
   const rep = event.slice().sort((a, b) => b.importance - a.importance)[0];
   return {
     at: earliestAt(event),
-    title: rep.item.title,
+    title: decodeEntities(rep.item.title),
     detail: sanitizeModelText(rep.summary) || rep.item.title,
     sourceIds: event.map((m) => m.item.id),
   };
@@ -438,7 +439,7 @@ export async function buildDevelopingStory(events: StoredItem[][]): Promise<Stor
   const byImportance = members.slice().sort((a, b) => b.importance - a.importance);
   return {
     id: storyId(members.map((m) => m.item.id)),
-    title: title || byImportance[0].item.title,
+    title: title || decodeEntities(byImportance[0].item.title),
     summary: summary || sanitizeModelText(byImportance[0].summary) || byImportance[0].item.title,
     synthesis: synthesis.length > 0 ? synthesis : [byImportance[0].item.title],
     topic: majorityTopic(members),

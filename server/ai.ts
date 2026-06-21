@@ -88,7 +88,15 @@ export interface JsonSchema {
 export async function chatRaw(
   system: string,
   payload: unknown,
-  opts: { maxTokens?: number; schema?: JsonSchema; onDelta?: (delta: string) => void } = {},
+  opts: {
+    maxTokens?: number;
+    schema?: JsonSchema;
+    /** Called with each chunk of visible answer text as it streams. */
+    onDelta?: (delta: string) => void;
+    /** Called with each chunk of REASONING text (models that expose a separate
+     *  reasoning channel emit this BEFORE any answer content). */
+    onReasoning?: (delta: string) => void;
+  } = {},
 ): Promise<string> {
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -151,13 +159,19 @@ export async function chatRaw(
       if (data === "[DONE]") return;
       try {
         const json = JSON.parse(data) as {
-          choices?: { delta?: { content?: string } }[];
+          choices?: {
+            delta?: { content?: string; reasoning_content?: string; reasoning?: string };
+          }[];
         };
-        const delta = json.choices?.[0]?.delta?.content;
-        if (typeof delta === "string") {
-          content += delta;
-          opts.onDelta?.(delta);
+        const delta = json.choices?.[0]?.delta;
+        if (typeof delta?.content === "string") {
+          content += delta.content;
+          opts.onDelta?.(delta.content);
         }
+        // Reasoning channel (DeepSeek-style `reasoning_content`, or `reasoning`)
+        // — emitted before any answer content; surfaced as a "thinking" signal.
+        const reason = delta?.reasoning_content ?? delta?.reasoning;
+        if (typeof reason === "string" && reason) opts.onReasoning?.(reason);
       } catch {
         /* keepalive / partial frame — ignore */
       }

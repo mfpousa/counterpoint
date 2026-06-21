@@ -766,7 +766,10 @@ export async function getStories(
       const memberIds = spec.members.map((s) => s.item.id).sort();
       const match = store.bestMatch(spec.kind, memberIds, used, config.stories.matchThreshold);
       if (match) used.add(match.entry.id);
-      if (match && match.equal) {
+      // Reuse verbatim only when the set is unchanged AND the cached synthesis is
+      // a real one. A DEGRADED story (model was offline -> headline fallback) is
+      // re-synthesized so its heading/description upgrade once the model is back.
+      if (match && match.equal && !match.entry.story.degraded) {
         reused.push({ story: match.entry.story, centroid: null, tokens: storyTokens(match.entry.story) });
       } else {
         toSynth.push({ spec, memberIds, reuseId: match?.entry.id });

@@ -6,6 +6,7 @@ import React from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { Briefing } from "../types";
+import { Typewriter } from "./anim";
 import { colors, font, radius, spacing } from "../theme";
 
 export function BriefingCard({
@@ -50,7 +51,7 @@ export function BriefingCard({
         {loading && <ActivityIndicator size="small" color={colors.accent} />}
       </View>
 
-      {mood.length > 0 && <Text style={styles.mood}>{mood}</Text>}
+      {mood.length > 0 && <Typewriter text={mood} cps={260} style={styles.mood} />}
 
       {threads.length > 0 && (
         <View style={styles.threads}>
@@ -59,7 +60,8 @@ export function BriefingCard({
               <View style={styles.dot} />
               <Text style={styles.threadText}>
                 {t.title.length > 0 && <Text style={styles.threadTitle}>{t.title}: </Text>}
-                {t.detail}
+                {/* Nested in <Text>, so no animated cursor here. */}
+                <Typewriter text={t.detail} cps={260} cursor={false} />
               </Text>
             </View>
           ))}
@@ -71,7 +73,7 @@ export function BriefingCard({
           <Ionicons name="trending-up" size={14} color={colors.good} />
           <Text style={styles.outlookText}>
             <Text style={styles.outlookLabel}>Where it’s headed: </Text>
-            {outlook}
+            <Typewriter text={outlook} cps={260} cursor={false} />
           </Text>
         </View>
       )}

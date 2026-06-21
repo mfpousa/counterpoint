@@ -73,11 +73,15 @@ export function Typewriter({
   active = true,
   cps = 220,
   style,
+  cursor = true,
 }: {
   text: string;
   active?: boolean;
   cps?: number;
   style?: TextStyle;
+  /** Show the blinking cursor while typing. Disable when nesting inside another
+   *  <Text> (an Animated cursor can't be a Text child on web). */
+  cursor?: boolean;
 }) {
   const [shown, setShown] = useState(active ? "" : text);
   useEffect(() => {
@@ -100,7 +104,7 @@ export function Typewriter({
   return (
     <Text style={style}>
       {shown}
-      {active && !done ? <Cursor /> : null}
+      {cursor && active && !done ? <Cursor /> : null}
     </Text>
   );
 }

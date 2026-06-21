@@ -173,7 +173,11 @@ app.get("/api/rewrite/stream", async (req, res) => {
   };
 
   try {
-    const article = await rewriteArticleStream(stored, (delta) => send("delta", delta));
+    const article = await rewriteArticleStream(
+      stored,
+      (delta) => send("delta", delta),
+      (reasoning) => send("reasoning", reasoning),
+    );
     if (!article) send("error", "The article couldn't be rewritten (paywall or model offline).");
     else send("done", article);
   } catch (e) {

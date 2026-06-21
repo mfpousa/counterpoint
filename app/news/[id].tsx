@@ -40,6 +40,7 @@ export default function NewsReader() {
   const [error, setError] = useState<string | null>(null);
   const [article, setArticle] = useState<RewrittenArticle | null>(null);
   const [streamed, setStreamed] = useState("");
+  const [thinking, setThinking] = useState("");
   const [related, setRelated] = useState<FeedItem[]>([]);
   const [grading, setGrading] = useState(false);
 
@@ -55,6 +56,7 @@ export default function NewsReader() {
     setError(null);
     setArticle(null);
     setStreamed("");
+    setThinking("");
     setRelated([]);
 
     // Non-streaming fallback (streaming unsupported here, or it errored).
@@ -76,6 +78,10 @@ export default function NewsReader() {
       world: worldId,
       onDelta: (d) => {
         if (!cancelled) setStreamed((p) => p + d);
+      },
+      onReasoning: (d) => {
+        // Keep a short rolling preview of the model's reasoning.
+        if (!cancelled) setThinking((p) => (p + d).slice(-400));
       },
       onDone: (a) => {
         if (!cancelled) {
@@ -131,7 +137,14 @@ export default function NewsReader() {
         {loading && !streamed && !article && (
           <View style={styles.center}>
             <ActivityIndicator size="large" color={colors.accent} />
-            <Text style={styles.centerText}>Reading the article and starting to write…</Text>
+            <Text style={styles.centerText}>
+              {thinking ? "Thinking…" : "Reading the article…"}
+            </Text>
+            {!!thinking && (
+              <Text style={styles.thinkingPreview} numberOfLines={3}>
+                {thinking}
+              </Text>
+            )}
           </View>
         )}
 
@@ -300,6 +313,14 @@ const styles = StyleSheet.create({
   },
   center: { alignItems: "center", gap: spacing.md, paddingVertical: spacing.xxl },
   centerText: { color: colors.textDim, fontSize: font.body, textAlign: "center" },
+  thinkingPreview: {
+    color: colors.textFaint,
+    fontSize: font.small,
+    fontStyle: "italic",
+    textAlign: "center",
+    lineHeight: font.small * 1.45,
+    maxWidth: 460,
+  },
   errorText: { color: colors.text, fontSize: font.body, textAlign: "center" },
   title: { color: colors.text, fontSize: font.h1, fontWeight: "800", lineHeight: font.h1 * 1.25 },
   metaRow: {
