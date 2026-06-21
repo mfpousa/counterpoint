@@ -176,6 +176,27 @@ export const config = {
     relatedCount: num("STORIES_RELATED", 4),
     // Cap on the synthesis reply length (constrained decoding stops earlier).
     maxTokens: num("STORIES_MAX_TOKENS", 1400),
+
+    // --- Developing ISSUES (second-level grouping) ---
+    // Event clusters are grouped into broader ongoing storylines (e.g. a conflict
+    // spanning strikes, a blockade, talks). These use a LOOSER similarity and a
+    // WIDER time window than same-event clustering.
+    issueSimThreshold: num("STORIES_ISSUE_SIM_THRESHOLD", 0.6),
+    issueTextSimThreshold: num("STORIES_ISSUE_TEXT_SIM_THRESHOLD", 0.18),
+    issueWindowMs: num("STORIES_ISSUE_WINDOW_MS", 10 * 24 * 60 * 60 * 1000),
+    // An issue is treated as DEVELOPING only if it spans at least this long,
+    // contains at least `issueMinEvents` distinct sub-events from at least
+    // `issueMinSources` outlets, and is still active within `issueActiveMs`.
+    issueMinSpanMs: num("STORIES_ISSUE_MIN_SPAN_MS", 18 * 60 * 60 * 1000),
+    issueMinEvents: num("STORIES_ISSUE_MIN_EVENTS", 2),
+    issueMinSources: num("STORIES_ISSUE_MIN_SOURCES", 3),
+    issueActiveMs: num("STORIES_ISSUE_ACTIVE_MS", 36 * 60 * 60 * 1000),
+    // Most developing-issue stories to synthesize per world.
+    maxIssues: num("STORIES_MAX_ISSUES", 6),
+    // Cap on sub-events (timeline milestones) fed into an issue synthesis prompt.
+    maxIssueEvents: num("STORIES_MAX_ISSUE_EVENTS", 10),
+    // Cap on the developing-issue synthesis reply length.
+    issueMaxTokens: num("STORIES_ISSUE_MAX_TOKENS", 2200),
   },
   transcripts: {
     // Fetch YouTube caption transcripts (via yt-dlp) so the model understands a

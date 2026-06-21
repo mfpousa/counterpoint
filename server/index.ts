@@ -11,11 +11,19 @@ import cors from "cors";
 import express from "express";
 import { aiReachable } from "./ai";
 import { config } from "./config";
-import { clearCaches, getBriefing, getFeed, getStatus, getStories, getStory } from "./feedService";
+import {
+  clearCaches,
+  getBriefing,
+  getFeed,
+  getRelated,
+  getStatus,
+  getStories,
+  getStory,
+} from "./feedService";
 import { gradeSummary } from "./grade";
 import { runStartupHealthcheck } from "./healthcheck";
 import { generateKnowledgeInsight, type KnowledgeCandidate } from "./knowledge";
-import { rewriteArticle } from "./rewrite";
+import { rewriteArticle, rewriteArticleStream } from "./rewrite";
 import { getStoredAnyWorld } from "./store";
 import { DEFAULT_WORLD_ID, WORLDS, isWorldId } from "../src/data/worlds";
 import type { KnowledgeProfile } from "../src/types";
@@ -113,6 +121,66 @@ app.get("/api/story", async (req, res) => {
   } catch (e) {
     console.error("[api] /api/story failed:", e);
     res.status(500).json({ error: e instanceof Error ? e.message : "failed" });
+  }
+});
+
+app.get("/api/related", (req, res) => {
+  const id = typeof req.query.id === "string" ? req.query.id : "";
+  if (!id) {
+    res.status(400).json({ error: "missing item id" });
+    return;
+  }
+  const limit = Math.max(1, Math.min(12, Number(req.query.limit) || 6));
+  try {
+    const items = getRelated(readWorld(req.query.world), id, limit);
+    res.json({ items });
+  } catch (e) {
+    console.error("[api] /api/related failed:", e);
+    res.status(500).json({ items: [], error: e instanceof Error ? e.message : "failed" });
+  }
+});
+
+// Streaming rewrite (SSE): forwards the model's tokens as they generate so the
+// reader can show the AI writing live. Events: `delta` (string chunk), `done`
+// (the final RewrittenArticle), `error` (message).
+app.get("/api/rewrite/stream", async (req, res) => {
+  const id = typeof req.query.id === "string" ? req.query.id : "";
+  if (!id) {
+    res.status(400).json({ error: "missing item id" });
+    return;
+  }
+  const stored = getStoredAnyWorld(id, readWorld(req.query.world));
+  if (!stored) {
+    res.status(404).json({ error: "item not found (it may have aged out of the feed)" });
+    return;
+  }
+
+  res.set({
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache, no-transform",
+    Connection: "keep-alive",
+    "X-Accel-Buffering": "no",
+  });
+  res.flushHeaders?.();
+
+  let closed = false;
+  req.on("close", () => {
+    closed = true;
+  });
+  const send = (event: string, data: unknown) => {
+    if (closed) return;
+    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  };
+
+  try {
+    const article = await rewriteArticleStream(stored, (delta) => send("delta", delta));
+    if (!article) send("error", "The article couldn't be rewritten (paywall or model offline).");
+    else send("done", article);
+  } catch (e) {
+    console.error("[api] /api/rewrite/stream failed:", e);
+    send("error", e instanceof Error ? e.message : "rewrite failed");
+  } finally {
+    if (!closed) res.end();
   }
 });
 

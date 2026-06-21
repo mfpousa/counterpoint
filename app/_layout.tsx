@@ -20,6 +20,9 @@ export default function RootLayout() {
           <Stack.Screen name="index" />
           <Stack.Screen name="onboarding" />
           <Stack.Screen name="(tabs)" />
+          {/* Full-screen, history-aware panels layered over the tabs. */}
+          <Stack.Screen name="news/[id]" />
+          <Stack.Screen name="story/[id]" />
         </Stack>
       </AppProvider>
     </SafeAreaProvider>

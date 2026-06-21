@@ -2,9 +2,49 @@
 
 import React, { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { colors, font, radius, spacing } from "../theme";
 import { leanBucket, leanBucketLabel } from "../lib/lean";
 import type { Lean, LeanSource } from "../types";
+
+/** A 0..1 opacity as a 2-digit hex alpha suffix for "#rrggbb" + alpha colors. */
+export function alphaHex(a: number): string {
+  const v = Math.max(0, Math.min(255, Math.round(Math.max(0, Math.min(1, a)) * 255)));
+  return v.toString(16).padStart(2, "0");
+}
+
+/**
+ * A tappable tag linking a story/article up to the ONGOING ISSUE it belongs to.
+ * Color intensity scales with the issue's severity so bigger stories pull more
+ * attention. Tapping opens the issue panel.
+ */
+export function IssueTag({
+  title,
+  severity,
+  onPress,
+}: {
+  title: string;
+  severity: number;
+  onPress: () => void;
+}) {
+  const s = Math.max(0, Math.min(1, severity));
+  const bg = colors.warn + alphaHex(0.1 + 0.4 * s);
+  const border = colors.warn + alphaHex(0.35 + 0.55 * s);
+  return (
+    <Pressable
+      onPress={onPress}
+      hitSlop={6}
+      accessibilityRole="button"
+      accessibilityLabel={`Part of developing issue: ${title}`}
+      style={[styles.issueTag, { backgroundColor: bg, borderColor: border }]}
+    >
+      <Ionicons name="pulse" size={11} color={colors.warn} />
+      <Text style={styles.issueTagText} numberOfLines={1}>
+        {title}
+      </Text>
+    </Pressable>
+  );
+}
 
 /** Interpolate the lean spectrum color: blue (-1) -> slate (0) -> amber (+1). */
 export function leanColor(lean: Lean): string {
@@ -112,6 +152,17 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
   },
   chipText: { color: colors.textDim, fontSize: font.tiny, fontWeight: "600" },
+  issueTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    maxWidth: 220,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+  },
+  issueTagText: { color: colors.warn, fontSize: font.tiny, fontWeight: "800", flexShrink: 1 },
   leanBadge: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   dot: { width: 8, height: 8, borderRadius: 4 },
   leanText: { fontSize: font.tiny, fontWeight: "700" },

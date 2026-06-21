@@ -20,6 +20,8 @@ import { generateBriefing } from "./briefing";
 import {
   clusterItems,
   distinctSources,
+  groupIntoIssues,
+  isDevelopingIssue,
   jaccard,
   rankClusters,
   titleTokens,
@@ -31,7 +33,7 @@ import { interestTokens, partitionByExclusion, toFeedItem } from "./personalize"
 import { interpretQuery, type ParsedQuery } from "./query";
 import { rankItems } from "./rank";
 import { getStore, type StoredItem } from "./store";
-import { buildStory } from "./synthesize";
+import { buildDevelopingStory, buildStory } from "./synthesize";
 import { fetchTranscripts } from "./transcripts";
 
 export interface FeedResult {
@@ -438,30 +440,40 @@ async function buildPool(worldId: string): Promise<void> {
 async function ensurePool(worldId: string, force: boolean): Promise<{ busyWith: string | null }> {
   const state = ws(worldId);
   const st = getStore(worldId);
+  // Whether we already have something to serve. The persisted store survives
+  // cache clears, so this is based on store size (NOT lastBuildAt, which a
+  // forced refresh zeroes). When we have content we NEVER block a request on a
+  // (re)build — the existing feed stays available and uninterrupted while the
+  // refresh runs in the background; new items stream in via the status poll.
+  const hasContent = st.size() > 0;
   const fresh =
     !force &&
     state.lastBuildAt > 0 &&
-    st.size() > 0 &&
+    hasContent &&
     Date.now() - state.lastBuildAt < config.server.feedTtlMs;
   if (fresh) return { busyWith: null };
 
-  // A foreground build for THIS world is already running — share it.
-  if (state.buildInFlight) {
-    await state.buildInFlight;
-    return { busyWith: null };
-  }
-  // This world already holds the lock (its backlog is draining in the
-  // background) — don't start a duplicate build; serve what it has.
-  if (buildingWorld === worldId) return { busyWith: null };
-  // A DIFFERENT world is refreshing — block (only one world at a time).
+  // A DIFFERENT world holds the global build lock — we can't rebuild right now;
+  // serve whatever this world already has and report who's busy.
   if (buildingWorld && buildingWorld !== worldId) return { busyWith: buildingWorld };
 
-  // Acquire the global lock and build.
+  // A build for THIS world is already running (cold foreground or background
+  // catch-up). Block ONLY on a cold start (nothing to show yet); otherwise
+  // return immediately and let the in-flight build surface progress live.
+  if (state.buildInFlight || buildingWorld === worldId) {
+    if (!hasContent && state.buildInFlight) await state.buildInFlight;
+    return { busyWith: null };
+  }
+
+  // Acquire the global lock and (re)build.
   buildingWorld = worldId;
-  state.buildInFlight = buildPool(worldId).finally(() => {
+  const build = buildPool(worldId).finally(() => {
     state.buildInFlight = null;
   });
-  await state.buildInFlight;
+  state.buildInFlight = build;
+  // Cold start must wait so the response has something to return. A WARM refresh
+  // rebuilds in the background so the current feed remains instantly available.
+  if (!hasContent) await build;
   return { busyWith: null };
 }
 
@@ -591,16 +603,17 @@ export async function getBriefing(
   return p;
 }
 
-/** The recent, analyzed pool eligible to be clustered into stories. */
+/** The recent, analyzed pool eligible to be clustered into stories. Uses the
+ *  WIDER of the event/issue windows so multi-day developing issues are covered. */
 function storyEligible(worldId: string, now = Date.now()): StoredItem[] {
+  const window = Math.min(
+    config.feed.retentionMs,
+    Math.max(config.stories.windowMs, config.stories.issueWindowMs),
+  );
   return getStore(worldId)
     .all()
     .filter(
-      (s) =>
-        !s.clickbait &&
-        s.analyzed &&
-        now - s.item.publishedAt <= config.feed.retentionMs &&
-        now - s.item.publishedAt <= config.stories.windowMs,
+      (s) => !s.clickbait && s.analyzed && now - s.item.publishedAt <= window,
     );
 }
 
@@ -661,36 +674,90 @@ export async function getStories(
       embedding: s.embedding,
     }));
 
+    // Level 1: dedupe into same-event clusters.
     const clusters = clusterItems(inputs, {
       simThreshold: config.stories.simThreshold,
       textSimThreshold: config.stories.textSimThreshold,
       windowMs: config.stories.windowMs,
     });
-    const multi = clusters.filter((c) => distinctSources(c.members) >= config.stories.minSources);
-    const top = rankClusters(multi).slice(0, config.stories.maxStories);
+    const toStored = (members: ClusterInput[]): StoredItem[] =>
+      members.map((m) => byId.get(m.id)).filter((s): s is StoredItem => !!s);
+    const tokensOf = (members: ClusterInput[]): Set<string> => {
+      const t = new Set<string>();
+      for (const m of members) for (const tok of titleTokens(m.title, m.keywords)) t.add(tok);
+      return t;
+    };
+
+    // Level 2: group event clusters into broader ongoing issues, then keep only
+    // those the heuristic flags as DEVELOPING (an LLM later confirms).
+    const issues = groupIntoIssues(clusters, {
+      simThreshold: config.stories.issueSimThreshold,
+      textSimThreshold: config.stories.issueTextSimThreshold,
+      windowMs: config.stories.issueWindowMs,
+    });
+    const developing = issues
+      .filter((iss) =>
+        isDevelopingIssue(iss, {
+          minSpanMs: config.stories.issueMinSpanMs,
+          minEvents: config.stories.issueMinEvents,
+          minSources: config.stories.issueMinSources,
+          activeMs: config.stories.issueActiveMs,
+        }),
+      )
+      .sort((a, b) => {
+        const sa = distinctSources(a.members);
+        const sb = distinctSources(b.members);
+        if (sb !== sa) return sb - sa;
+        return b.latestAt - a.latestAt;
+      })
+      .slice(0, config.stories.maxIssues);
+
+    // Every multi-source cluster becomes an event story — INCLUDING those that
+    // belong to a developing issue. We no longer hide issue members; instead the
+    // client tags each story/article with a link up to its ongoing issue. The
+    // issue itself is still emitted as its own umbrella story (with the timeline).
+    const eventCandidates = clusters.filter(
+      (c) => distinctSources(c.members) >= config.stories.minSources,
+    );
+    const remainingSlots = Math.max(0, config.stories.maxStories - developing.length);
+    const topEvents = rankClusters(eventCandidates).slice(0, remainingSlots);
+
     console.log(
       `[stories:${worldId}] ${eligible.length} eligible -> ${clusters.length} clusters, ` +
-        `${multi.length} multi-source; synthesizing top ${top.length}…`,
+        `${issues.length} issues; ${developing.length} developing + ${topEvents.length} event stories…`,
     );
-    if (top.length === 0) return [];
+    if (developing.length === 0 && topEvents.length === 0) return [];
 
     const started = Date.now();
-    const stories = await withConcurrency(
-      top.map((c) => async () => {
-        const members = c.members.map((m) => byId.get(m.id)!).filter(Boolean);
-        const story = await buildStory(members);
-        return { story, centroid: c.centroid, members: c.members };
-      }),
-      config.ai.concurrency,
-    );
+    type Built = { story: Story; centroid: number[] | null; tokens: Set<string> };
+    const tasks: (() => Promise<Built>)[] = [];
+    for (const iss of developing) {
+      tasks.push(async () => {
+        const events = iss.clusters
+          .map((c) => toStored(c.members))
+          .filter((e) => e.length > 0);
+        const story = await buildDevelopingStory(events);
+        return { story, centroid: iss.centroid, tokens: tokensOf(iss.members) };
+      });
+    }
+    for (const c of topEvents) {
+      tasks.push(async () => {
+        const story = await buildStory(toStored(c.members));
+        return { story, centroid: c.centroid, tokens: tokensOf(c.members) };
+      });
+    }
 
-    const built = stories.map((s) => {
-      const tokens = new Set<string>();
-      for (const m of s.members) for (const t of titleTokens(m.title, m.keywords)) tokens.add(t);
-      return { story: s.story, centroid: s.centroid, tokens };
-    });
+    const built = await withConcurrency(tasks, config.ai.concurrency);
     linkRelated(built);
-    const result = built.map((b) => b.story);
+    // Developing issues surface first (highlighted), then most-recent stories.
+    const result = built
+      .map((b) => b.story)
+      .sort((a, b) => {
+        const da = a.developing ? 1 : 0;
+        const db = b.developing ? 1 : 0;
+        if (db !== da) return db - da;
+        return b.updatedAt - a.updatedAt;
+      });
     console.log(
       `[stories:${worldId}] synthesized ${result.length} stor${result.length === 1 ? "y" : "ies"}` +
         ` in ${((Date.now() - started) / 1000).toFixed(0)}s`,
@@ -712,6 +779,55 @@ export async function getStory(
 ): Promise<Story | null> {
   const { stories } = await getStories(worldId);
   return stories.find((s) => s.id === id) ?? null;
+}
+
+/**
+ * Nearest-neighbor "related news" for an item: most semantically similar OTHER
+ * items in the recent pool (embedding cosine), falling back to topic + keyword
+ * overlap when embeddings are unavailable. Powers the in-app reader's continuous
+ * "keep reading" flow. Empty when the item is unknown/aged out.
+ */
+export function getRelated(
+  worldId: string = DEFAULT_WORLD_ID,
+  id: string,
+  limit = 6,
+): FeedItem[] {
+  const store = getStore(worldId);
+  const target = store.all().find((s) => s.item.id === id);
+  if (!target) return [];
+
+  const now = Date.now();
+  const pool = store
+    .all()
+    .filter(
+      (s) =>
+        s.item.id !== id &&
+        !s.clickbait &&
+        s.analyzed &&
+        now - s.item.publishedAt <= config.feed.retentionMs,
+    );
+
+  let ranked: StoredItem[];
+  if (target.embedding) {
+    ranked = pool
+      .filter((s) => s.embedding)
+      .map((s) => ({ s, score: cosineSim(target.embedding as number[], s.embedding as number[]) }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit)
+      .map((x) => x.s);
+  } else {
+    const tks = new Set(target.keywords.map((k) => k.toLowerCase()));
+    ranked = pool
+      .map((s) => {
+        const overlap = s.keywords.reduce((n, k) => n + (tks.has(k.toLowerCase()) ? 1 : 0), 0);
+        return { s, score: overlap + (s.topic === target.topic ? 1 : 0) };
+      })
+      .filter((x) => x.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit)
+      .map((x) => x.s);
+  }
+  return ranked.map((s) => toFeedItem(s, new Set<string>(), false));
 }
 
 /**

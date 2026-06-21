@@ -14,8 +14,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useApp } from "../../src/store/AppContext";
 import { fetchStories } from "../../src/lib/api";
 import { StoryCard } from "../../src/components/StoryCard";
-import { StoryReader } from "../../src/components/StoryReader";
 import { WorldSwitcher } from "../../src/components/WorldSwitcher";
+import { openStory } from "../../src/lib/nav";
 import { AnalysisProgress } from "../../src/components/AnalysisProgress";
 import { worldById } from "../../src/data/worlds";
 import { colors, font, radius, spacing } from "../../src/theme";
@@ -39,7 +39,6 @@ export default function StoriesScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const load = useCallback(
     async (force = false) => {
@@ -67,21 +66,8 @@ export default function StoriesScreen() {
   // Load on mount and whenever the world changes.
   useEffect(() => {
     setStories([]);
-    setSelectedId(null);
     void load();
   }, [load]);
-
-  const byId = useMemo(() => {
-    const m = new Map<string, Story>();
-    for (const s of stories) m.set(s.id, s);
-    return m;
-  }, [stories]);
-
-  const selected = selectedId ? byId.get(selectedId) ?? null : null;
-  const related = useMemo(
-    () => (selected ? selected.relatedIds.map((id) => byId.get(id)).filter((s): s is Story => !!s) : []),
-    [selected, byId],
-  );
 
   const contentW = Math.min(width, MAX_CONTENT_WIDTH) - H_PAD * 2;
   const cols = columnsFor(contentW);
@@ -89,7 +75,6 @@ export default function StoriesScreen() {
   const cardW = cols === 1 ? contentW : Math.floor((contentW - GAP * (cols - 1)) / cols);
 
   return (
-    <>
       <ScrollView
         style={{ flex: 1, backgroundColor: colors.bg }}
         contentContainerStyle={{
@@ -155,21 +140,13 @@ export default function StoriesScreen() {
             <View style={[styles.grid, { gap: GAP }]}>
               {stories.map((s) => (
                 <View key={s.id} style={{ width: cardW }}>
-                  <StoryCard story={s} onOpen={(st) => setSelectedId(st.id)} />
+                  <StoryCard story={s} onOpen={(st) => openStory(st.id)} />
                 </View>
               ))}
             </View>
           )}
         </View>
       </ScrollView>
-
-      <StoryReader
-        story={selected}
-        related={related}
-        onOpenRelated={(id) => setSelectedId(id)}
-        onClose={() => setSelectedId(null)}
-      />
-    </>
   );
 }
 

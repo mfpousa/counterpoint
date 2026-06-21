@@ -7,7 +7,19 @@ import { colors, font, radius, spacing } from "../theme";
 import { topicMeta } from "../lib/topics";
 import type { FeedItem, StoredSummary } from "../types";
 import { ScorePill } from "./GradeFeedback";
-import { LeanBadge } from "./ui";
+import { IssueTag, LeanBadge } from "./ui";
+
+/** Human "when": minutes/hours/days ago, then an absolute date past a week. */
+export function whenLabel(ms: number): string {
+  const diff = Math.max(0, Date.now() - ms);
+  const mins = Math.round(diff / 60000);
+  if (mins < 60) return `${Math.max(1, mins)}m ago`;
+  const h = Math.round(diff / 3_600_000);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.round(h / 24);
+  if (d <= 6) return `${d}d ago`;
+  return new Date(ms).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
 
 const KIND_ICON: Record<FeedItem["kind"], keyof typeof Ionicons.glyphMap> = {
   video: "play-circle",
@@ -52,6 +64,8 @@ export function FeedCard({
   summary,
   onSummarize,
   onRead,
+  issue,
+  onOpenIssue,
 }: {
   item: FeedItem;
   done: boolean;
@@ -60,6 +74,9 @@ export function FeedCard({
   /** Open the recall-summary gate (write / review). */
   onSummarize: (item: FeedItem) => void;
   onRead?: (item: FeedItem) => void;
+  /** The ongoing issue this article belongs to (drives the severity-colored tag). */
+  issue?: { id: string; title: string; severity: number };
+  onOpenIssue?: (id: string) => void;
 }) {
   const [imgError, setImgError] = useState(false);
   const open = () => {
@@ -90,6 +107,10 @@ export function FeedCard({
         <LeanBadge lean={item.lean} source={item.leanSource} rationale={item.leanRationale} />
       </View>
 
+      {issue && onOpenIssue && (
+        <IssueTag title={issue.title} severity={issue.severity} onPress={() => onOpenIssue(issue.id)} />
+      )}
+
       {(item.reason || item.aiReason) && (
         <View style={styles.reasonRow}>
           <Ionicons name="sparkles-outline" size={12} color={colors.accent} />
@@ -106,6 +127,8 @@ export function FeedCard({
         </Text>
         <Text style={styles.dot}>·</Text>
         <Text style={styles.time}>{item.estMinutes} min</Text>
+        <Text style={styles.dot}>·</Text>
+        <Text style={styles.time}>{whenLabel(item.publishedAt)}</Text>
       </View>
 
       <Pressable onPress={open} accessibilityRole="link">

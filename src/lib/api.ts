@@ -114,6 +114,84 @@ export async function fetchRewrite(id: string): Promise<RewrittenArticle> {
   return data.article;
 }
 
+export interface RewriteStreamHandlers {
+  /** A chunk of generated text (append to what's shown). */
+  onDelta: (delta: string) => void;
+  /** The final, cleaned article (replaces the streamed text). */
+  onDone: (article: RewrittenArticle) => void;
+  /** A failure (or that streaming is unsupported here) — caller may fall back. */
+  onError: (message: string) => void;
+  world?: string;
+}
+
+/**
+ * Stream the AI rewrite over Server-Sent Events so the reader can show the model
+ * writing in real time. Returns a handle with `cancel()` (abort on unmount), or
+ * `null` when streaming isn't supported in this runtime (caller should fall back
+ * to the non-streaming fetchRewrite + a typewriter reveal).
+ */
+export function streamRewrite(id: string, h: RewriteStreamHandlers): { cancel: () => void } | null {
+  // Needs fetch + a readable response body (Expo web / modern runtimes).
+  if (typeof fetch === "undefined" || typeof ReadableStream === "undefined") return null;
+
+  const params = new URLSearchParams({ id });
+  if (h.world) params.set("world", h.world);
+  const controller = new AbortController();
+
+  const dispatch = (frame: string) => {
+    let event = "message";
+    const dataLines: string[] = [];
+    for (const line of frame.split("\n")) {
+      if (line.startsWith("event:")) event = line.slice(6).trim();
+      else if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
+    }
+    if (dataLines.length === 0) return;
+    let payload: unknown;
+    try {
+      payload = JSON.parse(dataLines.join("\n"));
+    } catch {
+      return;
+    }
+    if (event === "delta" && typeof payload === "string") h.onDelta(payload);
+    else if (event === "done") h.onDone(payload as RewrittenArticle);
+    else if (event === "error") h.onError(typeof payload === "string" ? payload : "rewrite failed");
+  };
+
+  (async () => {
+    try {
+      const res = await fetch(`${apiBaseUrl()}/api/rewrite/stream?${params.toString()}`, {
+        method: "GET",
+        headers: { Accept: "text/event-stream" },
+        signal: controller.signal,
+      });
+      const reader = res.body?.getReader?.();
+      if (!res.ok || !reader) {
+        h.onError("stream unavailable");
+        return;
+      }
+      const decoder = new TextDecoder();
+      let buffer = "";
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        let idx: number;
+        while ((idx = buffer.indexOf("\n\n")) !== -1) {
+          dispatch(buffer.slice(0, idx));
+          buffer = buffer.slice(idx + 2);
+        }
+      }
+      if (buffer.trim()) dispatch(buffer);
+    } catch (e) {
+      if (!controller.signal.aborted) {
+        h.onError(e instanceof Error ? e.message : "stream failed");
+      }
+    }
+  })();
+
+  return { cancel: () => controller.abort() };
+}
+
 /**
  * Grade the reader's recall summary of an item against the article. Throws with
  * a clear message on failure so the summary UI can surface it (model offline,
@@ -187,6 +265,28 @@ export async function fetchStories(
     return { stories: Array.isArray(data.stories) ? data.stories : [], busyWith: data.busyWith ?? null };
   } catch {
     return { stories: [], busyWith: null };
+  }
+}
+
+/**
+ * Fetch "related news" for an item (semantic nearest-neighbors). Returns an empty
+ * list on any failure — the related section is supplementary and never blocks the
+ * reader. Never throws.
+ */
+export async function fetchRelated(
+  id: string,
+  opts: { world?: string; limit?: number } = {},
+): Promise<FeedItem[]> {
+  const params = new URLSearchParams({ id });
+  if (opts.world) params.set("world", opts.world);
+  if (opts.limit) params.set("limit", String(opts.limit));
+  try {
+    const res = await fetch(`${apiBaseUrl()}/api/related?${params.toString()}`, { method: "GET" });
+    if (!res.ok) return [];
+    const data = (await res.json()) as { items?: FeedItem[] };
+    return Array.isArray(data.items) ? data.items : [];
+  } catch {
+    return [];
   }
 }
 

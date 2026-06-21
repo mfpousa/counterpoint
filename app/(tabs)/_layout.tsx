@@ -24,13 +24,9 @@ export default function TabsLayout() {
           tabBarIcon: ({ color, size }) => <Ionicons name="today-outline" size={size} color={color} />,
         }}
       />
-      <Tabs.Screen
-        name="stories"
-        options={{
-          title: "Stories",
-          tabBarIcon: ({ color, size }) => <Ionicons name="git-merge-outline" size={size} color={color} />,
-        }}
-      />
+      {/* Stories are now merged into the unified feed (Today); the standalone
+          route stays reachable but is hidden from the tab bar. */}
+      <Tabs.Screen name="stories" options={{ href: null }} />
       <Tabs.Screen
         name="balance"
         options={{

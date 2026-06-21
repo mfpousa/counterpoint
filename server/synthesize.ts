@@ -6,7 +6,15 @@
 // constrained JSON schema, the degeneracy sanitizer, and a graceful fallback that
 // stitches the source summaries together when the model is offline or unusable.
 
-import type { Lean, Story, StoryAngle, StorySource, Topic } from "../src/types";
+import type {
+  Lean,
+  Story,
+  StoryAngle,
+  StoryMilestone,
+  StorySource,
+  StorySpectrum,
+  Topic,
+} from "../src/types";
 import { chatJsonObject, type JsonSchema } from "./ai";
 import { sanitizeModelText } from "./analysis";
 import { config } from "./config";
@@ -83,6 +91,19 @@ function majorityTopic(members: StoredItem[]): Topic {
     }
   }
   return best;
+}
+
+/**
+ * 0..1 attention weight for a story: blends peak newsworthiness with how widely
+ * it's covered (more outlets = bigger story), nudged up for developing issues.
+ */
+export function severityOf(members: StoredItem[], developing = false): number {
+  const maxImp = members.reduce((m, s) => Math.max(m, s.importance), 0);
+  const sources = new Set(members.map((s) => s.item.sourceId)).size;
+  const breadth = Math.min(1, sources / 8);
+  let sev = 0.6 * maxImp + 0.4 * breadth;
+  if (developing) sev += 0.15;
+  return Math.max(0, Math.min(1, sev));
 }
 
 /** Importance-weighted mean lean over political members; null when none. */
@@ -174,6 +195,7 @@ function fallbackStory(members: StoredItem[]): Story {
     synthesis: paragraphs.length > 0 ? paragraphs : [byImportance[0].item.title],
     topic: majorityTopic(members),
     lean: aggregateLean(members),
+    severity: severityOf(members),
     sources,
     angles: [],
     contradictions: [],
@@ -226,11 +248,211 @@ export async function buildStory(members: StoredItem[]): Promise<Story> {
     synthesis: synthesis.length > 0 ? synthesis : [byImportance[0].item.title],
     topic: majorityTopic(members),
     lean: aggregateLean(members),
+    severity: severityOf(members),
     sources: toSources(members),
     angles,
     contradictions,
     relatedIds: [],
     updatedAt: Math.max(...members.map((m) => m.item.publishedAt)),
     generatedAt: Date.now(),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Developing ISSUES: synthesize a broader ongoing storyline from several
+// same-issue sub-events (each its own event cluster), producing a timeline and a
+// left/center/right framing comparison.
+// ---------------------------------------------------------------------------
+
+const DEVELOPING_SCHEMA: JsonSchema = {
+  name: "developing_issue",
+  schema: {
+    type: "object",
+    properties: {
+      title: { type: "string" },
+      summary: { type: "string" },
+      status: { type: "string", enum: ["developing", "resolved"] },
+      synthesis: { type: "array", items: { type: "string" } },
+      timeline: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            event: { type: "integer" },
+            title: { type: "string" },
+            detail: { type: "string" },
+          },
+          required: ["event", "title", "detail"],
+          additionalProperties: false,
+        },
+      },
+      spectrum: {
+        type: "object",
+        properties: {
+          left: { type: "string" },
+          center: { type: "string" },
+          right: { type: "string" },
+        },
+        required: ["left", "center", "right"],
+        additionalProperties: false,
+      },
+      contradictions: { type: "array", items: { type: "string" } },
+    },
+    required: ["title", "summary", "status", "synthesis", "timeline", "spectrum", "contradictions"],
+    additionalProperties: false,
+  },
+};
+
+const DEVELOPING_RULES =
+  "You are a neutral wire-service editor tracking an ONGOING ISSUE that has unfolded across " +
+  "several sub-events over time (each provided with an integer 'event' index, a date, the outlets " +
+  "covering it and their political lean, headlines, and a one-line summary). Synthesize the whole " +
+  "storyline neutrally. Use ONLY the provided facts; do NOT invent details, numbers, names, or " +
+  "quotes. Output ONLY a JSON object:\n" +
+  '{\n' +
+  '  "title": "neutral storyline headline (<= 12 words)",\n' +
+  '  "summary": "ONE neutral sentence (<= 30 words) on the issue and its current state",\n' +
+  '  "status": "developing" if unresolved/still unfolding, else "resolved",\n' +
+  '  "synthesis": ["2 to 4 short neutral paragraphs giving the overall picture and trajectory"],\n' +
+  '  "timeline": [ { "event": <the integer index>, "title": "<= 8 word milestone label", "detail": "ONE sentence on what changed" } ],\n' +
+  '  "spectrum": { "left": "how left-leaning outlets frame it", "center": "how centrist outlets frame it", "right": "how right-leaning outlets frame it" },\n' +
+  '  "contradictions": ["specific points where coverage disagrees; [] if none are evident"]\n' +
+  "}\n" +
+  "Provide ONE timeline entry per provided event, reusing its exact 'event' index. For any spectrum " +
+  "side with no outlets present, use an empty string. No prose outside the JSON.";
+
+function earliestAt(members: StoredItem[]): number {
+  return Math.min(...members.map((m) => m.item.publishedAt));
+}
+
+function coerceSpectrum(raw: unknown): StorySpectrum {
+  const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  return {
+    left: sanitizeModelText(r["left"]),
+    center: sanitizeModelText(r["center"]),
+    right: sanitizeModelText(r["right"]),
+  };
+}
+
+/** A deterministic milestone from an event cluster (no model needed). */
+function fallbackMilestone(event: StoredItem[]): StoryMilestone {
+  const rep = event.slice().sort((a, b) => b.importance - a.importance)[0];
+  return {
+    at: earliestAt(event),
+    title: rep.item.title,
+    detail: sanitizeModelText(rep.summary) || rep.item.title,
+    sourceIds: event.map((m) => m.item.id),
+  };
+}
+
+/** Build the timeline, using model titles/details when present and backfilling
+ *  any event the model skipped so every sub-event is represented. */
+function buildTimeline(events: StoredItem[][], raw: unknown): StoryMilestone[] {
+  const byEvent = new Map<number, { title: string; detail: string }>();
+  if (Array.isArray(raw)) {
+    for (const row of raw) {
+      if (!row || typeof row !== "object") continue;
+      const r = row as Record<string, unknown>;
+      const idx = typeof r["event"] === "number" ? r["event"] : Number(r["event"]);
+      if (!Number.isInteger(idx) || idx < 0 || idx >= events.length) continue;
+      const title = sanitizeModelText(r["title"]);
+      const detail = sanitizeModelText(r["detail"]);
+      if (title || detail) byEvent.set(idx, { title, detail });
+    }
+  }
+  return events
+    .map((event, i) => {
+      const m = byEvent.get(i);
+      const fb = fallbackMilestone(event);
+      return {
+        at: fb.at,
+        title: m?.title || fb.title,
+        detail: m?.detail || fb.detail,
+        sourceIds: fb.sourceIds,
+      };
+    })
+    .sort((a, b) => a.at - b.at);
+}
+
+/** A degraded developing-issue story stitched without the model. */
+function fallbackDevelopingStory(events: StoredItem[][]): Story {
+  const members = events.flat();
+  const base = fallbackStory(members);
+  return {
+    ...base,
+    developing: true,
+    severity: severityOf(members, true),
+    startedAt: earliestAt(members),
+    timeline: events
+      .map(fallbackMilestone)
+      .sort((a, b) => a.at - b.at),
+    spectrum: { left: "", center: "", right: "" },
+  };
+}
+
+/**
+ * Synthesize a developing ISSUE from its time-ordered sub-events (each a list of
+ * same-event articles). Never throws: degrades to a stitched timeline when the
+ * model is unreachable or unusable. `relatedIds` is filled in by the service.
+ */
+export async function buildDevelopingStory(events: StoredItem[][]): Promise<Story> {
+  const clean = events.filter((e) => e.length > 0);
+  if (clean.length === 0) throw new Error("buildDevelopingStory: no events");
+
+  const members = clean.flat();
+  // Time-ordered events with a stable integer index for the model to reuse.
+  const ordered = clean
+    .map((e) => ({ event: e, at: earliestAt(e) }))
+    .sort((a, b) => a.at - b.at)
+    .slice(-config.stories.maxIssueEvents);
+
+  const payload = ordered.map((ev, i) => {
+    const ranked = ev.event.slice().sort((a, b) => b.importance - a.importance);
+    return {
+      event: i,
+      date: new Date(ev.at).toISOString().slice(0, 10),
+      outlets: Array.from(new Set(ranked.map((m) => m.item.sourceTitle))).slice(0, 6),
+      leans: Array.from(new Set(ranked.map((m) => leanLabel(m.lean)))),
+      headlines: ranked.slice(0, 3).map((m) => m.item.title),
+      summary: (ranked[0].summary || ranked[0].item.summary || "").slice(0, 220),
+    };
+  });
+  const orderedEvents = ordered.map((e) => e.event);
+
+  const obj = await chatJsonObject(DEVELOPING_RULES, payload, {
+    maxTokens: config.stories.issueMaxTokens,
+    schema: DEVELOPING_SCHEMA,
+  });
+  if (!obj) return fallbackDevelopingStory(orderedEvents);
+
+  const title = sanitizeModelText(obj["title"]);
+  const summary = sanitizeModelText(obj["summary"]);
+  const synthesis = coerceStringArray(obj["synthesis"], 6);
+  const contradictions = coerceStringArray(obj["contradictions"], 6);
+  const timeline = buildTimeline(orderedEvents, obj["timeline"]);
+  const spectrum = coerceSpectrum(obj["spectrum"]);
+  const resolved = sanitizeModelText(obj["status"]).toLowerCase() === "resolved";
+
+  if (!title && synthesis.length === 0) return fallbackDevelopingStory(orderedEvents);
+
+  const byImportance = members.slice().sort((a, b) => b.importance - a.importance);
+  return {
+    id: storyId(members.map((m) => m.item.id)),
+    title: title || byImportance[0].item.title,
+    summary: summary || sanitizeModelText(byImportance[0].summary) || byImportance[0].item.title,
+    synthesis: synthesis.length > 0 ? synthesis : [byImportance[0].item.title],
+    topic: majorityTopic(members),
+    lean: aggregateLean(members),
+    severity: severityOf(members, true),
+    sources: toSources(members),
+    angles: [],
+    contradictions,
+    relatedIds: [],
+    updatedAt: Math.max(...members.map((m) => m.item.publishedAt)),
+    generatedAt: Date.now(),
+    developing: !resolved,
+    startedAt: earliestAt(members),
+    timeline,
+    spectrum,
   };
 }

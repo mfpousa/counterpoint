@@ -1,15 +1,20 @@
 import {
   clusterItems,
   distinctSources,
+  groupIntoIssues,
+  isDevelopingIssue,
   jaccard,
   rankClusters,
   titleTokens,
+  type Cluster,
   type ClusterInput,
 } from "../server/cluster";
-import { storyId } from "../server/synthesize";
+import { severityOf, storyId } from "../server/synthesize";
+import type { StoredItem } from "../server/store";
 
 const DAY = 24 * 60 * 60 * 1000;
 const OPTS = { simThreshold: 0.82, textSimThreshold: 0.3, windowMs: 2 * DAY };
+const ISSUE_OPTS = { simThreshold: 0.6, textSimThreshold: 0.18, windowMs: 10 * DAY };
 
 let n = 0;
 function item(over: Partial<ClusterInput> = {}): ClusterInput {
@@ -91,6 +96,111 @@ describe("distinctSources / rankClusters", () => {
     };
     const ranked = rankClusters([small, big]);
     expect(ranked[0]).toBe(big);
+  });
+});
+
+describe("groupIntoIssues (hierarchical, level 2)", () => {
+  const BASE = 10 * DAY;
+  // Build an event cluster from explicit members.
+  const cl = (members: ClusterInput[]): Cluster<ClusterInput> => ({ members, centroid: null });
+
+  it("groups distinct sub-events of one storyline into a single issue", () => {
+    // Conflict storyline: three DISTINCT events (strikes / blockade / talks) that
+    // are too dissimilar to be the same event (cosine < 0.82) but close enough to
+    // be the same ISSUE (cosine >= 0.6), spread across days.
+    const strikes = cl([
+      item({ sourceId: "a1", embedding: [1, 0], publishedAt: BASE }),
+      item({ sourceId: "a2", embedding: [1, 0], publishedAt: BASE + DAY / 2 }),
+    ]);
+    const blockade = cl([
+      item({ sourceId: "b1", embedding: [0.8, 0.6], publishedAt: BASE + DAY }),
+      item({ sourceId: "b2", embedding: [0.8, 0.6], publishedAt: BASE + DAY }),
+    ]);
+    const talks = cl([
+      item({ sourceId: "c1", embedding: [0.75, 0.66], publishedAt: BASE + 2 * DAY }),
+      item({ sourceId: "c2", embedding: [0.75, 0.66], publishedAt: BASE + 2 * DAY }),
+    ]);
+    // An unrelated event (orthogonal embedding) must NOT join the conflict issue.
+    const sports = cl([
+      item({ sourceId: "x1", embedding: [0, 1], publishedAt: BASE + DAY }),
+      item({ sourceId: "x2", embedding: [0, 1], publishedAt: BASE + DAY }),
+    ]);
+
+    const issues = groupIntoIssues([strikes, blockade, talks, sports], ISSUE_OPTS);
+    expect(issues).toHaveLength(2);
+
+    const conflict = issues.find((i) => i.clusters.length === 3)!;
+    expect(conflict).toBeTruthy();
+    expect(distinctSources(conflict.members)).toBe(6);
+    // Clusters are returned earliest-first for the timeline.
+    const firsts = conflict.clusters.map((c) => Math.min(...c.members.map((m) => m.publishedAt)));
+    expect(firsts).toEqual([...firsts].sort((a, b) => a - b));
+  });
+
+  it("does not merge events separated by more than the issue window", () => {
+    const e1 = cl([item({ sourceId: "a", embedding: [1, 0], publishedAt: BASE })]);
+    const e2 = cl([item({ sourceId: "b", embedding: [1, 0], publishedAt: BASE + 30 * DAY })]);
+    const issues = groupIntoIssues([e1, e2], ISSUE_OPTS);
+    expect(issues).toHaveLength(2);
+  });
+});
+
+describe("isDevelopingIssue", () => {
+  const BASE = 10 * DAY;
+  const cl = (members: ClusterInput[]): Cluster<ClusterInput> => ({ members, centroid: null });
+  const opts = { minSpanMs: 12 * 3600 * 1000, minEvents: 2, minSources: 3, activeMs: DAY, now: BASE + 2 * DAY };
+
+  it("flags a multi-event, multi-source, still-active storyline as developing", () => {
+    const issues = groupIntoIssues(
+      [
+        cl([item({ sourceId: "a1", embedding: [1, 0], publishedAt: BASE })]),
+        cl([item({ sourceId: "b1", embedding: [0.8, 0.6], publishedAt: BASE + DAY })]),
+        cl([item({ sourceId: "c1", embedding: [0.75, 0.66], publishedAt: BASE + 2 * DAY })]),
+      ],
+      ISSUE_OPTS,
+    );
+    expect(issues).toHaveLength(1);
+    expect(isDevelopingIssue(issues[0], opts)).toBe(true);
+  });
+
+  it("rejects a single-event issue and a stale one", () => {
+    const single = groupIntoIssues(
+      [cl([item({ sourceId: "a1", embedding: [1, 0], publishedAt: BASE + 2 * DAY })])],
+      ISSUE_OPTS,
+    )[0];
+    expect(isDevelopingIssue(single, opts)).toBe(false);
+
+    const stale = groupIntoIssues(
+      [
+        cl([item({ sourceId: "a1", embedding: [1, 0], publishedAt: BASE })]),
+        cl([item({ sourceId: "b1", embedding: [0.8, 0.6], publishedAt: BASE + DAY })]),
+        cl([item({ sourceId: "c1", embedding: [0.75, 0.66], publishedAt: BASE + 2 * DAY })]),
+      ],
+      ISSUE_OPTS,
+    )[0];
+    // now far in the future -> not active.
+    expect(isDevelopingIssue(stale, { ...opts, now: BASE + 30 * DAY })).toBe(false);
+  });
+});
+
+describe("severityOf", () => {
+  const si = (importance: number, sourceId: string): StoredItem =>
+    ({ importance, item: { sourceId } } as unknown as StoredItem);
+
+  it("rises with importance and breadth, and gets a developing boost", () => {
+    const low = severityOf([si(0.1, "a")]);
+    const high = severityOf([si(0.9, "a"), si(0.8, "b"), si(0.7, "c"), si(0.6, "d")]);
+    expect(high).toBeGreaterThan(low);
+
+    const event = severityOf([si(0.5, "a"), si(0.5, "b")]);
+    const developing = severityOf([si(0.5, "a"), si(0.5, "b")], true);
+    expect(developing).toBeGreaterThan(event);
+  });
+
+  it("stays within [0,1]", () => {
+    const s = severityOf([si(1, "a"), si(1, "b"), si(1, "c"), si(1, "d")], true);
+    expect(s).toBeGreaterThanOrEqual(0);
+    expect(s).toBeLessThanOrEqual(1);
   });
 });
 

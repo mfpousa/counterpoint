@@ -7,7 +7,7 @@
 // cached in memory (per item) so re-opening an article is instant.
 
 import type { RewrittenArticle } from "../src/types";
-import { aiReachable, chatJsonObject, type JsonSchema } from "./ai";
+import { aiReachable, chatJsonObject, chatRaw, type JsonSchema } from "./ai";
 import { config } from "./config";
 import { extractReadable, htmlToText } from "./readability";
 import type { StoredItem } from "./store";
@@ -198,6 +198,102 @@ async function sourceText(stored: StoredItem): Promise<{ text: string; fallbackT
     }
   }
   return null;
+}
+
+// Plain-prose prompts for the STREAMING path: the model writes readable text we
+// can forward token-by-token (no JSON to incrementally parse). Headline on the
+// first line, blank line, then short body paragraphs separated by blank lines.
+const PLAIN_RULES =
+  REWRITE_RULES.replace(
+    /Output ONLY a JSON object[\s\S]*$/,
+    "Output the clean HEADLINE on the first line, then a blank line, then the article " +
+      "body as short paragraphs separated by blank lines. No markdown, no JSON, no preamble.",
+  );
+const PLAIN_DEGRADED_RULES =
+  DEGRADED_RULES.replace(
+    /Output ONLY a JSON object[\s\S]*$/,
+    "Output the headline on the first line, then a blank line, then 1-3 short paragraphs " +
+      "separated by blank lines. No markdown, no JSON, no preamble.",
+  );
+
+/** Parse the streamed plain-prose reply into a clean {title, paragraphs}. */
+function parsePlainArticle(
+  raw: string,
+  fallbackTitle: string,
+): { title: string; paragraphs: string[] } | null {
+  const text = stripFences(raw).trim();
+  if (!text) return null;
+  const blocks = text
+    .split(/\n\s*\n/)
+    .map((b) => b.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+  if (blocks.length === 0) return null;
+  let title = fallbackTitle;
+  let body = blocks;
+  const first = blocks[0].replace(/^#+\s*/, "").replace(/^["']|["']$/g, "").trim();
+  if (first.length <= 120 && blocks.length > 1) {
+    title = first;
+    body = blocks.slice(1);
+  }
+  const paragraphs = body.filter((p) => !isJsonScaffolding(p));
+  if (!paragraphs.some((p) => p.length >= 40 && /\s/.test(p))) return null;
+  return { title: title || fallbackTitle, paragraphs };
+}
+
+/**
+ * STREAMING rewrite: forwards the model's tokens to `onDelta` as they generate
+ * (so the reader can show the AI writing live), then returns the cleaned, cached
+ * article. Falls back to a degraded brief when no full body is available. Returns
+ * null when the model is unreachable or replies with nothing usable. A cached
+ * article is replayed in one delta so re-opens are instant.
+ */
+export async function rewriteArticleStream(
+  stored: StoredItem,
+  onDelta: (delta: string) => void,
+): Promise<RewrittenArticle | null> {
+  const { item } = stored;
+
+  const cached = cache.get(item.id);
+  if (cached && Date.now() - cached.at < config.reader.cacheTtlMs) {
+    onDelta(`${cached.article.title}\n\n${cached.article.paragraphs.join("\n\n")}`);
+    return cached.article;
+  }
+
+  if (!(await aiReachable())) return null;
+
+  const src = await sourceText(stored);
+  let degraded = false;
+  let system: string;
+  let payload: Record<string, unknown>;
+  if (src) {
+    system = PLAIN_RULES;
+    payload = { sourceTitle: item.sourceTitle, originalTitle: item.title, kind: item.kind, content: src.text };
+  } else {
+    if (!config.reader.degradedFallback) return null;
+    const summary = (item.summary || stored.summary || "").trim();
+    const keywords = stored.keywords?.length ? stored.keywords.join(", ") : "";
+    if (summary.length < 60 && keywords.length < 20) return null;
+    degraded = true;
+    system = PLAIN_DEGRADED_RULES;
+    payload = { headline: item.title, sourceTitle: item.sourceTitle, feedSummary: summary, keywords };
+  }
+
+  const full = await chatRaw(system, payload, { maxTokens: config.reader.maxTokens, onDelta });
+  const parsed = parsePlainArticle(full, src?.fallbackTitle || item.title);
+  if (!parsed) return null;
+
+  const article: RewrittenArticle = {
+    id: item.id,
+    title: parsed.title,
+    paragraphs: parsed.paragraphs,
+    sourceTitle: item.sourceTitle,
+    url: item.url,
+    kind: item.kind,
+    estMinutes: readMinutes(parsed.paragraphs),
+    degraded,
+  };
+  cache.set(item.id, { at: Date.now(), article });
+  return article;
 }
 
 /**

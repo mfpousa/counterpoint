@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -16,15 +16,17 @@ import { useApp } from "../../src/store/AppContext";
 import { assessDrift } from "../../src/lib/lean";
 import { topicMeta, TOPIC_ORDER } from "../../src/lib/topics";
 import { FeedCard } from "../../src/components/FeedCard";
+import { StoryCard } from "../../src/components/StoryCard";
+import { FadeInView } from "../../src/components/anim";
 import { BriefingCard } from "../../src/components/BriefingCard";
 import { AnalysisProgress } from "../../src/components/AnalysisProgress";
-import { ArticleReader } from "../../src/components/ArticleReader";
-import { SummaryModal } from "../../src/components/SummaryModal";
 import { WorldSwitcher } from "../../src/components/WorldSwitcher";
+import { fetchStories } from "../../src/lib/api";
+import { openNews, openStory } from "../../src/lib/nav";
 import { worldById } from "../../src/data/worlds";
 import { LeanDial, QuotaMeter } from "../../src/components/meters";
 import { colors, font, radius, spacing } from "../../src/theme";
-import type { FeedItem, Topic } from "../../src/types";
+import type { FeedItem, Story, Topic } from "../../src/types";
 
 const MAX_CONTENT_WIDTH = 1180;
 const H_PAD = spacing.lg;
@@ -51,16 +53,44 @@ export default function FeedScreen() {
     summaries,
     worldId,
     busyWorld,
-    gradeAndRecord,
     refreshFeed,
     setWorld,
     updatePrefs,
   } = useApp();
   const [selected, setSelected] = useState<Topic | "all">("all");
-  const [readingItem, setReadingItem] = useState<FeedItem | null>(null);
-  const [summarizingItem, setSummarizingItem] = useState<FeedItem | null>(null);
 
-  // Map item id -> this reader's graded summary, for the card badge + modal.
+  // Synthesized stories (developing issues + deduped multi-source events) are
+  // interest-independent and built from the full pool, so we fetch them
+  // alongside the feed and merge them in below.
+  const [stories, setStories] = useState<Story[]>([]);
+  const loadStories = useCallback(
+    async (force = false) => {
+      const res = await fetchStories({ world: worldId, force });
+      setStories(res.stories);
+    },
+    [worldId],
+  );
+  useEffect(() => {
+    setStories([]);
+    void loadStories();
+  }, [loadStories]);
+
+  // Live: when the backend finishes analyzing a chunk (analyzed count grows),
+  // silently re-fetch stories so new/updated ones appear in real time.
+  const prevAnalyzed = useRef(0);
+  useEffect(() => {
+    const a = status?.analyzed ?? 0;
+    if (prevAnalyzed.current === 0) {
+      prevAnalyzed.current = a;
+      return;
+    }
+    if (a > prevAnalyzed.current) {
+      prevAnalyzed.current = a;
+      void loadStories();
+    }
+  }, [status?.analyzed, loadStories]);
+
+  // Map item id -> this reader's graded summary, for the card badge.
   const summaryById = useMemo(() => {
     const m = new Map<string, (typeof summaries)[number]>();
     for (const s of summaries) m.set(s.id, s);
@@ -98,35 +128,86 @@ export default function FeedScreen() {
     [progress.completedItemIds],
   );
 
-  // Group the balanced feed into per-topic sections for discoverability, and
-  // order each section's cards by relevance (highest first; recency breaks ties)
-  // so the most relevant news in a topic surfaces at the top of its section.
-  const sections = useMemo(() => {
-    const byTopic = new Map<Topic, FeedItem[]>();
-    for (const it of feed) {
-      const arr = byTopic.get(it.topic);
-      if (arr) arr.push(it);
-      else byTopic.set(it.topic, [it]);
+  // Developing issues (ongoing storylines) are highlighted in their own band.
+  const developingStories = useMemo(() => stories.filter((s) => s.developing), [stories]);
+
+  // Map each article id -> the ongoing issue it belongs to (with severity), so
+  // stories/articles can show a severity-colored tag linking up to the issue.
+  const issueByArticle = useMemo(() => {
+    const map = new Map<string, { id: string; title: string; severity: number }>();
+    for (const iss of developingStories) {
+      const tag = { id: iss.id, title: iss.title, severity: iss.severity };
+      for (const src of iss.sources) if (!map.has(src.id)) map.set(src.id, tag);
     }
-    const byRelevance = (a: FeedItem, b: FeedItem) => {
-      // Already-read items sink to the bottom of their section (still visible).
-      const da = completedSet.has(a.id) ? 1 : 0;
-      const db = completedSet.has(b.id) ? 1 : 0;
+    return map;
+  }, [developingStories]);
+  const issueForStory = useCallback(
+    (s: Story) => {
+      for (const src of s.sources) {
+        const t = issueByArticle.get(src.id);
+        if (t) return t;
+      }
+      return undefined;
+    },
+    [issueByArticle],
+  );
+
+  // Build the UNIFIED feed: per topic, interleave deduped event-story cards with
+  // standalone news items. Only MULTI-SOURCE event stories dedupe their members
+  // (the duplicate coverage lives inside the story). Items that merely belong to
+  // a developing ISSUE are NOT hidden — they stay in the stream and get a tag
+  // linking up to the issue.
+  type Entry =
+    | { kind: "story"; story: Story; topic: Topic; at: number; done: boolean }
+    | { kind: "item"; item: FeedItem; topic: Topic; at: number; done: boolean };
+  const sections = useMemo(() => {
+    const feedIds = new Set(feed.map((it) => it.id));
+    const eventStories = stories.filter(
+      (s) => !s.developing && s.sources.some((src) => feedIds.has(src.id)),
+    );
+    // Dedup only collapses same-event coverage shown as an event story.
+    const absorbed = new Set<string>();
+    for (const s of eventStories) for (const src of s.sources) absorbed.add(src.id);
+    const standalone = feed.filter((it) => !absorbed.has(it.id));
+
+    const entries: Entry[] = [
+      ...eventStories.map(
+        (story): Entry => ({ kind: "story", story, topic: story.topic, at: story.updatedAt, done: false }),
+      ),
+      ...standalone.map(
+        (item): Entry => ({
+          kind: "item",
+          item,
+          topic: item.topic,
+          at: item.publishedAt,
+          done: completedSet.has(item.id),
+        }),
+      ),
+    ];
+
+    const byTopic = new Map<Topic, Entry[]>();
+    for (const e of entries) {
+      const arr = byTopic.get(e.topic);
+      if (arr) arr.push(e);
+      else byTopic.set(e.topic, [e]);
+    }
+    // Read items sink; otherwise newest first (stories use their latest update).
+    const order = (a: Entry, b: Entry) => {
+      const da = a.done ? 1 : 0;
+      const db = b.done ? 1 : 0;
       if (da !== db) return da - db;
-      const ra = a.relevance ?? 0;
-      const rb = b.relevance ?? 0;
-      if (rb !== ra) return rb - ra;
-      return b.publishedAt - a.publishedAt;
+      return b.at - a.at;
     };
     return TOPIC_ORDER.filter((t) => byTopic.has(t)).map((t) => ({
       topic: t,
-      items: (byTopic.get(t) as FeedItem[]).slice().sort(byRelevance),
+      entries: (byTopic.get(t) as Entry[]).slice().sort(order),
     }));
-  }, [feed, completedSet]);
+  }, [feed, stories, developingStories, completedSet]);
 
   const unreadCount = useMemo(
-    () => feed.filter((it) => !completedSet.has(it.id)).length,
-    [feed, completedSet],
+    () =>
+      sections.reduce((n, s) => n + s.entries.filter((e) => e.kind === "story" || !e.done).length, 0),
+    [sections],
   );
 
   const activeSelected = selected !== "all" && sections.some((s) => s.topic === selected)
@@ -134,6 +215,10 @@ export default function FeedScreen() {
     : "all";
   const visibleSections =
     activeSelected === "all" ? sections : sections.filter((s) => s.topic === activeSelected);
+  const visibleDeveloping =
+    activeSelected === "all"
+      ? developingStories
+      : developingStories.filter((s) => s.topic === activeSelected);
 
   // Responsive layout math.
   const contentW = Math.min(width, MAX_CONTENT_WIDTH) - H_PAD * 2;
@@ -144,7 +229,6 @@ export default function FeedScreen() {
   const atQuota = progress.consumedMin >= prefs.dailyQuotaMin;
 
   return (
-    <>
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.bg }}
       contentContainerStyle={{
@@ -156,7 +240,10 @@ export default function FeedScreen() {
       refreshControl={
         <RefreshControl
           refreshing={loadingFeed}
-          onRefresh={() => refreshFeed({ force: true })}
+          onRefresh={() => {
+            void refreshFeed({ force: true });
+            void loadStories(true);
+          }}
           tintColor={colors.accent}
         />
       }
@@ -215,7 +302,10 @@ export default function FeedScreen() {
             )}
           </View>
           <Pressable
-            onPress={() => refreshFeed({ force: true })}
+            onPress={() => {
+              void refreshFeed({ force: true });
+              void loadStories(true);
+            }}
             style={styles.refreshBtn}
             accessibilityRole="button"
             disabled={loadingFeed}
@@ -259,7 +349,7 @@ export default function FeedScreen() {
               label="All"
               icon="albums"
               color={colors.accent}
-              count={feed.length}
+              count={sections.reduce((n, s) => n + s.entries.length, 0)}
               active={activeSelected === "all"}
               onPress={() => setSelected("all")}
             />
@@ -271,7 +361,7 @@ export default function FeedScreen() {
                   label={m.label}
                   icon={m.icon}
                   color={m.color}
-                  count={s.items.length}
+                  count={s.entries.length}
                   active={activeSelected === s.topic}
                   onPress={() => setSelected(s.topic)}
                 />
@@ -280,14 +370,34 @@ export default function FeedScreen() {
           </ScrollView>
         )}
 
-        {/* Body */}
-        {feed.length === 0 ? (
+        {/* Developing issues — highlighted band of ongoing storylines. */}
+        {visibleDeveloping.length > 0 && (
+          <View style={{ gap: spacing.md }}>
+            <View style={styles.sectionHeader}>
+              <View style={[styles.sectionIcon, { backgroundColor: colors.warn + "22" }]}>
+                <Ionicons name="pulse" size={15} color={colors.warn} />
+              </View>
+              <Text style={styles.sectionTitle}>Developing</Text>
+              <Text style={styles.sectionCount}>{visibleDeveloping.length}</Text>
+            </View>
+            <View style={[styles.grid, { gap: GAP }]}>
+              {visibleDeveloping.map((story) => (
+                <FadeInView key={story.id} style={{ width: cardW }}>
+                  <StoryCard story={story} onOpen={(s) => openStory(s.id)} />
+                </FadeInView>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* Body: per-topic stream of deduped stories + standalone items. */}
+        {sections.length === 0 ? (
           loadingFeed ? (
             <View style={styles.empty}>
               <ActivityIndicator color={colors.accent} />
               <Text style={styles.emptySub}>Curating your balanced feed…</Text>
             </View>
-          ) : feedError ? null : (
+          ) : feedError || visibleDeveloping.length > 0 ? null : (
             <View style={styles.empty}>
               <Ionicons
                 name={atQuota ? "checkmark-done-circle-outline" : "newspaper-outline"}
@@ -314,20 +424,33 @@ export default function FeedScreen() {
                     <Ionicons name={m.icon} size={15} color={m.color} />
                   </View>
                   <Text style={styles.sectionTitle}>{m.label}</Text>
-                  <Text style={styles.sectionCount}>{section.items.length}</Text>
+                  <Text style={styles.sectionCount}>{section.entries.length}</Text>
                 </View>
                 <View style={[styles.grid, { gap: GAP }]}>
-                  {section.items.map((item) => (
-                    <View key={item.id} style={{ width: cardW }}>
-                      <FeedCard
-                        item={item}
-                        done={completedSet.has(item.id)}
-                        summary={summaryById.get(item.id)}
-                        onSummarize={setSummarizingItem}
-                        onRead={setReadingItem}
-                      />
-                    </View>
-                  ))}
+                  {section.entries.map((e) =>
+                    e.kind === "story" ? (
+                      <FadeInView key={e.story.id} style={{ width: cardW }}>
+                        <StoryCard
+                          story={e.story}
+                          onOpen={(s) => openStory(s.id)}
+                          issue={issueForStory(e.story)}
+                          onOpenIssue={openStory}
+                        />
+                      </FadeInView>
+                    ) : (
+                      <FadeInView key={e.item.id} style={{ width: cardW }}>
+                        <FeedCard
+                          item={e.item}
+                          done={completedSet.has(e.item.id)}
+                          summary={summaryById.get(e.item.id)}
+                          onSummarize={(it) => openNews(it.id)}
+                          onRead={(it) => openNews(it.id)}
+                          issue={issueByArticle.get(e.item.id)}
+                          onOpenIssue={openStory}
+                        />
+                      </FadeInView>
+                    ),
+                  )}
                 </View>
               </View>
             );
@@ -335,14 +458,6 @@ export default function FeedScreen() {
         )}
       </View>
     </ScrollView>
-    <ArticleReader item={readingItem} onClose={() => setReadingItem(null)} />
-    <SummaryModal
-      item={summarizingItem}
-      existing={summarizingItem ? summaryById.get(summarizingItem.id) : undefined}
-      onGrade={gradeAndRecord}
-      onClose={() => setSummarizingItem(null)}
-    />
-    </>
   );
 }
 

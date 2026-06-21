@@ -88,7 +88,7 @@ export interface JsonSchema {
 export async function chatRaw(
   system: string,
   payload: unknown,
-  opts: { maxTokens?: number; schema?: JsonSchema } = {},
+  opts: { maxTokens?: number; schema?: JsonSchema; onDelta?: (delta: string) => void } = {},
 ): Promise<string> {
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -154,7 +154,10 @@ export async function chatRaw(
           choices?: { delta?: { content?: string } }[];
         };
         const delta = json.choices?.[0]?.delta?.content;
-        if (typeof delta === "string") content += delta;
+        if (typeof delta === "string") {
+          content += delta;
+          opts.onDelta?.(delta);
+        }
       } catch {
         /* keepalive / partial frame — ignore */
       }

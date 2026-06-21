@@ -165,6 +165,31 @@ export interface StoryAngle {
 }
 
 /**
+ * One milestone in a developing issue's timeline — a distinct sub-event in the
+ * larger storyline (e.g. for an ongoing conflict: a strike, a closure, talks).
+ */
+export interface StoryMilestone {
+  /** Epoch ms of the sub-event (earliest contributing article). */
+  at: number;
+  /** Short milestone label. */
+  title: string;
+  /** One sentence on what changed at this point. */
+  detail: string;
+  /** Contributing source-article ids (open in the in-app reader). */
+  sourceIds: string[];
+}
+
+/**
+ * How coverage of an issue differs across the political spectrum, aggregated to
+ * left / center / right. Empty strings where a side isn't represented.
+ */
+export interface StorySpectrum {
+  left: string;
+  center: string;
+  right: string;
+}
+
+/**
  * An AI-synthesized story aggregating multiple outlets' coverage of ONE event.
  * The synthesis is neutral and cites every contributing source; `angles` and
  * `contradictions` surface HOW the reporting differs across outlets.
@@ -181,6 +206,12 @@ export interface Story {
   topic: Topic;
   /** Importance-weighted aggregate lean of the contributing coverage, or null. */
   lean: Lean;
+  /**
+   * 0..1 attention weight ("severity") combining newsworthiness, how widely it's
+   * covered, and developing status. Drives the color intensity of the issue tag
+   * so bigger stories pull more attention.
+   */
+  severity: number;
   /** The deduped source articles that fed the synthesis. */
   sources: StorySource[];
   /** Per-outlet framing differences. */
@@ -193,6 +224,18 @@ export interface Story {
   updatedAt: number;
   /** When this story was synthesized (epoch ms). */
   generatedAt: number;
+  /**
+   * True for an ONGOING ISSUE: a broader storyline grouping several sub-events
+   * over time (vs a single settled event). Developing stories carry a `timeline`
+   * and `spectrum` and are highlighted inline in the feed.
+   */
+  developing?: boolean;
+  /** Earliest contributing article time (epoch ms) — the issue's start. */
+  startedAt?: number;
+  /** Ordered sub-events for a developing issue (empty for single events). */
+  timeline?: StoryMilestone[];
+  /** Left/center/right framing comparison for a developing issue. */
+  spectrum?: StorySpectrum;
   /**
    * True when synthesis is a graceful FALLBACK (model offline/failed): built
    * from the source one-line summaries without cross-outlet analysis. The UI
