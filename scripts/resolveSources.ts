@@ -41,10 +41,14 @@ function parseArgs(argv: string[]): Args {
  *    (the frequent newspaper subclasses are listed directly, no `P279*` walk),
  *  - country via `P17` OR `P495` only (drop the expensive HQ->country hop),
  *  - no region join here (recover region later, it caused row blow-up + cost).
+ *
+ * NOTE: plain `SELECT` (NOT `SELECT DISTINCT`) — the `wikibase:label` auto-label
+ * magic is silently disabled by DISTINCT/GROUP BY, which leaves every `?outletLabel`
+ * unbound (we dedupe by title in code instead).
  */
 function query(qid: string, lang: string): string {
   return `
-    SELECT DISTINCT ?outlet ?outletLabel ?website WHERE {
+    SELECT ?outlet ?outletLabel ?website WHERE {
       VALUES ?type {
         wd:Q11032     # newspaper
         wd:Q1110794   # daily newspaper
