@@ -15,10 +15,10 @@ import { useApp } from "../../src/store/AppContext";
 import { fetchStories } from "../../src/lib/api";
 import { StoryCard } from "../../src/components/StoryCard";
 import { lastMinuteStories } from "../../src/lib/storyUpdates";
-import { WorldSwitcher } from "../../src/components/WorldSwitcher";
+import { GeoNavigator } from "../../src/components/GeoNavigator";
+import { GEO_ROOT_ID, geoLabel, geoNodeIdOf, poolIdForNode } from "../../src/data/geo";
 import { openStory } from "../../src/lib/nav";
 import { AnalysisProgress } from "../../src/components/AnalysisProgress";
-import { worldById } from "../../src/data/worlds";
 import { colors, font, radius, spacing } from "../../src/theme";
 import type { Story } from "../../src/types";
 
@@ -34,7 +34,7 @@ function columnsFor(contentWidth: number): number {
 export default function StoriesScreen() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const { worldId, busyWorld, setWorld, status, storyViews } = useApp();
+  const { prefs, feedWorldId, updatePrefs, status, storyViews } = useApp();
 
   const [stories, setStories] = useState<Story[]>([]);
   const [loading, setLoading] = useState(false);
@@ -45,15 +45,15 @@ export default function StoriesScreen() {
   // STILL matches when it resolves — an in-flight request for the world we just
   // switched away from must not overwrite the current world's stories (which
   // would surface foreign stories in "Last minute").
-  const currentWorldRef = useRef(worldId);
-  currentWorldRef.current = worldId;
+  const currentWorldRef = useRef(feedWorldId);
+  currentWorldRef.current = feedWorldId;
   const load = useCallback(
     async (force = false) => {
       setLoading(true);
       setError(null);
       try {
-        const res = await fetchStories({ world: worldId, force });
-        if (currentWorldRef.current !== worldId) return;
+        const res = await fetchStories({ world: feedWorldId, force });
+        if (currentWorldRef.current !== feedWorldId) return;
         setStories(res.stories);
         setBusy(res.busyWith ?? null);
         if (res.stories.length === 0 && !res.busyWith) {
@@ -63,14 +63,14 @@ export default function StoriesScreen() {
           );
         }
       } catch (e) {
-        if (currentWorldRef.current === worldId) {
+        if (currentWorldRef.current === feedWorldId) {
           setError(e instanceof Error ? e.message : "Failed to load stories.");
         }
       } finally {
-        if (currentWorldRef.current === worldId) setLoading(false);
+        if (currentWorldRef.current === feedWorldId) setLoading(false);
       }
     },
-    [worldId],
+    [feedWorldId],
   );
 
   // Load on mount and whenever the world changes.
@@ -104,7 +104,15 @@ export default function StoriesScreen() {
         }
       >
         <View style={{ width: contentW, gap: spacing.md }}>
-          <WorldSwitcher worldId={worldId} busyWorld={busyWorld} onSelect={setWorld} />
+          <GeoNavigator
+            activePoolId={prefs.geoPool}
+            home={prefs.geoHome}
+            onSelect={(poolId) => {
+              const next = !poolId || poolId === poolIdForNode(GEO_ROOT_ID) ? undefined : poolId;
+              if (next !== prefs.geoPool) void updatePrefs({ geoPool: next });
+            }}
+            onSetHome={(nodeId) => void updatePrefs({ geoHome: nodeId })}
+          />
 
           <View style={styles.headerRow}>
             <View style={{ flex: 1 }}>
@@ -126,12 +134,12 @@ export default function StoriesScreen() {
 
           <AnalysisProgress status={status} />
 
-          {busy && busy !== worldId && stories.length === 0 && (
+          {busy && busy !== feedWorldId && stories.length === 0 && (
             <View style={styles.busyBanner}>
               <ActivityIndicator size="small" color={colors.warn} />
               <Text style={styles.busyText}>
-                “{worldById(busy).title}” is still refreshing. Only one world refreshes at a time —
-                stories here will build once it’s free.
+                “{geoLabel(geoNodeIdOf(busy)) || "Another area"}” is still refreshing. Only one
+                refreshes at a time — stories here will build once it’s free.
               </Text>
             </View>
           )}

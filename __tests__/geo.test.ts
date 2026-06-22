@@ -27,6 +27,18 @@ describe("geo tree", () => {
     expect(childrenOf("es-galicia-pontevedra-vigo")).toEqual([]); // leaf
   });
 
+  it("populates Europe's countries from the dataset (not a hardcoded handful)", () => {
+    const euCountries = childrenOf("eu");
+    // A broad, data-driven set — well beyond the original Spain-only seed.
+    expect(euCountries.length).toBeGreaterThan(30);
+    expect(euCountries.every((n) => n.level === "country" && n.parent === "eu")).toBe(true);
+    const ids = euCountries.map((n) => n.id);
+    expect(ids).toEqual(expect.arrayContaining(["es", "fr", "de", "it", "gb", "ua"]));
+    expect(isGeoNode("fr")).toBe(true);
+    expect(geoNode("de")?.label).toBe("Germany");
+    expect(pathOf("fr").map((n) => n.id)).toEqual(["world", "eu", "fr"]);
+  });
+
   it("builds the root→node path inclusive and ordered", () => {
     const path = pathOf("es-galicia-pontevedra-vigo").map((n) => n.id);
     expect(path).toEqual([

@@ -42,10 +42,78 @@ export interface GeoNode {
   country?: string;
 }
 
+// --- Country dataset --------------------------------------------------------
+// The country level is DATA-DRIVEN, not hand-listed in the tree: continents map
+// to a list of [ISO 3166-1 alpha-2, display name] pairs, and the country nodes
+// are generated from it below. This keeps the navigator's options from being a
+// hardcoded handful — adding a country (or a whole continent) is a one-line data
+// edit, and coverage stays resolved on demand by the server.
+
+/** Sovereign states of Europe (ISO 3166-1 alpha-2 → English name). */
+const EUROPE_COUNTRIES: ReadonlyArray<readonly [string, string]> = [
+  ["al", "Albania"],
+  ["ad", "Andorra"],
+  ["at", "Austria"],
+  ["by", "Belarus"],
+  ["be", "Belgium"],
+  ["ba", "Bosnia & Herzegovina"],
+  ["bg", "Bulgaria"],
+  ["hr", "Croatia"],
+  ["cy", "Cyprus"],
+  ["cz", "Czechia"],
+  ["dk", "Denmark"],
+  ["ee", "Estonia"],
+  ["fi", "Finland"],
+  ["fr", "France"],
+  ["de", "Germany"],
+  ["gr", "Greece"],
+  ["hu", "Hungary"],
+  ["is", "Iceland"],
+  ["ie", "Ireland"],
+  ["it", "Italy"],
+  ["xk", "Kosovo"],
+  ["lv", "Latvia"],
+  ["li", "Liechtenstein"],
+  ["lt", "Lithuania"],
+  ["lu", "Luxembourg"],
+  ["mt", "Malta"],
+  ["md", "Moldova"],
+  ["mc", "Monaco"],
+  ["me", "Montenegro"],
+  ["nl", "Netherlands"],
+  ["mk", "North Macedonia"],
+  ["no", "Norway"],
+  ["pl", "Poland"],
+  ["pt", "Portugal"],
+  ["ro", "Romania"],
+  ["ru", "Russia"],
+  ["sm", "San Marino"],
+  ["rs", "Serbia"],
+  ["sk", "Slovakia"],
+  ["si", "Slovenia"],
+  ["es", "Spain"],
+  ["se", "Sweden"],
+  ["ch", "Switzerland"],
+  ["ua", "Ukraine"],
+  ["gb", "United Kingdom"],
+  ["va", "Vatican City"],
+];
+
+/** Generate the country-level nodes for a continent from its ISO dataset. */
+function countriesUnder(continent: string, list: ReadonlyArray<readonly [string, string]>): GeoNode[] {
+  return list.map(([code, label]) => ({
+    id: code,
+    parent: continent,
+    level: "country" as const,
+    label,
+    country: code,
+  }));
+}
+
 // --- Seed tree --------------------------------------------------------------
-// A deliberately small, REAL vertical slice (World → Europe → Spain → Galicia →
-// Pontevedra → Vigo) plus the continents, so navigation works end to end before
-// discovery is automated. New branches are added here (or, later, merged from
+// The continents plus a REAL deeper vertical slice (Spain → Galicia → Pontevedra
+// → Vigo) so sub-country navigation works end to end. Country nodes are merged in
+// from the dataset above; deeper branches are added here (or, later, from
 // on-demand discovery) without touching the plumbing.
 
 const NODES: GeoNode[] = [
@@ -58,8 +126,12 @@ const NODES: GeoNode[] = [
   { id: "as", parent: "world", level: "continent", label: "Asia" },
   { id: "oc", parent: "world", level: "continent", label: "Oceania" },
 
-  // Spain vertical slice.
-  { id: "es", parent: "eu", level: "country", label: "Spain", country: "es" },
+  // Countries (data-driven). Europe is populated; other continents follow the
+  // same one-line pattern once their datasets land.
+  ...countriesUnder("eu", EUROPE_COUNTRIES),
+
+  // Spain vertical slice (deeper than country — "es" itself comes from the
+  // dataset above).
   { id: "es-galicia", parent: "es", level: "region", label: "Galicia", country: "es" },
   {
     id: "es-galicia-pontevedra",

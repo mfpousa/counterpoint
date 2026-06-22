@@ -20,8 +20,8 @@ import { StoryCard } from "../../src/components/StoryCard";
 import { FadeInView } from "../../src/components/anim";
 import { BriefingCard } from "../../src/components/BriefingCard";
 import { AnalysisProgress } from "../../src/components/AnalysisProgress";
-import { WorldSwitcher } from "../../src/components/WorldSwitcher";
 import { GeoNavigator } from "../../src/components/GeoNavigator";
+import { GEO_ROOT_ID, poolIdForNode } from "../../src/data/geo";
 import { fetchStories } from "../../src/lib/api";
 import { cacheStories } from "../../src/lib/storyCache";
 import { lastMinuteStories } from "../../src/lib/storyUpdates";
@@ -62,11 +62,9 @@ export default function FeedScreen() {
     status,
     summaries,
     storyViews,
-    worldId,
     feedWorldId,
     busyWorld,
     refreshFeed,
-    setWorld,
     updatePrefs,
   } = useApp();
   const t = useT();
@@ -321,16 +319,16 @@ export default function FeedScreen() {
       }
     >
       <View style={{ width: contentW, gap: spacing.md }}>
-        {/* World switcher: pick which news universe to browse. */}
-        <WorldSwitcher worldId={worldId} busyWorld={busyWorld} onSelect={setWorld} />
-
-        {/* Coverage drill-down: browse by source geography (world → … → council).
-            Selecting a node makes its outlets the feed pool. */}
+        {/* Geography is the only navigator: drill World → continent → country → …
+            and a node's outlets become the feed pool. Selecting the World root means
+            "no geographic override" — i.e. the broad Front Page. */}
         <GeoNavigator
           activePoolId={prefs.geoPool}
           home={prefs.geoHome}
           onSelect={(poolId) => {
-            if (poolId !== prefs.geoPool) void updatePrefs({ geoPool: poolId });
+            // World root = the Front Page (clear any geographic override).
+            const next = !poolId || poolId === poolIdForNode(GEO_ROOT_ID) ? undefined : poolId;
+            if (next !== prefs.geoPool) void updatePrefs({ geoPool: next });
           }}
           onSetHome={(nodeId) => void updatePrefs({ geoHome: nodeId })}
         />
