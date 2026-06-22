@@ -251,6 +251,19 @@ function coerceAngles(raw: unknown, members: StoredItem[], max: number): StoryAn
   return out;
 }
 
+/**
+ * Representative image for a story: the most newsworthy contributing article's
+ * thumbnail, if any has one. Lets a story card present like an article.
+ */
+function pickThumbnail(members: StoredItem[]): string | undefined {
+  const ranked = members.slice().sort((a, b) => b.importance - a.importance);
+  for (const m of ranked) {
+    const th = m.item.thumbnail;
+    if (th && /^https?:\/\//i.test(th)) return th;
+  }
+  return undefined;
+}
+
 /** A degraded story stitched from source summaries (model offline/unusable). */
 function fallbackStory(members: StoredItem[]): Story {
   const sources = toSources(members);
@@ -269,6 +282,7 @@ function fallbackStory(members: StoredItem[]): Story {
     title: decodeEntities(byImportance[0].item.title),
     summary: sanitizeModelText(byImportance[0].summary) || decodeEntities(byImportance[0].item.title),
     synthesis: paragraphs.length > 0 ? paragraphs : [byImportance[0].item.title],
+    thumbnail: pickThumbnail(members),
     topic: majorityTopic(members),
     lean: aggregateLean(members),
     severity: severityOf(members),
@@ -326,6 +340,7 @@ export async function buildStory(members: StoredItem[], lang: Lang = "en"): Prom
     synthesis: synthesis.length > 0 ? synthesis : [byImportance[0].item.title],
     topic: majorityTopic(members),
     lean: aggregateLean(members),
+    thumbnail: pickThumbnail(members),
     severity: severityOf(members),
     sources: toSources(members),
     angles,
@@ -549,6 +564,7 @@ export async function buildDevelopingStory(
     synthesis: synthesis.length > 0 ? synthesis : [byImportance[0].item.title],
     topic: majorityTopic(members),
     lean: aggregateLean(members),
+    thumbnail: pickThumbnail(members),
     severity: severityOf(members, true),
     sources: toSources(members),
     angles: [],

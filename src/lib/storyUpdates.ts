@@ -31,17 +31,24 @@ export function storyChange(story: Story, view?: StoryView | null): StoryChange 
   return { seen: true, hasUpdates, newSources, seenAt: view.seenAt };
 }
 
+/** Default "recent activity" window for the last-minute band: 2 hours. */
+export const RECENT_ACTIVITY_MS = 2 * 60 * 60 * 1000;
+
 /**
- * The "last minute" set: stories that gained new coverage since the reader last
- * saw them. Developing issues sort first (they're the ones readers track over
- * time), then by most-recent activity.
+ * The "last minute" set: what's moving RIGHT NOW. A story qualifies if either
+ *  - it gained new coverage since the reader last opened it (seen + changed), OR
+ *  - it simply has recent activity (updated within `recentMs`), even if the
+ *    reader has never opened it — fresh developments surface regardless.
+ * Developing issues sort first (readers track them over time), then by recency.
  */
 export function lastMinuteStories(
   stories: Story[],
   views: Record<string, StoryView>,
+  recentMs: number = RECENT_ACTIVITY_MS,
+  now: number = Date.now(),
 ): Story[] {
   return stories
-    .filter((s) => storyChange(s, views[s.id]).hasUpdates)
+    .filter((s) => storyChange(s, views[s.id]).hasUpdates || now - s.updatedAt <= recentMs)
     .sort((a, b) => {
       const da = a.developing ? 1 : 0;
       const db = b.developing ? 1 : 0;

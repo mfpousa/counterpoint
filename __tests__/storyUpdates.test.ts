@@ -86,6 +86,15 @@ describe("lastMinuteStories", () => {
     };
     expect(lastMinuteStories([a, b], views)).toEqual([]);
   });
+
+  it("promotes unseen stories with recent activity (within the window)", () => {
+    const now = 10_000_000;
+    const recentMs = 2 * 60 * 60 * 1000;
+    const recent = story({ id: "r", updatedAt: now - 1000, sources: [src("x")] }); // never seen
+    const stale = story({ id: "s", updatedAt: now - 5 * 60 * 60 * 1000, sources: [src("y")] });
+    const out = lastMinuteStories([recent, stale], {}, recentMs, now);
+    expect(out.map((s) => s.id)).toEqual(["r"]);
+  });
 });
 
 describe("milestoneIsNew", () => {

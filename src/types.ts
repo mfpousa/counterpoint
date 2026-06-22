@@ -273,6 +273,11 @@ export interface Story {
   title: string;
   /** One-line dek summarizing the event. */
   summary: string;
+  /**
+   * Representative image for the story (the most newsworthy contributing
+   * article's thumbnail, if any). Lets a story card present like an article.
+   */
+  thumbnail?: string;
   /** The neutral synthesized article, one entry per paragraph. */
   synthesis: string[];
   topic: Topic;

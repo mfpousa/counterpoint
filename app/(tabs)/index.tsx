@@ -17,7 +17,6 @@ import { assessDrift } from "../../src/lib/lean";
 import { topicMeta, TOPIC_ORDER } from "../../src/lib/topics";
 import { FeedCard } from "../../src/components/FeedCard";
 import { StoryCard } from "../../src/components/StoryCard";
-import { StoryCardSkeleton } from "../../src/components/Skeleton";
 import { FadeInView } from "../../src/components/anim";
 import { BriefingCard } from "../../src/components/BriefingCard";
 import { AnalysisProgress } from "../../src/components/AnalysisProgress";
@@ -78,11 +77,16 @@ export default function FeedScreen() {
       setLoadingStories(true);
       try {
         const res = await fetchStories({ world: worldId, force, lang: prefs.language });
-        setStories(res.stories);
-        storiesByKey.current.set(`${worldId}:${prefs.language}`, res.stories);
-        // Share with the routed story panel so opening a listed story is instant
-        // and never dead-ends on an id that changed during a rebuild.
-        cacheStories(res.stories);
+        // Never WIPE a populated set while the backend is mid-rebuild: /api/stories
+        // can transiently return [] during synthesis. Keep showing the stale set
+        // until real stories arrive, then swap them in (they eventually update).
+        if (res.stories.length > 0) {
+          setStories(res.stories);
+          storiesByKey.current.set(`${worldId}:${prefs.language}`, res.stories);
+          // Share with the routed story panel so opening a listed story is instant
+          // and never dead-ends on an id that changed during a rebuild.
+          cacheStories(res.stories);
+        }
         storiesLoadedOnce.current = true;
       } finally {
         setLoadingStories(false);
@@ -181,39 +185,48 @@ export default function FeedScreen() {
     [issueByArticle],
   );
 
-  // Synthesized cross-source EVENT stories present in the current feed. These are
-  // surfaced in their OWN band (above the per-topic article stream) so synthesized
-  // coverage never mixes in with individual articles. Newest update first.
-  const eventStories = useMemo(() => {
+  // ALL synthesized stories (developing + event) present in the current feed.
+  // They live INSIDE their topic sections, interleaved with articles and treated
+  // like them. Their member articles are deduped out of the article stream (that
+  // coverage now lives in the story card itself).
+  const feedStories = useMemo(() => {
     const feedIds = new Set(feed.map((it) => it.id));
-    return stories
-      .filter((s) => !s.developing && s.sources.some((src) => feedIds.has(src.id)))
-      .sort((a, b) => b.updatedAt - a.updatedAt);
+    return stories.filter((s) => s.sources.some((src) => feedIds.has(src.id)));
   }, [feed, stories]);
 
-  // Per-topic stream of INDIVIDUAL articles only. Members absorbed by an event
-  // story are deduped out (that coverage now lives inside the story card above).
-  // Items that merely belong to a developing ISSUE stay in the stream with a tag
-  // linking up to the issue.
-  type Entry = { item: FeedItem; topic: Topic; at: number; done: boolean };
+  // Per-topic stream: story cards (ongoing + synthesized) interleaved with the
+  // standalone articles that no story absorbed, ordered by recency (read articles
+  // sink to the bottom). Stories sort by their latest update.
+  type Entry =
+    | { kind: "story"; story: Story; topic: Topic; at: number; done: false }
+    | { kind: "item"; item: FeedItem; topic: Topic; at: number; done: boolean };
   const sections = useMemo(() => {
     const absorbed = new Set<string>();
-    for (const s of eventStories) for (const src of s.sources) absorbed.add(src.id);
+    for (const s of feedStories) for (const src of s.sources) absorbed.add(src.id);
     const standalone = feed.filter((it) => !absorbed.has(it.id));
 
+    const entries: Entry[] = [
+      ...feedStories.map(
+        (story): Entry => ({ kind: "story", story, topic: story.topic, at: story.updatedAt, done: false }),
+      ),
+      ...standalone.map(
+        (item): Entry => ({
+          kind: "item",
+          item,
+          topic: item.topic,
+          at: item.publishedAt,
+          done: completedSet.has(item.id),
+        }),
+      ),
+    ];
+
     const byTopic = new Map<Topic, Entry[]>();
-    for (const item of standalone) {
-      const e: Entry = {
-        item,
-        topic: item.topic,
-        at: item.publishedAt,
-        done: completedSet.has(item.id),
-      };
+    for (const e of entries) {
       const arr = byTopic.get(e.topic);
       if (arr) arr.push(e);
       else byTopic.set(e.topic, [e]);
     }
-    // Read items sink; otherwise newest first.
+    // Read items sink; otherwise newest first (stories use their latest update).
     const order = (a: Entry, b: Entry) => {
       const da = a.done ? 1 : 0;
       const db = b.done ? 1 : 0;
@@ -224,34 +237,20 @@ export default function FeedScreen() {
       topic: t,
       entries: (byTopic.get(t) as Entry[]).slice().sort(order),
     }));
-  }, [feed, eventStories, completedSet]);
+  }, [feed, feedStories, completedSet]);
 
   const unreadCount = useMemo(
-    () => eventStories.length + sections.reduce((n, s) => n + s.entries.filter((e) => !e.done).length, 0),
-    [eventStories, sections],
+    () =>
+      sections.reduce((n, s) => n + s.entries.filter((e) => e.kind === "story" || !e.done).length, 0),
+    [sections],
   );
 
-  // A topic filter is valid if ANY band has that topic (articles, event stories,
-  // or developing issues) — so an all-stories topic doesn't silently reset.
-  const topicHasContent = (tp: Topic) =>
-    sections.some((s) => s.topic === tp) ||
-    eventStories.some((s) => s.topic === tp) ||
-    developingStories.some((s) => s.topic === tp);
   const activeSelected =
-    selected !== "all" && topicHasContent(selected as Topic) ? selected : "all";
+    selected !== "all" && sections.some((s) => s.topic === selected) ? selected : "all";
   const visibleSections =
     activeSelected === "all" ? sections : sections.filter((s) => s.topic === activeSelected);
-  const visibleDeveloping =
-    activeSelected === "all"
-      ? developingStories
-      : developingStories.filter((s) => s.topic === activeSelected);
-  // Synthesized (non-developing) stories for the dedicated band, topic-filtered.
-  const visibleStories =
-    activeSelected === "all"
-      ? eventStories
-      : eventStories.filter((s) => s.topic === activeSelected);
-  // "Last minute": stories with new coverage since the reader last opened them,
-  // honoring the active topic filter.
+  // "Last minute": stories moving right now (recent activity, or new coverage
+  // since the reader last opened them), honoring the active topic filter.
   const visibleLastMinute = useMemo(() => {
     const lm = lastMinuteStories(stories, storyViews);
     return activeSelected === "all" ? lm : lm.filter((s) => s.topic === activeSelected);
@@ -430,77 +429,16 @@ export default function FeedScreen() {
           </View>
         )}
 
-        {/* Developing issues — highlighted band of ongoing storylines. Stories are
-            synthesized lazily (an LLM call each), so on the FIRST load we reserve
-            the band's space with skeleton cards. This keeps the feed below from
-            jumping down when the band resolves (the reader may be mid-tap). Once
-            loaded, the band only stays if there are actual developing stories. */}
-        {(!storiesLoadedOnce.current || visibleDeveloping.length > 0) && (
-          <View style={{ gap: spacing.md }}>
-            <View style={styles.sectionHeader}>
-              <View style={[styles.sectionIcon, { backgroundColor: colors.warn + "22" }]}>
-                <Ionicons name="pulse" size={15} color={colors.warn} />
-              </View>
-              <Text style={styles.sectionTitle}>{t("feed.developing")}</Text>
-              {storiesLoadedOnce.current ? (
-                <>
-                  <Text style={styles.sectionCount}>{visibleDeveloping.length}</Text>
-                  {loadingStories && <ActivityIndicator size="small" color={colors.warn} />}
-                </>
-              ) : (
-                <ActivityIndicator size="small" color={colors.warn} />
-              )}
-            </View>
-            <View style={[styles.grid, { gap: GAP }]}>
-              {storiesLoadedOnce.current
-                ? visibleDeveloping.map((story) => (
-                    <FadeInView key={story.id} style={{ width: cardW }}>
-                      <StoryCard story={story} onOpen={(s) => openStory(s.id)} />
-                    </FadeInView>
-                  ))
-                : Array.from({ length: cols === 1 ? 2 : cols }).map((_, i) => (
-                    <View key={`sk-${i}`} style={{ width: cardW }}>
-                      <StoryCardSkeleton />
-                    </View>
-                  ))}
-            </View>
-          </View>
-        )}
-
-        {/* Stories — synthesized cross-source coverage, surfaced in its OWN band
-            so it never mixes with the individual articles below. */}
-        {visibleStories.length > 0 && (
-          <View style={{ gap: spacing.md }}>
-            <View style={styles.sectionHeader}>
-              <View style={[styles.sectionIcon, { backgroundColor: colors.accent + "22" }]}>
-                <Ionicons name="git-merge-outline" size={15} color={colors.accent} />
-              </View>
-              <Text style={styles.sectionTitle}>{t("feed.stories")}</Text>
-              <Text style={styles.sectionCount}>{visibleStories.length}</Text>
-            </View>
-            <View style={[styles.grid, { gap: GAP }]}>
-              {visibleStories.map((story) => (
-                <FadeInView key={story.id} style={{ width: cardW }}>
-                  <StoryCard
-                    story={story}
-                    onOpen={(s) => openStory(s.id)}
-                    issue={issueForStory(story)}
-                    onOpenIssue={openStory}
-                  />
-                </FadeInView>
-              ))}
-            </View>
-          </View>
-        )}
-
-        {/* Body: per-topic stream of INDIVIDUAL articles only. */}
+        {/* Body: per-topic stream of story cards + standalone articles, treated
+            alike. Developing/synthesized stories sit in their own topic section
+            (no separate band) and just show stale until a refresh updates them. */}
         {sections.length === 0 ? (
           loadingFeed ? (
             <View style={styles.empty}>
               <ActivityIndicator color={colors.accent} />
               <Text style={styles.emptySub}>{t("feed.curating")}</Text>
             </View>
-          ) : feedError || visibleDeveloping.length > 0 || visibleStories.length > 0 ? null : (
+          ) : feedError ? null : (
             <View style={styles.empty}>
               <Ionicons
                 name={atQuota ? "checkmark-done-circle-outline" : "newspaper-outline"}
@@ -528,19 +466,30 @@ export default function FeedScreen() {
                   <Text style={styles.sectionCount}>{section.entries.length}</Text>
                 </View>
                 <View style={[styles.grid, { gap: GAP }]}>
-                  {section.entries.map((e) => (
-                    <FadeInView key={e.item.id} style={{ width: cardW }}>
-                      <FeedCard
-                        item={e.item}
-                        done={completedSet.has(e.item.id)}
-                        summary={summaryById.get(e.item.id)}
-                        onSummarize={(it) => openNews(it.id)}
-                        onRead={(it) => openNews(it.id)}
-                        issue={issueByArticle.get(e.item.id)}
-                        onOpenIssue={openStory}
-                      />
-                    </FadeInView>
-                  ))}
+                  {section.entries.map((e) =>
+                    e.kind === "story" ? (
+                      <FadeInView key={e.story.id} style={{ width: cardW }}>
+                        <StoryCard
+                          story={e.story}
+                          onOpen={(s) => openStory(s.id)}
+                          issue={issueForStory(e.story)}
+                          onOpenIssue={openStory}
+                        />
+                      </FadeInView>
+                    ) : (
+                      <FadeInView key={e.item.id} style={{ width: cardW }}>
+                        <FeedCard
+                          item={e.item}
+                          done={completedSet.has(e.item.id)}
+                          summary={summaryById.get(e.item.id)}
+                          onSummarize={(it) => openNews(it.id)}
+                          onRead={(it) => openNews(it.id)}
+                          issue={issueByArticle.get(e.item.id)}
+                          onOpenIssue={openStory}
+                        />
+                      </FadeInView>
+                    ),
+                  )}
                 </View>
               </View>
             );
