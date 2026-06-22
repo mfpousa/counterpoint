@@ -214,6 +214,28 @@ describe("buildFeed", () => {
     expect(cultureCount).toBeLessThan(feed.length);
   });
 
+  it("balances providers so no single source dominates the feed", () => {
+    // Two outlets, same topic, all non-political — without a source-diversity
+    // penalty the most-recent run from one outlet could fill the feed.
+    const items = [
+      ...Array.from({ length: 8 }, () => makeItem({ lean: null, topic: "science", sourceId: "A" })),
+      ...Array.from({ length: 8 }, () => makeItem({ lean: null, topic: "science", sourceId: "B" })),
+    ];
+    const feed = buildFeed({
+      items,
+      prefs: makePrefs({ dailyQuotaMin: 80 }), // ~8 picks at 10 min each
+      progress: emptyProgress(),
+      now: 100000,
+    });
+    const a = feed.filter((i) => i.sourceId === "A").length;
+    const b = feed.filter((i) => i.sourceId === "B").length;
+    expect(feed.length).toBeGreaterThan(2);
+    // Neither provider monopolizes — the two outlets are drawn roughly evenly.
+    expect(Math.abs(a - b)).toBeLessThanOrEqual(1);
+    expect(a).toBeGreaterThan(0);
+    expect(b).toBeGreaterThan(0);
+  });
+
   it("excludes stale items older than the recency window", () => {
     const now = 100 * 24 * 60 * 60 * 1000; // day 100
     const fresh = makeItem({ lean: -0.5, publishedAt: now - 1000 });

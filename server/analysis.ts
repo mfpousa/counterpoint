@@ -37,8 +37,12 @@ function arraySchema(name: string, item: Record<string, unknown>): JsonSchema {
 
 const TRIAGE_SCHEMA = arraySchema("triage", {
   type: "object",
-  properties: { id: { type: "string" }, junk: { type: "boolean" } },
-  required: ["id", "junk"],
+  properties: {
+    id: { type: "string" },
+    junk: { type: "boolean" },
+    importance: { type: "number" },
+  },
+  required: ["id", "junk", "importance"],
   additionalProperties: false,
 });
 
@@ -129,13 +133,16 @@ const VALID_TOPICS: ReadonlySet<string> = new Set<Topic>([
 ]);
 
 const TRIAGE_PROMPT =
-  "You are a ruthless news-quality filter. For EACH headline decide if it is " +
-  "CLICKBAIT or low-signal junk. Junk includes: vague curiosity-gap teasers " +
+  "You are a ruthless news-quality filter. For EACH headline output two judgments:\n" +
+  '- "junk": true if CLICKBAIT or low-signal junk — vague curiosity-gap teasers ' +
   '("you won\'t believe", "this one trick"), ragebait, listicles, horoscopes, ' +
   "sponsored/ads, celebrity gossip, and individual accidents/crime-blotter or " +
-  "deaths with no wider significance. Substantive reporting and analysis is NOT " +
-  'junk. Output ONLY a JSON object {"items": [ {"id": echo the id, "junk": ' +
-  "true|false}, ... ]}, same order as input. No prose.";
+  "deaths with no wider significance. Substantive reporting and analysis is NOT junk.\n" +
+  '- "importance": 0.0..1.0 coarse newsworthiness for an informed, curious reader ' +
+  "— reward consequential, forward-looking, widely-relevant stories; penalize thin " +
+  "filler. A rough estimate from the headline alone is fine.\n" +
+  'Output ONLY a JSON object {"items": [ {"id": echo the id, "junk": true|false, ' +
+  '"importance": number}, ... ]}, same order as input. No prose.';
 
 const ANALYZE_PROMPT =
   "You are a neutral editor building a high-signal, politically balanced feed. " +
@@ -176,13 +183,13 @@ function asRecord(row: unknown): Record<string, unknown> | null {
 
 // --- Pass 1: clickbait triage ------------------------------------------------
 
-async function triageBatch(batch: FeedItem[]): Promise<Set<string>> {
-  const junk = new Set<string>();
+async function triageBatch(batch: FeedItem[]): Promise<Map<string, GeoPrescreen>> {
+  const out = new Map<string, GeoPrescreen>();
   const payload = batch.map((it) => ({ id: it.id, source: it.sourceTitle, title: it.title }));
-  // Each verdict is tiny ({id, junk}); cap output so a non-stopping model can't
-  // run away and overflow the context window.
+  // Each verdict is tiny ({id, junk, importance}); cap output so a non-stopping
+  // model can't run away and overflow the context window.
   const rows = await chatJsonArray(TRIAGE_PROMPT, payload, {
-    maxTokens: batch.length * 24 + 64,
+    maxTokens: batch.length * 32 + 64,
     schema: TRIAGE_SCHEMA,
   });
   const byId = new Map(batch.map((it) => [it.id, it]));
@@ -195,34 +202,42 @@ async function triageBatch(batch: FeedItem[]): Promise<Set<string>> {
         : batch[i]?.id;
     if (!id) return;
     const v = r["junk"] ?? r["clickbait"];
-    if (v === true || v === "true") junk.add(id);
+    out.set(id, {
+      junk: v === true || v === "true",
+      importance: clampNum(r["importance"], 0, 1, 0.5),
+    });
   });
-  return junk;
+  return out;
 }
 
 /** Reports cumulative items processed out of the total for a phase. */
 export type ProgressFn = (done: number, total: number) => void;
 
-/** Return the set of item ids judged clickbait/junk (title-only, cheap). */
+/**
+ * Cheap title-only triage for a TOPICAL world: per headline, a junk flag AND a
+ * coarse 0..1 newsworthiness score. The importance lets the front page rank its
+ * provisional (not-yet-deep-analyzed) items by "how big is this" instead of pure
+ * recency, mirroring what geo/regional pools already get from their prescreen.
+ */
 export async function detectClickbait(
   items: FeedItem[],
   onProgress?: ProgressFn,
-): Promise<Set<string>> {
-  const junk = new Set<string>();
-  if (items.length === 0) return junk;
+): Promise<Map<string, GeoPrescreen>> {
+  const out = new Map<string, GeoPrescreen>();
+  if (items.length === 0) return out;
   const batches = chunk(items, config.ai.triageBatchSize);
   let done = 0;
-  const sets = await withConcurrency(
+  const maps = await withConcurrency(
     batches.map((b) => async () => {
-      const s = await triageBatch(b);
+      const m = await triageBatch(b);
       done += b.length;
       onProgress?.(done, items.length);
-      return s;
+      return m;
     }),
     config.ai.concurrency,
   );
-  for (const s of sets) for (const id of s) junk.add(id);
-  return junk;
+  for (const m of maps) for (const [id, v] of m) out.set(id, v);
+  return out;
 }
 
 // --- Geo-scope: filter GLOBAL stories out of a LOCAL feed -------------------

@@ -31,6 +31,7 @@ import { gazetteerFor } from "./places";
 import { placeSourcesFor } from "./placeSources";
 import { coverageStateOf, sourcesForNode, type CoverageState } from "./sourceRegistry";
 import { dedupeNearClones } from "./dedupe";
+import { interleaveByRecencyBuckets } from "./fairness";
 import type { Source } from "../src/types";
 import { aiReachable, withConcurrency } from "./ai";
 import {
@@ -243,11 +244,39 @@ function pendingForAnalysis(worldId: string): StoredItem[] {
     const survivors = all.filter(
       (s) => !s.clickbait && s.global !== true && s.item.publishedAt >= cutoff,
     );
-    return topLocalBacklog(survivors, config.place.deepAnalyzeKeep);
+    // topLocalBacklog caps WHICH locals earn the deep pass (top-N by importance);
+    // orderBacklog then sequences them freshest-first for analysis priority.
+    return orderBacklog(topLocalBacklog(survivors, config.place.deepAnalyzeKeep));
   }
-  return all
-    .filter((s) => !s.clickbait && !s.analyzed && s.global !== true && s.item.publishedAt >= cutoff)
-    .sort((a, b) => b.item.publishedAt - a.item.publishedAt);
+  const pending = all.filter(
+    (s) => !s.clickbait && !s.analyzed && s.global !== true && s.item.publishedAt >= cutoff,
+  );
+  return orderBacklog(pending);
+}
+
+/** Best-first ordering for the backlog/provisional set: coarse newsworthiness
+ *  first (the cheap triage importance), recency breaking ties. */
+function byImportanceThenRecency(a: StoredItem, b: StoredItem): number {
+  return (
+    (b.prescreenImportance ?? 0.5) - (a.prescreenImportance ?? 0.5) ||
+    b.item.publishedAt - a.item.publishedAt
+  );
+}
+
+/**
+ * Order a backlog the way we WORK it: freshest news first, stepping backwards in
+ * fixed time buckets, and WITHIN each bucket provider-fair + importance-first. So
+ * 1-2h-old stories across all outlets get analyzed (and shown provisionally)
+ * before we move to the next band — while no single provider dominates a band.
+ */
+function orderBacklog(items: StoredItem[], now = Date.now()): StoredItem[] {
+  return interleaveByRecencyBuckets(
+    items,
+    (s) => now - s.item.publishedAt,
+    (s) => s.item.sourceId,
+    byImportanceThenRecency,
+    config.feed.recencyBucketHours * 60 * 60 * 1000,
+  );
 }
 
 /**
@@ -311,12 +340,8 @@ async function refreshSources(worldId: string): Promise<void> {
     const cc = placeCountryOf(worldId);
     const regional = !!cc && config.place.sourcesEnabled;
     const geo = isGeoPoolId(worldId);
-    // Geo + regional pools both score a COARSE importance so the deep pass can be
-    // gated to the top-N. Only legacy regional pools also judge local/global —
-    // geo pools show everything their outlets report.
-    const capped = geo || regional;
 
-    let junk = new Set<string>();
+    const junk = new Set<string>();
     const coarse = new Map<string, number>(); // id -> coarse importance (capped pools)
     const globals = new Set<string>();
     if (geo) {
@@ -362,9 +387,20 @@ async function refreshSources(worldId: string): Promise<void> {
           `of ${untriaged.length}`,
       );
     } else if (config.feed.clickbaitFilter) {
+      // TOPICAL worlds: ONE cheap title-only pass folds clickbait + a coarse
+      // importance, so the front page can rank its provisional items (and order
+      // its analysis backlog) by newsworthiness instead of pure recency.
       const batches = Math.ceil(untriaged.length / config.ai.triageBatchSize);
       console.log(`[feed:${worldId}] triage: ${untriaged.length} headline(s) in ${batches} batch(es)…`);
-      junk = await withModelLock(() => detectClickbait(untriaged, progressLogger(state, "triage")));
+      const verdicts = await withModelLock(() =>
+        detectClickbait(untriaged, progressLogger(state, "triage")),
+      );
+      for (const it of untriaged) {
+        const v = verdicts.get(it.id);
+        if (!v) continue; // absent → kept, neutral importance
+        if (v.junk) junk.add(it.id);
+        coarse.set(it.id, v.importance);
+      }
       console.log(`[feed:${worldId}] triage flagged ${junk.size}/${untriaged.length} as clickbait/junk`);
     }
 
@@ -375,8 +411,10 @@ async function refreshSources(worldId: string): Promise<void> {
         // Set at prescreen for legacy regional pools so global stories are excluded
         // from the backlog + feed. Geo pools never drop globals (undefined).
         global: regional ? globals.has(it.id) : undefined,
-        // Coarse newsworthiness used to pick the top-N for deep analysis (capped pools).
-        prescreenImportance: capped ? (coarse.get(it.id) ?? 0.5) : undefined,
+        // Coarse newsworthiness from the cheap triage pass — now scored for EVERY
+        // pool (topical included). Drives provisional ranking + analysis order;
+        // overwritten by the real score once deep-analyzed.
+        prescreenImportance: coarse.has(it.id) ? coarse.get(it.id) : undefined,
         analyzed: false, // deep analysis pending
         topic: it.topic,
         lean: it.lean,
@@ -505,15 +543,15 @@ async function analyzeGeoChunk(
 
   let analyses = new Map<string, ItemAnalysis>();
   if (items.length > 0) {
-    setPhase(state, "transcripts", 0, items.length);
-    const transcripts = await fetchTranscripts(items);
+    // Transcripts deferred to the background enrichTranscripts() tick (see
+    // analyzePending) — analyze on title+summary now to keep the path fast.
     const batches = Math.ceil(items.length / config.ai.batchSize);
     console.log(
       `[feed:${worldId}] geo deep analysis: ${items.length} representative(s) ` +
         `(of ${plan.length} clusters) in ${batches} batch(es)…`,
     );
     analyses = await withModelLock(() =>
-      analyzeItems(items, transcripts, progressLogger(state, "analyze")),
+      analyzeItems(items, new Map(), progressLogger(state, "analyze")),
     );
   }
 
@@ -594,18 +632,17 @@ function analyzePending(worldId: string): Promise<{ remaining: number; progresse
     const slice = config.ai.maxItems > 0 ? pending.slice(0, config.ai.maxItems) : pending;
     const items = slice.map((s) => s.item);
 
-    setPhase(state, "transcripts", 0, items.length);
-    console.log(`[feed:${worldId}] fetching transcripts for up to ${items.length} item(s)…`);
-    const transcripts = await fetchTranscripts(items);
-    if (transcripts.size > 0) console.log(`[feed:${worldId}] fetched ${transcripts.size} transcript(s)`);
-
+    // Transcripts are NOT fetched here — they're slow (yt-dlp + network) and would
+    // stall the hot path. Items are analyzed on title+summary now; the background
+    // enrichTranscripts() tick later re-analyzes important video/podcast items with
+    // their transcript for a sharper summary.
     const batches = Math.ceil(items.length / config.ai.batchSize);
     console.log(
       `[feed:${worldId}] deep analysis: ${items.length} of ${pending.length} pending in ${batches} batch(es)` +
         ` (concurrency ${config.ai.concurrency})…`,
     );
     const analyses = await withModelLock(() =>
-      analyzeItems(items, transcripts, progressLogger(state, "analyze")),
+      analyzeItems(items, new Map(), progressLogger(state, "analyze")),
     );
 
     // Source-level lean rationales (the curated prior) for the "source" provenance
@@ -1026,20 +1063,96 @@ async function classifyRegionalScope(worldId: string): Promise<number> {
 }
 
 /**
- * Run the reactive augmentations after a build. TOPICAL worlds get YouTube
- * discovery + international zones; a REGIONAL pool instead gets the geo-scope
+ * Background ENRICHMENT TICK. The fast analysis path skips transcript fetching
+ * (slow yt-dlp + network), so video/podcast items are first summarized from just
+ * their title+feed-description. This pass picks the most IMPORTANT such items that
+ * haven't been enriched yet, fetches their transcript, and RE-analyzes only those
+ * for a faithful summary/keywords. Bounded by importance + a per-tick cap, and
+ * idempotent (the `transcriptEnriched` flag stops re-work). Returns how many were
+ * actually re-analyzed. Works for ANY pool.
+ */
+async function enrichTranscripts(worldId: string): Promise<number> {
+  if (!config.transcripts.enabled) return 0;
+  const st = getStore(worldId);
+  const cutoff = analyzeCutoff();
+  const candidates = st
+    .all()
+    .filter(
+      (s) =>
+        s.analyzed &&
+        !s.transcriptEnriched &&
+        !s.clickbait &&
+        !s.cloneOf &&
+        (s.item.kind === "video" || s.item.kind === "podcast") &&
+        s.importance >= config.transcripts.enrichMinImportance &&
+        s.item.publishedAt >= cutoff,
+    )
+    .sort((a, b) => b.importance - a.importance)
+    .slice(0, config.transcripts.enrichMaxPerTick);
+  if (candidates.length === 0) return 0;
+  if (!(await aiReachable())) return 0;
+
+  const transcripts = await fetchTranscripts(candidates.map((s) => s.item));
+  const withT = candidates.filter((s) => transcripts.has(s.item.id));
+
+  let reanalyzed = 0;
+  if (withT.length > 0) {
+    const analyses = await withModelLock(() =>
+      analyzeItems(
+        withT.map((s) => s.item),
+        transcripts,
+        () => {},
+      ),
+    );
+    const srcById = new Map(sourcesForWorld(worldId).map((src) => [src.id, src]));
+    const now = Date.now();
+    for (const s of withT) {
+      const a = analyses.get(s.item.id);
+      if (!a) continue;
+      // Re-apply the sharper analysis and clear the stale embedding so the next
+      // embed pass re-embeds from the transcript-informed summary.
+      st.upsert({
+        ...applyAnalysisToItem(s, a, srcById, now, s.coveredBy),
+        embedding: undefined,
+        transcriptEnriched: true,
+      });
+      reanalyzed += 1;
+    }
+  }
+  // Mark items we couldn't get a transcript for as enriched too, so we don't
+  // re-attempt the (failing) fetch every tick.
+  for (const s of candidates) {
+    if (!transcripts.has(s.item.id)) st.upsert({ ...s, transcriptEnriched: true });
+  }
+  st.save();
+  const state = ws(worldId);
+  state.lastBuildAt = Date.now();
+  state.viewCache.clear();
+  if (reanalyzed > 0) {
+    console.log(`[feed:${worldId}] transcript enrichment re-analyzed ${reanalyzed} item(s)`);
+  }
+  return reanalyzed;
+}
+
+/**
+ * Run the reactive augmentations after a build. EVERY pool first gets transcript
+ * enrichment for its important video/podcast items; then TOPICAL worlds get
+ * YouTube discovery + international zones, and a REGIONAL pool gets the geo-scope
  * pass (drop global stories from local outlets). Fire-and-forget; guarded so only
- * one runs per world. To honor the GLOBAL single-build invariant, analysis runs
- * only when the build lock is free; otherwise new items stay pending for the next
- * drain.
+ * one runs per world. Model passes serialize on the global mutex.
  */
 function augmentReactively(worldId: string): Promise<void> {
   const state = ws(worldId);
   if (state.augmentInFlight) return state.augmentInFlight;
 
   state.augmentInFlight = (async () => {
+    // Deferred transcript enrichment for important video/podcast items (all pools).
+    // If anything was re-analyzed, its embedding was cleared — re-embed in the bg.
+    const enriched = await enrichTranscripts(worldId);
+    if (enriched > 0) scheduleCatchUp(worldId);
+
     // GEO pools show everything their own outlets report — no geo-scope filtering,
-    // and no YouTube/zone augmentation (those extend TOPICAL worlds). Nothing to do.
+    // and no YouTube/zone augmentation (those extend TOPICAL worlds). Nothing more.
     if (isGeoPoolId(worldId)) return;
     // Regional pool: classify geo-scope (no YouTube/zones — those are international).
     if (isPlaceWorldId(worldId)) {
@@ -1215,20 +1328,18 @@ function assembleView(
   // `ranked` above and upgrade in place on the client.
   let provisional: FeedItem[] = [];
   if (config.feed.serveProvisional) {
-    const pend = pendingForAnalysis(worldId)
-      .filter(
-        (s) =>
-          !s.cloneOf &&
-          now - s.item.publishedAt <= config.feed.retentionMs &&
-          !(dropGlobal && s.global === true),
-      )
-      .sort(
-        (a, b) =>
-          (b.prescreenImportance ?? 0.5) - (a.prescreenImportance ?? 0.5) ||
-          b.item.publishedAt - a.item.publishedAt,
-      )
-      .slice(0, config.feed.provisionalMax);
-    const { kept: pkept } = partitionByExclusion(pend, parsed.exclude);
+    const pend = pendingForAnalysis(worldId).filter(
+      (s) =>
+        !s.cloneOf &&
+        now - s.item.publishedAt <= config.feed.retentionMs &&
+        !(dropGlobal && s.global === true),
+    );
+    // Freshest-first, then provider-fair + importance within each time bucket, so
+    // the FIRST provisionalMax items (what the reader sees while analysis catches
+    // up) lead with very recent news and no single source fills the slice.
+    const fair = orderBacklog(pend, now);
+    const sliced = fair.slice(0, config.feed.provisionalMax);
+    const { kept: pkept } = partitionByExclusion(sliced, parsed.exclude);
     provisional = rankItems(pkept.map((s) => toFeedItem(s, tokens, hasInterest, queryVec, true)));
   }
 

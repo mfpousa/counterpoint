@@ -120,10 +120,17 @@ export const config = {
     retentionMs: num("FEED_RETENTION_MS", 14 * 24 * 60 * 60 * 1000),
     // Hard cap on stored items (oldest pruned first) to bound memory/disk.
     maxStored: num("FEED_MAX_STORED", 8000),
-    // Only items published within this window are eligible for analysis. Keeps
-    // the first run from chewing through a two-week backlog; older items are
-    // simply skipped (the feed is recency-oriented anyway).
-    analyzeMaxAgeMs: num("FEED_ANALYZE_MAX_AGE_MS", 3 * 24 * 60 * 60 * 1000),
+    // Only items published within this window are eligible for analysis. The feed
+    // is recency-oriented: we prioritize very fresh news and work backwards, and
+    // don't bother analyzing anything older than this (already-analyzed older
+    // items still show until they age out of the retention window).
+    analyzeMaxAgeMs: num("FEED_ANALYZE_MAX_AGE_MS", 24 * 60 * 60 * 1000),
+    // Recency BUCKET size (hours) for ordering the analysis backlog + provisional
+    // view: items are grouped into buckets this wide and the FRESHEST bucket is
+    // worked first (newest news leads, then we step backwards in time). Within a
+    // bucket, provider round-robin + importance decide order. Smaller = stricter
+    // freshness priority; larger = more importance/fairness mixing across time.
+    recencyBucketHours: num("FEED_RECENCY_BUCKET_HOURS", 2),
     // Gap between background analysis chunks while draining the backlog.
     catchUpDelayMs: num("FEED_CATCHUP_DELAY_MS", 1500),
     // REACTIVE LOADING. Serve fetched + cheaply-triaged items that haven't been
@@ -298,6 +305,14 @@ export const config = {
     // Parallel yt-dlp processes (each spawns a child + network; keep low).
     concurrency: num("TRANSCRIPT_CONCURRENCY", 2),
     timeoutMs: num("TRANSCRIPT_TIMEOUT_MS", 30_000),
+    // Transcript fetching is SLOW (yt-dlp + network), so it's removed from the hot
+    // analysis path: items are first analyzed on title+summary, then a background
+    // ENRICHMENT TICK fetches transcripts for the most important video/podcast
+    // items and re-analyzes just those for a sharper summary. These bound that tick.
+    // Min deep-analysis importance (0..1) for an item to earn transcript enrichment.
+    enrichMinImportance: num("TRANSCRIPT_ENRICH_MIN_IMPORTANCE", 0.55),
+    // Max items enriched per tick (bounds yt-dlp + model cost per background pass).
+    enrichMaxPerTick: num("TRANSCRIPT_ENRICH_MAX_PER_TICK", 8),
   },
   youtube: {
     // Story-driven YouTube SEARCH. Instead of relying on raw channel feeds (whose

@@ -90,18 +90,24 @@ function byRelevanceThenRecency(a: FeedItem, b: FeedItem): number {
   return byRecency(a, b);
 }
 
+/** How strongly a repeated SOURCE is penalized when picking the next item. Set
+ *  above the topic weight so no single outlet dominates the feed even when it
+ *  publishes across several topics (the explicit "balance providers" goal). */
+const SOURCE_REPEAT_PENALTY = 3;
+
 /**
- * Pick the best candidate to maximize topic variety.
+ * Pick the best candidate to maximize topic AND source variety.
  *
  * `pool` is pre-sorted most-recent-first, so we prefer the most recent item
  * whose topic is currently the LEAST represented in the feed so far (and, all
- * else equal, one different from the previous pick). This spreads coverage
- * across disciplines instead of letting whichever topic happens to publish most
- * often (e.g. culture) monopolize the feed.
+ * else equal, one different from the previous pick) AND whose SOURCE we've drawn
+ * from least. This spreads coverage across disciplines AND outlets instead of
+ * letting whichever topic/provider publishes most often monopolize the feed.
  */
 function pickDiverse(
   pool: FeedItem[],
   topicCounts: Map<string, number>,
+  sourceCounts: Map<string, number>,
   prevTopic: string | null,
 ): FeedItem | null {
   if (pool.length === 0) return null;
@@ -109,14 +115,17 @@ function pickDiverse(
   let best: FeedItem | null = null;
   let bestScore = Infinity;
   for (const it of pool) {
-    // Score: how many of this topic we've already taken, with a penalty for
-    // repeating the immediately previous topic so we avoid back-to-back runs.
+    // Score: how many of this topic we've already taken, a penalty for repeating
+    // the immediately previous topic (avoid back-to-back runs), and a stronger
+    // penalty per prior item from the SAME source (avoid provider domination).
     const used = topicCounts.get(it.topic) ?? 0;
-    const score = used * 2 + (it.topic === prevTopic ? 1 : 0);
+    const srcUsed = sourceCounts.get(it.sourceId) ?? 0;
+    const score =
+      used * 2 + srcUsed * SOURCE_REPEAT_PENALTY + (it.topic === prevTopic ? 1 : 0);
     if (score < bestScore) {
       best = it;
       bestScore = score;
-      if (score === 0) break; // can't do better than a fresh, non-repeating topic
+      if (score === 0) break; // fresh topic + unused source + non-repeating — unbeatable
     }
   }
   return best ?? pool[0];
@@ -174,6 +183,10 @@ export function buildFeed(input: BuildFeedInput): FeedItem[] {
   // How many items of each topic we've taken so far, to spread coverage.
   const topicCounts = new Map<string, number>();
 
+  // Items already drawn from each SOURCE so far, so pickDiverse can penalize a
+  // provider that's starting to dominate (the explicit "balance providers" goal).
+  const sourceCounts = new Map<string, number>();
+
   const take = (it: FeedItem, source: FeedItem[], reason: string) => {
     const idx = source.indexOf(it);
     if (idx >= 0) source.splice(idx, 1);
@@ -182,6 +195,7 @@ export function buildFeed(input: BuildFeedInput): FeedItem[] {
     totalMinutes += it.estMinutes;
     prevTopic = it.topic;
     topicCounts.set(it.topic, (topicCounts.get(it.topic) ?? 0) + 1);
+    sourceCounts.set(it.sourceId, (sourceCounts.get(it.sourceId) ?? 0) + 1);
   };
 
   const fits = (it: FeedItem) => {
@@ -261,9 +275,9 @@ export function buildFeed(input: BuildFeedInput): FeedItem[] {
       );
 
       chosen =
-        pickDiverse(sided, topicCounts, prevTopic) ??
-        pickDiverse(center, topicCounts, prevTopic) ??
-        pickDiverse(other, topicCounts, prevTopic);
+        pickDiverse(sided, topicCounts, sourceCounts, prevTopic) ??
+        pickDiverse(center, topicCounts, sourceCounts, prevTopic) ??
+        pickDiverse(other, topicCounts, sourceCounts, prevTopic);
 
       if (chosen && fits(chosen)) {
         const s = sideOf(chosen.lean as number);
@@ -282,7 +296,7 @@ export function buildFeed(input: BuildFeedInput): FeedItem[] {
     }
 
     // Non-political (or political didn't fit): broaden topics.
-    const npChoice = pickDiverse(nonPolitical, topicCounts, prevTopic);
+    const npChoice = pickDiverse(nonPolitical, topicCounts, sourceCounts, prevTopic);
     if (npChoice && fits(npChoice)) {
       take(npChoice, nonPolitical, `Broadening your learning — ${npChoice.topic}`);
       continue;

@@ -43,11 +43,16 @@ export interface StoredItem {
    *  story (already covered by international sources) rather than genuinely local,
    *  so it's filtered out of the regional feed. Undefined = not yet classified. */
   global?: boolean;
-  /** REGIONAL pools only: coarse 0..1 newsworthiness from the cheap title-only
-   *  prescreen. Used ONLY to pick which local items earn the expensive deep pass
-   *  (top-N); the deep pass overwrites `importance` with its real score. Undefined
-   *  on topical worlds and on items predating the prescreen. */
+  /** Coarse 0..1 newsworthiness from the cheap title-only triage/prescreen, scored
+   *  for EVERY pool (topical, geo, regional). Drives provisional ranking + the
+   *  analysis order before the deep pass; the deep pass overwrites `importance`
+   *  with its real score. Undefined only on items predating the prescreen. */
   prescreenImportance?: number;
+  /** Video/podcast items: a transcript-based RE-analysis has already run (the
+   *  background enrichment tick). The fast analysis path skips transcript fetching
+   *  (slow); this flag stops the tick from re-fetching/re-analyzing the same item.
+   *  Undefined/false = not yet enriched (eligible). */
+  transcriptEnriched?: boolean;
   /** Number of distinct outlets that carried this same story (>=1). Set by
    *  pre-analysis near-clone dedup: a CLONE inherits its representative's analysis
    *  and the cluster's source count, so the feed can show "covered by N outlets"
