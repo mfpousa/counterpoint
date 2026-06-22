@@ -32,18 +32,38 @@ function parseArgs(argv: string[]): Args {
   return { qid: get("--qid", "Q29"), lang: get("--lang", "en") };
 }
 
-/** SPARQL: news outlets (instance of / subclass of newspaper) in a country. */
+/**
+ * SPARQL: news OUTLETS tied to a country.
+ *
+ * Broad on purpose — outlets are modelled inconsistently on Wikidata:
+ *  - type: newspaper / online newspaper / news agency / TV / radio station
+ *    (all reached via the P279* subclass chain), and
+ *  - country: P17 (country) OR P495 (country of origin) OR P159 (headquarters)
+ *    whose own P17 is the country. We UNION all three so we don't miss outlets
+ *    that only set one of them.
+ */
 function query(qid: string, lang: string): string {
   return `
-    SELECT ?outlet ?outletLabel ?website ?regionLabel WHERE {
-      ?outlet wdt:P31/wdt:P279* wd:Q11032 .   # instance of (subclass of) newspaper
-      ?outlet wdt:P17 wd:${qid} .             # country
+    SELECT DISTINCT ?outlet ?outletLabel ?website ?regionLabel WHERE {
+      VALUES ?type {
+        wd:Q11032     # newspaper
+        wd:Q1153191   # online newspaper
+        wd:Q192283    # news agency
+        wd:Q1616075   # television station
+        wd:Q14350     # radio station
+      }
+      ?outlet wdt:P31/wdt:P279* ?type .
+      {
+        { ?outlet wdt:P17 wd:${qid} . }            # country
+        UNION { ?outlet wdt:P495 wd:${qid} . }      # country of origin
+        UNION { ?outlet wdt:P159 ?hq . ?hq wdt:P17 wd:${qid} . }  # HQ -> country
+      }
       OPTIONAL { ?outlet wdt:P856 ?website. } # official website
       OPTIONAL { ?outlet wdt:P131 ?region. }  # located in admin entity
       SERVICE wikibase:label { bd:serviceParam wikibase:language "${lang},en". }
     }
     ORDER BY ?outletLabel
-    LIMIT 500`;
+    LIMIT 1000`;
 }
 
 interface Binding {
@@ -69,11 +89,16 @@ async function run(args: Args): Promise<SourceCandidate[]> {
   if (!res.ok) throw new Error(`WDQS ${res.status} ${res.statusText}`);
   const json = (await res.json()) as { results: { bindings: Binding[] } };
 
+  const bindings = json.results.bindings;
+  let skippedUnlabeled = 0;
   // Dedupe by outlet label (one row per outlet even with multiple regions).
   const byTitle = new Map<string, SourceCandidate>();
-  for (const b of json.results.bindings) {
+  for (const b of bindings) {
     const title = b.outletLabel?.value?.trim();
-    if (!title || /^Q\d+$/.test(title)) continue; // skip unlabeled items
+    if (!title || /^Q\d+$/.test(title)) {
+      skippedUnlabeled++; // label service returned a bare QID (or nothing)
+      continue;
+    }
     if (!byTitle.has(title)) {
       byTitle.set(title, {
         title,
@@ -85,6 +110,11 @@ async function run(args: Args): Promise<SourceCandidate[]> {
       });
     }
   }
+  // Diagnostics so a 0-result run is never a mystery.
+  console.error(
+    `Wikidata returned ${bindings.length} row(s); ` +
+    `${skippedUnlabeled} skipped (unlabeled QIDs); ${byTitle.size} unique outlet(s).`,
+  );
   return [...byTitle.values()];
 }
 
