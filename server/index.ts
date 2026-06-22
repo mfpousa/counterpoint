@@ -27,7 +27,7 @@ import { runStartupHealthcheck } from "./healthcheck";
 import { generateKnowledgeInsight, type KnowledgeCandidate } from "./knowledge";
 import { rewriteArticle, rewriteArticleStream } from "./rewrite";
 import { getStoredAnyWorld } from "./store";
-import { DEFAULT_WORLD_ID, WORLDS, isWorldId } from "../src/data/worlds";
+import { DEFAULT_WORLD_ID, WORLDS, isPlaceWorldId, isWorldId } from "../src/data/worlds";
 import type { KnowledgeProfile, Place } from "../src/types";
 
 const app = express();
@@ -49,9 +49,13 @@ function readInterest(raw: unknown): string {
   return raw.slice(0, config.feed.maxInterestLen);
 }
 
-/** Resolve a world id from a query param / body, defaulting to the front page. */
+/**
+ * Resolve a pool id from a query param / body. Accepts a topical world id OR a
+ * synthetic REGIONAL pool id (`place-<cc>`, the International↔Regional switch),
+ * defaulting to the front page.
+ */
 function readWorld(raw: unknown): string {
-  return typeof raw === "string" && isWorldId(raw) ? raw : DEFAULT_WORLD_ID;
+  return typeof raw === "string" && (isWorldId(raw) || isPlaceWorldId(raw)) ? raw : DEFAULT_WORLD_ID;
 }
 
 /**

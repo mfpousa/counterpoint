@@ -457,6 +457,13 @@ export interface Preferences {
    * mention the place and can pull in local sources. Orthogonal to `worldId`.
    */
   place?: Place | null;
+  /**
+   * Feed DATASET mode. "international" (default) browses the topical world's
+   * curated/global sources; "regional" switches to a LOCAL-ONLY pool fed by the
+   * place country's discovered outlets, with global stories filtered out by the
+   * AI geo-scope pass. Requires `place.country` to be meaningful.
+   */
+  scope?: "international" | "regional";
   /** UI + AI-output language (the app is shown in this; AI writes in it too). */
   language: Lang;
 }

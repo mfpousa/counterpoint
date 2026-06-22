@@ -42,6 +42,13 @@ const TRIAGE_SCHEMA = arraySchema("triage", {
   additionalProperties: false,
 });
 
+const GEOSCOPE_SCHEMA = arraySchema("geoscope", {
+  type: "object",
+  properties: { id: { type: "string" }, global: { type: "boolean" } },
+  required: ["id", "global"],
+  additionalProperties: false,
+});
+
 // Item-level lean refinement (judge THIS item's framing + explain it) is opt-out.
 // When enabled we add a `leanRationale` field to the analysis schema/prompt.
 const LEAN_REFINE = config.ai.leanRefine;
@@ -193,6 +200,75 @@ export async function detectClickbait(
   );
   for (const s of sets) for (const id of s) junk.add(id);
   return junk;
+}
+
+// --- Geo-scope: filter GLOBAL stories out of a LOCAL feed -------------------
+
+/** One item to geo-classify (id + the text the model judges scope from). */
+export interface GeoScopeInput {
+  id: string;
+  title: string;
+  summary: string;
+}
+
+function geoScopePrompt(placeLabel: string): string {
+  return (
+    `You curate a LOCAL news feed for ${placeLabel}. Local outlets also republish ` +
+    `national and international stories that are ALREADY covered by global media. ` +
+    `For EACH item decide if it is GLOBAL (true) — primarily about international ` +
+    `affairs, other countries, or worldwide topics (foreign wars, global tech, ` +
+    `another country's politics, world sport) — or LOCAL (false): genuinely about ` +
+    `${placeLabel} or its regions/cities (local government, regional economy, local ` +
+    `culture/events/people). When unsure, prefer false (keep it). Output ONLY a JSON ` +
+    `object {"items":[{"id": echo the id, "global": true|false}, ...]}, same order. No prose.`
+  );
+}
+
+async function geoScopeBatch(batch: GeoScopeInput[], placeLabel: string): Promise<Set<string>> {
+  const globals = new Set<string>();
+  const payload = batch.map((it) => ({ id: it.id, title: it.title, summary: it.summary.slice(0, 300) }));
+  const rows = await chatJsonArray(geoScopePrompt(placeLabel), payload, {
+    maxTokens: batch.length * 24 + 64,
+    schema: GEOSCOPE_SCHEMA,
+  });
+  const byId = new Map(batch.map((it) => [it.id, it]));
+  rows.forEach((row, i) => {
+    const r = asRecord(row);
+    if (!r) return;
+    const id =
+      typeof r["id"] === "string" && byId.has(r["id"] as string) ? (r["id"] as string) : batch[i]?.id;
+    if (!id) return;
+    const v = r["global"];
+    if (v === true || v === "true") globals.add(id);
+  });
+  return globals;
+}
+
+/**
+ * Classify which items are GLOBAL (vs local to `placeLabel`). Returns the set of
+ * ids judged global — the regional feed filters these out. Batched + concurrent,
+ * same as triage. Empty set on no input.
+ */
+export async function classifyGlobalScope(
+  items: GeoScopeInput[],
+  placeLabel: string,
+  onProgress?: ProgressFn,
+): Promise<Set<string>> {
+  const globals = new Set<string>();
+  if (items.length === 0) return globals;
+  const batches = chunk(items, config.ai.triageBatchSize);
+  let done = 0;
+  const sets = await withConcurrency(
+    batches.map((b) => async () => {
+      const s = await geoScopeBatch(b, placeLabel);
+      done += b.length;
+      onProgress?.(done, items.length);
+      return s;
+    }),
+    config.ai.concurrency,
+  );
+  for (const s of sets) for (const id of s) globals.add(id);
+  return globals;
 }
 
 // --- Pass 2: deep analysis ---------------------------------------------------

@@ -62,6 +62,7 @@ export default function FeedScreen() {
     summaries,
     storyViews,
     worldId,
+    feedWorldId,
     busyWorld,
     refreshFeed,
     setWorld,
@@ -76,7 +77,7 @@ export default function FeedScreen() {
   // cache so a remount (e.g. backing out of a story) shows the already-built set
   // immediately instead of blanking to empty.
   const [stories, setStories] = useState<Story[]>(
-    () => storiesByKey.get(storyKeyFor(worldId, prefs.language)) ?? [],
+    () => storiesByKey.get(storyKeyFor(feedWorldId, prefs.language)) ?? [],
   );
   const [loadingStories, setLoadingStories] = useState(false);
   const storiesLoadedOnce = useRef(false);
@@ -84,13 +85,13 @@ export default function FeedScreen() {
     async (force = false) => {
       setLoadingStories(true);
       try {
-        const res = await fetchStories({ world: worldId, force, lang: prefs.language });
+        const res = await fetchStories({ world: feedWorldId, force, lang: prefs.language });
         // Never WIPE a populated set while the backend is mid-rebuild: /api/stories
         // can transiently return [] during synthesis. Keep showing the stale set
         // until real stories arrive, then swap them in (they eventually update).
         if (res.stories.length > 0) {
           setStories(res.stories);
-          storiesByKey.set(storyKeyFor(worldId, prefs.language), res.stories);
+          storiesByKey.set(storyKeyFor(feedWorldId, prefs.language), res.stories);
           // Share with the routed story panel so opening a listed story is instant
           // and never dead-ends on an id that changed during a rebuild.
           cacheStories(res.stories);
@@ -100,20 +101,20 @@ export default function FeedScreen() {
         setLoadingStories(false);
       }
     },
-    [worldId, prefs.language],
+    [feedWorldId, prefs.language],
   );
   useEffect(() => {
     // Show this world+language's cached stories immediately (no skeleton flash)
     // when we've built them before; otherwise leave whatever's there until the
     // background refresh lands. NEVER force-clear to [] here: that's what made
     // stories vanish on a remount. Always refresh in the bg.
-    const cached = storiesByKey.get(storyKeyFor(worldId, prefs.language));
+    const cached = storiesByKey.get(storyKeyFor(feedWorldId, prefs.language));
     if (cached) {
       setStories(cached);
       storiesLoadedOnce.current = true;
     }
     void loadStories();
-  }, [loadStories, worldId, prefs.language]);
+  }, [loadStories, feedWorldId, prefs.language]);
 
   // Live: when the backend finishes analyzing a chunk (analyzed count grows),
   // silently re-fetch stories so new/updated ones appear in real time.
@@ -305,9 +306,20 @@ export default function FeedScreen() {
         {/* World switcher: pick which news universe to browse. */}
         <WorldSwitcher worldId={worldId} busyWorld={busyWorld} onSelect={setWorld} />
 
+        {/* International vs Regional: switch the whole dataset between the world's
+            global sources and the reader's place-local outlets. */}
+        <ScopeToggle
+          scope={prefs.scope ?? "international"}
+          hasPlace={!!prefs.place?.country}
+          onChange={(s) => {
+            if (s !== (prefs.scope ?? "international")) void updatePrefs({ scope: s });
+          }}
+          t={t}
+        />
+
         {/* Only one world refreshes at a time. Surface this only when the
             selected world has nothing to show because another is hogging the lock. */}
-        {busyWorld && busyWorld !== worldId && feed.length === 0 && (
+        {busyWorld && busyWorld !== feedWorldId && feed.length === 0 && (
           <View style={styles.busyBanner}>
             <ActivityIndicator size="small" color={colors.warn} />
             <Text style={styles.busyText}>{t("feed.busy", { world: t(`world.${busyWorld}`) })}</Text>
@@ -547,7 +559,88 @@ function FilterChip({
   );
 }
 
+/** International ↔ Regional dataset switch. Regional needs a place; without one
+ *  it's disabled with a hint to set one in Settings. */
+function ScopeToggle({
+  scope,
+  hasPlace,
+  onChange,
+  t,
+}: {
+  scope: "international" | "regional";
+  hasPlace: boolean;
+  onChange: (s: "international" | "regional") => void;
+  t: (key: string, params?: Record<string, string | number>) => string;
+}) {
+  const seg = (
+    key: "international" | "regional",
+    icon: keyof typeof Ionicons.glyphMap,
+    disabled = false,
+  ) => {
+    const active = scope === key;
+    return (
+      <Pressable
+        key={key}
+        onPress={() => {
+          if (!disabled) onChange(key);
+        }}
+        disabled={disabled}
+        accessibilityRole="button"
+        accessibilityState={{ selected: active, disabled }}
+        style={[styles.scopeSeg, active && styles.scopeSegActive, disabled && styles.scopeSegDisabled]}
+      >
+        <Ionicons
+          name={icon}
+          size={14}
+          color={active ? colors.bg : disabled ? colors.textFaint : colors.textDim}
+        />
+        <Text
+          style={[
+            styles.scopeSegText,
+            active && styles.scopeSegTextActive,
+            disabled && { color: colors.textFaint },
+          ]}
+        >
+          {t(`feed.scope.${key}`)}
+        </Text>
+      </Pressable>
+    );
+  };
+  return (
+    <View>
+      <View style={styles.scopeToggle}>
+        {seg("international", "earth")}
+        {seg("regional", "location", !hasPlace)}
+      </View>
+      {!hasPlace && <Text style={styles.scopeHint}>{t("feed.scope.needPlace")}</Text>}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  scopeToggle: {
+    flexDirection: "row",
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    padding: 3,
+    gap: 3,
+  },
+  scopeSeg: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.xs,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.pill,
+  },
+  scopeSegActive: { backgroundColor: colors.accent },
+  scopeSegDisabled: { opacity: 0.6 },
+  scopeSegText: { color: colors.textDim, fontSize: font.small, fontWeight: "700" },
+  scopeSegTextActive: { color: colors.bg },
+  scopeHint: { color: colors.textFaint, fontSize: font.tiny, marginTop: spacing.xs, textAlign: "center" },
   headerRow: { flexDirection: "row", alignItems: "flex-start", gap: spacing.md },
   title: { color: colors.text, fontSize: font.h1, fontWeight: "800" },
   subtitle: { color: colors.textDim, fontSize: font.small, marginTop: 2 },

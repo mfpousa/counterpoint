@@ -292,4 +292,25 @@ export function isWorldId(id: string | undefined | null): boolean {
   return !!id && WORLDS.some((w) => w.id === id);
 }
 
+/**
+ * A synthetic "regional" pool id: `place-<cc>` (e.g. "place-es"). Regional mode
+ * is a DATASET SWITCH — its pool is fed exclusively by the country's locally-
+ * discovered outlets (src/data/placeSources/<cc>.json), orthogonal to the topical
+ * worlds. Encoded in the worldId so all per-world plumbing (store, build, view
+ * cache, status) works unchanged.
+ */
+export function isPlaceWorldId(id: string | undefined | null): boolean {
+  return !!id && /^place-[a-z]{2}$/.test(id);
+}
+
+/** The country code of a regional pool id ("place-es" -> "es"), else null. */
+export function placeCountryOf(id: string | undefined | null): string | null {
+  return isPlaceWorldId(id) ? (id as string).slice(6) : null;
+}
+
+/** The regional pool id for a country code ("es" -> "place-es"). */
+export function placeWorldId(country: string): string {
+  return `place-${country.toLowerCase().slice(0, 2)}`;
+}
+
 export default WORLDS;

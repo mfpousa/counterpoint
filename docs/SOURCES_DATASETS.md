@@ -74,6 +74,36 @@ dataset like AllSides/Ad Fontes/MBFC — but those are US-centric and licence-bo
 2. **Media Cloud key** — DECIDED: user has a key (pass via `MEDIACLOUD_API_KEY` env var).
 3. **Lean seeding** — DECIDED: lean is AI-generated per item; discovered sources carry `lean: null`.
 
+## Automated pipeline (one command)
+
+The fold-in is fully automated — no manual paste-back. This resolves outlets
+(Wikidata + optional Media Cloud), RSS-autodiscovers + validates their feeds, and
+writes the generated registry `src/data/placeSources/<cc>.json`. The server loads
+it on demand when a reader sets that country as their place (see
+`server/placeSources.ts` + `addPlacePending` in `server/feedService.ts`), so local
+coverage enters the pool and the gazetteer boost lifts it. `lean` is always `null`
+(assigned per item by analysis).
+
+```bash
+# Wikidata only (keyless):
+npm run sources:place -- --country es
+# With Media Cloud too — collections are AI-PICKED, no id needed:
+MEDIACLOUD_API_KEY=xxx npm run sources:place -- --country es
+```
+
+**Media Cloud is hands-off.** With a key, the pipeline searches the Media Cloud
+collection directory for the place and the model picks the relevant GEOGRAPHIC news
+collections (national/regional/local), excluding topical/experimental/foreign ones.
+If the model is unreachable it falls back to a name-match heuristic. You can still
+force ids with `--mc-collection 1234,5678` or change the search term with
+`--mc-query "..."`.
+
+Flags: `--country <cc>` `[--qid Qnnn]` `[--lang xx]` `[--mc-collection ids]`
+`[--mc-query text]` `[--limit N]` `[--concurrency N]` `[--out path]`. Re-run anytime
+to refresh; commit the generated JSON so it ships with the app.
+
+The individual steps below remain available for debugging.
+
 ## Running the validations (on an un-proxied machine)
 
 Some corporate networks 403 archive (`.zip`) downloads, which blocks the GeoNames
@@ -112,6 +142,19 @@ request 401s, re-check the key; if the result shape differs, adjust the `BASE`/
 parsing in `scripts/resolveSourcesMediaCloud.ts` (endpoint paths are documented but
 unverified — see the script header).
 
-> Next step after validation: RSS-autodiscover each candidate `homepage`, validate
-> the feeds, and fold survivors into the place registries (lean stays `null` — the
-> analysis pass assigns lean per item).
+**4. RSS autodiscovery (keyless, run un-proxied).** Turns the candidate homepages
+from steps 2–3 into validated feeds. Reads declared `<link rel="alternate">` feeds
+first, then tries conventional paths (`/feed`, `/rss`, …), and keeps only feeds that
+parse with real items. Emits `Source`-shaped entries (`lean: null`).
+
+```bash
+npm run discover:feeds -- --in /tmp/wikidata-es.json --lang es > /tmp/feeds-es.json
+cat /tmp/mediacloud.json | npm run discover:feeds -- --lang es > /tmp/feeds-mc.json
+```
+
+Verify: each entry has `ok: true` and a populated `url` (the feed). The stderr
+summary prints `N/M have a working feed`. Send me the two output files (or just the
+`ok: true` entries) and I'll fold the survivors into the place registries.
+
+> Final fold-in: dedupe against existing sources, assign `topic`/`zone`, and register
+> under the place lens. `lean` stays `null` — the analysis pass assigns lean per item.

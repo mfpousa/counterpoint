@@ -39,6 +39,10 @@ export interface StoredItem {
   /** Semantic embedding of the item (for meaning-based interest matching).
    *  Absent until backfilled, or when no embedding model is available. */
   embedding?: number[];
+  /** REGIONAL pools only: the model judged this item to be a GLOBAL/international
+   *  story (already covered by international sources) rather than genuinely local,
+   *  so it's filtered out of the regional feed. Undefined = not yet classified. */
+  global?: boolean;
 }
 
 interface StoreFile {

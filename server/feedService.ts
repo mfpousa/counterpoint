@@ -13,13 +13,15 @@
 
 import { fetchAll } from "../src/lib/rss";
 import type { AnalysisStatus, Briefing, FeedItem, Lang, Place, Story } from "../src/types";
-import { DEFAULT_WORLD_ID, worldSources } from "../src/data/worlds";
+import { DEFAULT_WORLD_ID, isPlaceWorldId, placeCountryOf, worldSources } from "../src/data/worlds";
 import { ZONES, ZONES_BY_ID } from "../src/data/zones";
 import { detectZones } from "../src/lib/zones";
 import { placeBoostedRelevance, scorePlace } from "../src/lib/places";
 import { gazetteerFor } from "./places";
+import { placeSourcesFor } from "./placeSources";
+import type { Source } from "../src/types";
 import { aiReachable, withConcurrency } from "./ai";
-import { analyzeItems, detectClickbait } from "./analysis";
+import { analyzeItems, classifyGlobalScope, detectClickbait } from "./analysis";
 import { generateBriefing, generateBriefingStream } from "./briefing";
 import {
   clusterItems,
@@ -202,6 +204,16 @@ function pendingForAnalysis(worldId: string): StoredItem[] {
 }
 
 /**
+ * The source set for a pool. Topical worlds use their curated sources; a REGIONAL
+ * pool (`place-<cc>`) is fed EXCLUSIVELY by that country's locally-discovered
+ * outlets — the "International vs Regional" dataset switch.
+ */
+function sourcesForWorld(worldId: string): Source[] {
+  const cc = placeCountryOf(worldId);
+  return cc ? placeSourcesFor(cc) : worldSources(worldId);
+}
+
+/**
  * Network phase: fetch all sources, triage brand-new & recent items, and store
  * them — junk flagged, survivors marked PENDING (analyzed:false). Deep analysis
  * is deferred to analyzePending() so the build is chunked, not a multi-hour block.
@@ -209,7 +221,7 @@ function pendingForAnalysis(worldId: string): StoredItem[] {
 async function refreshSources(worldId: string): Promise<void> {
   const state = ws(worldId);
   const st = getStore(worldId);
-  const sources = worldSources(worldId);
+  const sources = sourcesForWorld(worldId);
   const started = Date.now();
   setPhase(state, "fetching");
   console.log(`[feed:${worldId}] refresh — fetching ${sources.length} sources…`);
@@ -668,19 +680,66 @@ async function addZonePending(worldId: string): Promise<number> {
   return added;
 }
 
+/** Display label for a country code (gazetteer country node, else the code). */
+function placeLabelFor(cc: string): string {
+  const country = gazetteerFor(cc).find((n) => n.level === "country");
+  return country?.label ?? cc.toUpperCase();
+}
+
 /**
- * Run the reactive augmentations (YouTube discovery + international zones): add
- * their candidate articles as PENDING, then drain the backlog ONCE through the
- * normal analysis pipeline. Fire-and-forget; guarded so only one runs per world.
- * To honor the GLOBAL single-build invariant, analysis runs only when the build
- * lock is free (it's invoked right after this world released it); otherwise the
- * new items stay pending and the next build drains them.
+ * REGIONAL pools only: classify each newly-analyzed LOCAL item as GLOBAL (an
+ * international story already covered by international sources) vs genuinely
+ * LOCAL, and persist the verdict on the stored item. assembleView then filters
+ * the globals out, so the regional feed stays local. No-op for topical worlds.
+ * Returns how many items were classified.
+ */
+async function classifyRegionalScope(worldId: string): Promise<number> {
+  if (!config.place.sourcesEnabled) return 0;
+  const cc = placeCountryOf(worldId);
+  if (!cc) return 0;
+  const st = getStore(worldId);
+  const cutoff = analyzeCutoff();
+  const pending = st
+    .all()
+    .filter((s) => s.analyzed && !s.clickbait && s.global === undefined && s.item.publishedAt >= cutoff);
+  if (pending.length === 0) return 0;
+  if (!(await aiReachable())) return 0;
+
+  const globals = await classifyGlobalScope(
+    pending.map((s) => ({ id: s.item.id, title: s.item.title, summary: s.summary })),
+    placeLabelFor(cc),
+  );
+  for (const s of pending) {
+    s.global = globals.has(s.item.id);
+    st.upsert(s);
+  }
+  st.save();
+  // Bust cached views so the filter takes effect on the next assemble.
+  ws(worldId).lastBuildAt = Date.now();
+  console.log(
+    `[place:${worldId}] geo-scope: ${globals.size}/${pending.length} judged global (hidden from local feed)`,
+  );
+  return pending.length;
+}
+
+/**
+ * Run the reactive augmentations after a build. TOPICAL worlds get YouTube
+ * discovery + international zones; a REGIONAL pool instead gets the geo-scope
+ * pass (drop global stories from local outlets). Fire-and-forget; guarded so only
+ * one runs per world. To honor the GLOBAL single-build invariant, analysis runs
+ * only when the build lock is free; otherwise new items stay pending for the next
+ * drain.
  */
 function augmentReactively(worldId: string): Promise<void> {
   const state = ws(worldId);
   if (state.augmentInFlight) return state.augmentInFlight;
 
   state.augmentInFlight = (async () => {
+    // Regional pool: classify geo-scope (no YouTube/zones — those are international).
+    if (isPlaceWorldId(worldId)) {
+      await classifyRegionalScope(worldId);
+      return;
+    }
     let added = 0;
     added += await addYouTubePending(worldId);
     added += await addZonePending(worldId);
@@ -849,9 +908,18 @@ function assembleView(
   const hasInterest = tokens.size > 0;
   const now = Date.now();
 
+  // REGIONAL pools drop items the geo-scope pass judged GLOBAL (international
+  // stories local outlets republish, already covered by international sources).
+  const dropGlobal = isPlaceWorldId(worldId);
   const eligible = st
     .all()
-    .filter((s) => !s.clickbait && s.analyzed && now - s.item.publishedAt <= config.feed.retentionMs);
+    .filter(
+      (s) =>
+        !s.clickbait &&
+        s.analyzed &&
+        now - s.item.publishedAt <= config.feed.retentionMs &&
+        !(dropGlobal && s.global === true),
+    );
   // Apply negation exclusions with a safety valve against over-broad terms.
   const { kept, removed, skipped, counts } = partitionByExclusion(eligible, parsed.exclude);
   if (skipped.length > 0) {

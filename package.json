@@ -18,7 +18,9 @@
     "gazetteer:fetch": "bash scripts/fetch-geonames.sh",
     "gazetteer:build": "tsx scripts/buildGazetteer.ts",
     "sources:wikidata": "tsx scripts/resolveSources.ts",
-    "sources:mediacloud": "tsx scripts/resolveSourcesMediaCloud.ts"
+    "sources:mediacloud": "tsx scripts/resolveSourcesMediaCloud.ts",
+    "discover:feeds": "tsx scripts/discoverFeeds.ts",
+    "sources:place": "tsx scripts/buildPlaceSources.ts"
   },
   "dependencies": {
     "@expo/vector-icons": "^14.0.2",
