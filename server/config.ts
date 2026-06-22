@@ -149,6 +149,13 @@ export const config = {
     fetchTtlMs: num("PLACE_FETCH_TTL_MS", 3 * 60 * 60 * 1000),
     // Max recent local articles queued per country per augmentation pass.
     perBuildItemCap: num("PLACE_PER_BUILD_ITEMS", 40),
+    // Local outlets flood the pool (thousands/day) but only a few hundred ever
+    // reach the reader. The cheap title-only PRESCREEN scores coarse importance;
+    // we then deep-analyze only the top-N LOCAL items by that score, skipping the
+    // long tail (kept in store, never analyzed → excluded from the feed). This is
+    // the main throughput lever for a token-bound local model. 0 = no cap
+    // (analyze every local survivor, as before).
+    deepAnalyzeKeep: numOrZero("PLACE_DEEP_ANALYZE_KEEP", 600),
   },
   reader: {
     // In-app "AI rewrite" reader. The backend fetches the article, extracts the

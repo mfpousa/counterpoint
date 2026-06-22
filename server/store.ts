@@ -43,6 +43,11 @@ export interface StoredItem {
    *  story (already covered by international sources) rather than genuinely local,
    *  so it's filtered out of the regional feed. Undefined = not yet classified. */
   global?: boolean;
+  /** REGIONAL pools only: coarse 0..1 newsworthiness from the cheap title-only
+   *  prescreen. Used ONLY to pick which local items earn the expensive deep pass
+   *  (top-N); the deep pass overwrites `importance` with its real score. Undefined
+   *  on topical worlds and on items predating the prescreen. */
+  prescreenImportance?: number;
 }
 
 interface StoreFile {

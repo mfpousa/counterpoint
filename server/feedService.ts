@@ -21,7 +21,7 @@ import { gazetteerFor } from "./places";
 import { placeSourcesFor } from "./placeSources";
 import type { Source } from "../src/types";
 import { aiReachable, withConcurrency } from "./ai";
-import { analyzeItems, classifyGlobalScope, detectClickbait } from "./analysis";
+import { analyzeItems, classifyGlobalScope, detectClickbait, prescreenRegional } from "./analysis";
 import { generateBriefing, generateBriefingStream } from "./briefing";
 import {
   clusterItems,
@@ -194,16 +194,45 @@ function analyzeCutoff(now = Date.now()): number {
   return now - config.feed.analyzeMaxAgeMs;
 }
 
-/** The recency-ordered backlog of items still needing deep analysis. Items the
- *  cheap triage pass already judged GLOBAL (in a regional pool) are excluded —
- *  they'd be filtered out of the local feed anyway, so we never pay the expensive
- *  pass on them. */
+/** The backlog of items still needing deep analysis. Items the cheap triage pass
+ *  judged clickbait — or GLOBAL in a regional pool — are excluded (they'd be kept
+ *  out of the feed anyway, so we never pay the expensive pass on them).
+ *
+ *  REGIONAL pools additionally cap the backlog to the top-N local survivors by
+ *  COARSE (prescreen) importance: local outlets flood the pool but only a few
+ *  hundred reach the reader, so deep-analyzing the long tail is wasted tokens.
+ *  The cut is taken over ALL in-window survivors (analyzed + pending) so it stays
+ *  stable as items get analyzed — we never deep-analyze more than N locals — and
+ *  the returned backlog is importance-ordered so the most newsworthy go first. */
 function pendingForAnalysis(worldId: string): StoredItem[] {
   const cutoff = analyzeCutoff();
-  return getStore(worldId)
-    .all()
+  const all = getStore(worldId).all();
+  if (isPlaceWorldId(worldId) && config.place.deepAnalyzeKeep > 0) {
+    const survivors = all.filter(
+      (s) => !s.clickbait && s.global !== true && s.item.publishedAt >= cutoff,
+    );
+    return topLocalBacklog(survivors, config.place.deepAnalyzeKeep);
+  }
+  return all
     .filter((s) => !s.clickbait && !s.analyzed && s.global !== true && s.item.publishedAt >= cutoff)
     .sort((a, b) => b.item.publishedAt - a.item.publishedAt);
+}
+
+/**
+ * Pure: from the in-window LOCAL survivors (already filtered for clickbait/global/
+ * recency), pick the not-yet-analyzed members of the TOP-`keep` by coarse prescreen
+ * importance. The cut is taken over the WHOLE survivor set (analyzed + pending) so
+ * it's STABLE: as items get analyzed they keep occupying their slot, so the total
+ * deep-analyzed local count never exceeds `keep`. Returned importance-first.
+ */
+export function topLocalBacklog(survivors: StoredItem[], keep: number): StoredItem[] {
+  const ranked = [...survivors].sort(
+    (a, b) =>
+      (b.prescreenImportance ?? 0.5) - (a.prescreenImportance ?? 0.5) ||
+      b.item.publishedAt - a.item.publishedAt,
+  );
+  const cut = keep > 0 ? ranked.slice(0, keep) : ranked;
+  return cut.filter((s) => !s.analyzed);
 }
 
 /**
@@ -244,44 +273,51 @@ async function refreshSources(worldId: string): Promise<void> {
       setPhase(state, "idle");
       return;
     }
+    const cc = placeCountryOf(worldId);
+    const regional = !!cc && config.place.sourcesEnabled;
+
     let junk = new Set<string>();
-    if (config.feed.clickbaitFilter) {
+    // Regional pools: ONE cheap title-only pass folds clickbait + local/global +
+    // a coarse importance, so we scan the flood once and later deep-analyze only
+    // the top-N local items by that score. Topical worlds keep the clickbait-only
+    // triage (their curated sources aren't a flood).
+    const coarse = new Map<string, number>(); // id -> coarse importance (regional)
+    const globals = new Set<string>();
+    if (regional && cc) {
+      const batches = Math.ceil(untriaged.length / config.ai.triageBatchSize);
+      console.log(`[feed:${worldId}] prescreen: ${untriaged.length} headline(s) in ${batches} batch(es)…`);
+      const verdicts = await prescreenRegional(
+        untriaged.map((it) => ({ id: it.id, title: it.title, summary: it.summary })),
+        placeLabelFor(cc),
+        progressLogger(state, "triage"),
+      );
+      for (const it of untriaged) {
+        const v = verdicts.get(it.id);
+        if (!v) continue; // absent from reply → treat conservatively (kept, default importance)
+        if (config.feed.clickbaitFilter && v.junk) junk.add(it.id);
+        if (v.global) globals.add(it.id);
+        coarse.set(it.id, v.importance);
+      }
+      console.log(
+        `[feed:${worldId}] prescreen flagged ${junk.size} junk, ${globals.size} global ` +
+          `of ${untriaged.length}`,
+      );
+    } else if (config.feed.clickbaitFilter) {
       const batches = Math.ceil(untriaged.length / config.ai.triageBatchSize);
       console.log(`[feed:${worldId}] triage: ${untriaged.length} headline(s) in ${batches} batch(es)…`);
       junk = await detectClickbait(untriaged, progressLogger(state, "triage"));
       console.log(`[feed:${worldId}] triage flagged ${junk.size}/${untriaged.length} as clickbait/junk`);
     }
 
-    // REGIONAL pools: judge local-vs-global from the HEADLINE now (cheap, title-
-    // only) and drop the obvious internationals BEFORE the expensive deep pass —
-    // local outlets republish a lot of globally-covered news. Conservative: the
-    // prompt keeps anything it's unsure about. Only non-junk items are worth the
-    // check. Topical worlds skip this (global flag stays undefined).
-    const cc = placeCountryOf(worldId);
-    let globals = new Set<string>();
-    if (cc && config.place.sourcesEnabled) {
-      const localCandidates = untriaged.filter((it) => !junk.has(it.id));
-      if (localCandidates.length > 0) {
-        console.log(`[feed:${worldId}] geo-scope: classifying ${localCandidates.length} headline(s) local/global…`);
-        globals = await classifyGlobalScope(
-          localCandidates.map((it) => ({ id: it.id, title: it.title, summary: it.summary })),
-          placeLabelFor(cc),
-          progressLogger(state, "triage"),
-        );
-        console.log(
-          `[feed:${worldId}] geo-scope flagged ${globals.size}/${localCandidates.length} as global ` +
-            `(dropped before deep analysis)`,
-        );
-      }
-    }
-
     for (const it of untriaged) {
       st.upsert({
         item: it,
         clickbait: junk.has(it.id),
-        // Set at triage for regional pools so the global stories are excluded from
+        // Set at prescreen for regional pools so global stories are excluded from
         // the deep-analysis backlog (pendingForAnalysis) and the local feed.
-        global: cc ? globals.has(it.id) : undefined,
+        global: regional ? globals.has(it.id) : undefined,
+        // Coarse newsworthiness used ONLY to pick the top-N locals for deep analysis.
+        prescreenImportance: regional ? (coarse.get(it.id) ?? 0.5) : undefined,
         analyzed: false, // deep analysis pending
         topic: it.topic,
         lean: it.lean,

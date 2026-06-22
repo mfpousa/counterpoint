@@ -49,6 +49,18 @@ const GEOSCOPE_SCHEMA = arraySchema("geoscope", {
   additionalProperties: false,
 });
 
+const PRESCREEN_SCHEMA = arraySchema("prescreen", {
+  type: "object",
+  properties: {
+    id: { type: "string" },
+    junk: { type: "boolean" },
+    global: { type: "boolean" },
+    importance: { type: "number" },
+  },
+  required: ["id", "junk", "global", "importance"],
+  additionalProperties: false,
+});
+
 // Item-level lean refinement (judge THIS item's framing + explain it) is opt-out.
 // When enabled we add a `leanRationale` field to the analysis schema/prompt.
 const LEAN_REFINE = config.ai.leanRefine;
@@ -269,6 +281,93 @@ export async function classifyGlobalScope(
   );
   for (const s of sets) for (const id of s) globals.add(id);
   return globals;
+}
+
+// --- Combined prescreen (REGIONAL): junk + global + coarse importance --------
+// One cheap, title-only pass that folds the clickbait and geo-scope judgments
+// together AND estimates coarse newsworthiness — so we scan the flood of local
+// headlines ONCE and then deep-analyze only the top-N by that score. This is the
+// main throughput lever for a token-bound local model.
+
+/** Coarse per-headline verdict from the combined regional prescreen. */
+export interface Prescreen {
+  junk: boolean;
+  global: boolean;
+  /** 0..1 rough newsworthiness from the headline alone. */
+  importance: number;
+}
+
+function prescreenPrompt(placeLabel: string): string {
+  return (
+    `You are a fast headline triage for a LOCAL news feed for ${placeLabel}. For ` +
+    `EACH headline output three judgments:\n` +
+    `- "junk": true if CLICKBAIT or low-signal — curiosity-gap teasers, ragebait, ` +
+    `listicles, horoscopes, ads/sponsored, celebrity gossip, lone accidents or ` +
+    `crime-blotter with no wider significance. Substantive reporting is NOT junk.\n` +
+    `- "global": true if primarily INTERNATIONAL — foreign affairs, another ` +
+    `country, or worldwide topics already covered by global media (foreign wars, ` +
+    `global tech, other countries' politics, world sport). false if genuinely ` +
+    `about ${placeLabel} or its regions/cities. When unsure, prefer false (keep it).\n` +
+    `- "importance": 0.0..1.0 coarse newsworthiness for an informed local reader — ` +
+    `reward consequential local reporting, penalize thin filler. A rough estimate ` +
+    `from the headline alone is fine.\n` +
+    `Output ONLY {"items":[{"id": echo the id, "junk": bool, "global": bool, ` +
+    `"importance": number}, ...]}, same order as input. No prose.`
+  );
+}
+
+async function prescreenBatch(
+  batch: GeoScopeInput[],
+  placeLabel: string,
+): Promise<Map<string, Prescreen>> {
+  const out = new Map<string, Prescreen>();
+  // Title-only — the whole point is to avoid shipping summaries for the flood.
+  const payload = batch.map((it) => ({ id: it.id, title: it.title }));
+  const rows = await chatJsonArray(prescreenPrompt(placeLabel), payload, {
+    maxTokens: batch.length * 32 + 64,
+    schema: PRESCREEN_SCHEMA,
+  });
+  const byId = new Map(batch.map((it) => [it.id, it]));
+  rows.forEach((row, i) => {
+    const r = asRecord(row);
+    if (!r) return;
+    const id =
+      typeof r["id"] === "string" && byId.has(r["id"] as string) ? (r["id"] as string) : batch[i]?.id;
+    if (!id) return;
+    out.set(id, {
+      junk: r["junk"] === true || r["junk"] === "true",
+      global: r["global"] === true || r["global"] === "true",
+      importance: clampNum(r["importance"], 0, 1, 0.5),
+    });
+  });
+  return out;
+}
+
+/**
+ * Combined regional prescreen: returns id -> {junk, global, importance} for each
+ * headline. Batched + concurrent like triage. Items missing from the model reply
+ * are simply absent from the map (callers treat absence conservatively).
+ */
+export async function prescreenRegional(
+  items: GeoScopeInput[],
+  placeLabel: string,
+  onProgress?: ProgressFn,
+): Promise<Map<string, Prescreen>> {
+  const out = new Map<string, Prescreen>();
+  if (items.length === 0) return out;
+  const batches = chunk(items, config.ai.triageBatchSize);
+  let done = 0;
+  const maps = await withConcurrency(
+    batches.map((b) => async () => {
+      const m = await prescreenBatch(b, placeLabel);
+      done += b.length;
+      onProgress?.(done, items.length);
+      return m;
+    }),
+    config.ai.concurrency,
+  );
+  for (const m of maps) for (const [id, p] of m) out.set(id, p);
+  return out;
 }
 
 // --- Pass 2: deep analysis ---------------------------------------------------
