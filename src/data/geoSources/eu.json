@@ -1,0 +1,35 @@
+[
+  {
+    "id": "geo-eu-euronews",
+    "title": "Euronews",
+    "url": "https://www.euronews.com/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.6,
+    "leanRationale": "Pan-European news broadcaster.",
+    "lang": "en"
+  },
+  {
+    "id": "geo-eu-politico",
+    "title": "POLITICO Europe",
+    "url": "https://www.politico.eu/feed/",
+    "kind": "news",
+    "topic": "politics",
+    "lean": null,
+    "confidence": 0.6,
+    "leanRationale": "EU affairs and Brussels politics.",
+    "lang": "en"
+  },
+  {
+    "id": "geo-eu-euractiv",
+    "title": "EURACTIV",
+    "url": "https://www.euractiv.com/feed/",
+    "kind": "news",
+    "topic": "politics",
+    "lean": null,
+    "confidence": 0.6,
+    "leanRationale": "EU policy news network.",
+    "lang": "en"
+  }
+]

@@ -48,6 +48,16 @@ export interface StoredItem {
    *  (top-N); the deep pass overwrites `importance` with its real score. Undefined
    *  on topical worlds and on items predating the prescreen. */
   prescreenImportance?: number;
+  /** Number of distinct outlets that carried this same story (>=1). Set by
+   *  pre-analysis near-clone dedup: a CLONE inherits its representative's analysis
+   *  and the cluster's source count, so the feed can show "covered by N outlets"
+   *  without deep-analyzing every copy. Undefined when the item stands alone. */
+  coveredBy?: number;
+  /** The id of this item's REPRESENTATIVE when it's a near-clone of another (set
+   *  by geo-pool dedup fan-out). Clones are kept in the store (for the coveredBy
+   *  count + completeness) but HIDDEN from the feed/stories so each story shows as
+   *  a single card. Undefined on representatives and stand-alone items. */
+  cloneOf?: string;
 }
 
 interface StoreFile {

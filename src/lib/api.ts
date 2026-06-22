@@ -101,6 +101,41 @@ export async function fetchRankedFeed(
   };
 }
 
+/** Coverage state of a geographic node (mirrors the server's CoverageState). */
+export type CoverageState = "ready" | "none" | "unknown";
+
+/** One node in the coverage map (mirrors the server's CoverageNode). */
+export interface CoverageNode {
+  nodeId: string;
+  poolId: string;
+  label: string;
+  level: "world" | "continent" | "country" | "region" | "province" | "locality";
+  state: CoverageState;
+  hasChildren: boolean;
+}
+
+export interface CoverageView {
+  node: CoverageNode;
+  /** Breadcrumb from the world root down to (and including) the focused node. */
+  path: CoverageNode[];
+  /** The focused node's children — the drill-down options. */
+  children: CoverageNode[];
+}
+
+/**
+ * Fetch the coverage map for a geographic node (defaults to the world root): the
+ * node itself, its breadcrumb, and its children with coverage states for coloring.
+ * Throws on network/HTTP failure so the navigator can surface it.
+ */
+export async function fetchCoverage(node?: string): Promise<CoverageView> {
+  const params = new URLSearchParams();
+  if (node) params.set("node", node);
+  const qs = params.toString();
+  const res = await fetch(`${apiBaseUrl()}/api/coverage${qs ? `?${qs}` : ""}`, { method: "GET" });
+  if (!res.ok) throw new Error(`Coverage request failed (HTTP ${res.status}).`);
+  return (await res.json()) as CoverageView;
+}
+
 /**
  * Ask the backend to fetch + AI-rewrite an item into a clean, readable article
  * for in-app reading. Throws with a clear message on failure so the reader UI

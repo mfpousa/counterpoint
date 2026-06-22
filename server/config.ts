@@ -157,6 +157,21 @@ export const config = {
     // (analyze every local survivor, as before).
     deepAnalyzeKeep: numOrZero("PLACE_DEEP_ANALYZE_KEEP", 600),
   },
+  geo: {
+    // GEOGRAPHIC POOLS (geo-<nodeId>): world → continent → country → region →
+    // province → locality. Each pool is fed by its node's own outlets (see
+    // server/sourceRegistry.ts) and shows EVERYTHING they report.
+    //
+    // Throughput lever: a cheap title-only prescreen scores coarse importance,
+    // we near-clone DEDUP the survivors (so identical wire copy is analyzed once),
+    // and then deep-analyze only the top-N CLUSTERS by that score — ~200 is
+    // "plenty" for any level. 0 = no cap.
+    deepAnalyzeKeep: numOrZero("GEO_DEEP_ANALYZE_KEEP", 200),
+    // Min title Jaccard for two items to count as the SAME story (near-clone).
+    dedupeJaccard: num("GEO_DEDUPE_JACCARD", 0.7),
+    // Max publish-time gap (ms) for two items to be considered clones.
+    dedupeWindowMs: num("GEO_DEDUPE_WINDOW_MS", 2 * 24 * 60 * 60 * 1000),
+  },
   reader: {
     // In-app "AI rewrite" reader. The backend fetches the article, extracts the
     // text, and the LLM rewrites it into a clean, readable version.

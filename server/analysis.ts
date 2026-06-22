@@ -61,6 +61,17 @@ const PRESCREEN_SCHEMA = arraySchema("prescreen", {
   additionalProperties: false,
 });
 
+const GEO_PRESCREEN_SCHEMA = arraySchema("geoprescreen", {
+  type: "object",
+  properties: {
+    id: { type: "string" },
+    junk: { type: "boolean" },
+    importance: { type: "number" },
+  },
+  required: ["id", "junk", "importance"],
+  additionalProperties: false,
+});
+
 // Item-level lean refinement (judge THIS item's framing + explain it) is opt-out.
 // When enabled we add a `leanRationale` field to the analysis schema/prompt.
 const LEAN_REFINE = config.ai.leanRefine;
@@ -360,6 +371,87 @@ export async function prescreenRegional(
   const maps = await withConcurrency(
     batches.map((b) => async () => {
       const m = await prescreenBatch(b, placeLabel);
+      done += b.length;
+      onProgress?.(done, items.length);
+      return m;
+    }),
+    config.ai.concurrency,
+  );
+  for (const m of maps) for (const [id, p] of m) out.set(id, p);
+  return out;
+}
+
+// --- Geo-pool prescreen: junk + coarse importance (NO local/global) ----------
+// Geographic pools (world → continent → country → region → province → locality)
+// show EVERYTHING their outlets report — we never drop "global" stories — so the
+// prescreen here only filters junk and scores coarse importance, which gates the
+// expensive deep pass to the top-N. Works at any level; the optional label is
+// just context for the model ("for readers of Galicia").
+
+/** Coarse per-headline verdict for a geographic pool. */
+export interface GeoPrescreen {
+  junk: boolean;
+  /** 0..1 rough newsworthiness from the headline alone. */
+  importance: number;
+}
+
+function geoPrescreenPrompt(label?: string): string {
+  const who = label ? `for readers of ${label}` : "for a general news reader";
+  return (
+    `You are a fast headline triage ${who}. For EACH headline output:\n` +
+    `- "junk": true if CLICKBAIT or low-signal — curiosity-gap teasers, ragebait, ` +
+    `listicles, horoscopes, ads/sponsored, celebrity gossip, lone accidents or ` +
+    `crime-blotter with no wider significance. Substantive reporting is NOT junk.\n` +
+    `- "importance": 0.0..1.0 coarse newsworthiness — reward consequential, ` +
+    `informative reporting; penalize thin filler. A rough estimate from the ` +
+    `headline alone is fine.\n` +
+    `Output ONLY {"items":[{"id": echo the id, "junk": bool, "importance": ` +
+    `number}, ...]}, same order as input. No prose.`
+  );
+}
+
+async function geoPrescreenBatch(
+  batch: GeoScopeInput[],
+  label?: string,
+): Promise<Map<string, GeoPrescreen>> {
+  const out = new Map<string, GeoPrescreen>();
+  const payload = batch.map((it) => ({ id: it.id, title: it.title }));
+  const rows = await chatJsonArray(geoPrescreenPrompt(label), payload, {
+    maxTokens: batch.length * 24 + 64,
+    schema: GEO_PRESCREEN_SCHEMA,
+  });
+  const byId = new Map(batch.map((it) => [it.id, it]));
+  rows.forEach((row, i) => {
+    const r = asRecord(row);
+    if (!r) return;
+    const id =
+      typeof r["id"] === "string" && byId.has(r["id"] as string) ? (r["id"] as string) : batch[i]?.id;
+    if (!id) return;
+    out.set(id, {
+      junk: r["junk"] === true || r["junk"] === "true",
+      importance: clampNum(r["importance"], 0, 1, 0.5),
+    });
+  });
+  return out;
+}
+
+/**
+ * Geo-pool prescreen: id -> {junk, importance}. Title-only, batched + concurrent.
+ * Items absent from the model reply are absent from the map (treated as kept,
+ * neutral importance by callers).
+ */
+export async function prescreenGeo(
+  items: GeoScopeInput[],
+  label?: string,
+  onProgress?: ProgressFn,
+): Promise<Map<string, GeoPrescreen>> {
+  const out = new Map<string, GeoPrescreen>();
+  if (items.length === 0) return out;
+  const batches = chunk(items, config.ai.triageBatchSize);
+  let done = 0;
+  const maps = await withConcurrency(
+    batches.map((b) => async () => {
+      const m = await geoPrescreenBatch(b, label);
       done += b.length;
       onProgress?.(done, items.length);
       return m;

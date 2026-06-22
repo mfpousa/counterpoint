@@ -203,6 +203,13 @@ export interface FeedItem {
    * Used to group coverage into conflict SIDES inside a story.
    */
   zone?: string;
+  /**
+   * How many outlets carried this same story (>=1). Set by pre-analysis near-clone
+   * dedup: only the representative copy is deep-analyzed, and its analysis is fanned
+   * out to the clones, so the UI can show "also covered by N outlets". Absent/1 when
+   * the item stands alone.
+   */
+  coveredBy?: number;
 }
 
 /** One storyline within the daily briefing. */
@@ -464,6 +471,13 @@ export interface Preferences {
    * AI geo-scope pass. Requires `place.country` to be meaningful.
    */
   scope?: "international" | "regional";
+  /**
+   * Selected GEOGRAPHIC POOL id (`geo-<nodeId>`) from the coverage-map drill-down
+   * (world → continent → country → region → province → locality). When set, it is
+   * the EFFECTIVE pool — its node's own outlets feed it and everything they report
+   * is shown. Overrides `worldId`/`scope`. Absent = use the topical world / scope.
+   */
+  geoPool?: string;
   /** UI + AI-output language (the app is shown in this; AI writes in it too). */
   language: Lang;
 }

@@ -21,6 +21,7 @@ import { FadeInView } from "../../src/components/anim";
 import { BriefingCard } from "../../src/components/BriefingCard";
 import { AnalysisProgress } from "../../src/components/AnalysisProgress";
 import { WorldSwitcher } from "../../src/components/WorldSwitcher";
+import { GeoNavigator } from "../../src/components/GeoNavigator";
 import { fetchStories } from "../../src/lib/api";
 import { cacheStories } from "../../src/lib/storyCache";
 import { lastMinuteStories } from "../../src/lib/storyUpdates";
@@ -315,6 +316,15 @@ export default function FeedScreen() {
             if (s !== (prefs.scope ?? "international")) void updatePrefs({ scope: s });
           }}
           t={t}
+        />
+
+        {/* Coverage drill-down: browse by source geography (world → … → council).
+            Selecting a node makes its outlets the feed pool. */}
+        <GeoNavigator
+          activePoolId={prefs.geoPool}
+          onSelect={(poolId) => {
+            if (poolId !== prefs.geoPool) void updatePrefs({ geoPool: poolId });
+          }}
         />
 
         {/* Only one world refreshes at a time. Surface this only when the

@@ -14,14 +14,34 @@
 import { fetchAll } from "../src/lib/rss";
 import type { AnalysisStatus, Briefing, FeedItem, Lang, Place, Story } from "../src/types";
 import { DEFAULT_WORLD_ID, isPlaceWorldId, placeCountryOf, worldSources } from "../src/data/worlds";
+import {
+  childrenOf,
+  geoLabel,
+  geoNode,
+  geoNodeIdOf,
+  GEO_ROOT_ID,
+  isGeoPoolId,
+  pathOf,
+  poolIdForNode,
+  type GeoNode,
+} from "../src/data/geo";
 import { ZONES, ZONES_BY_ID } from "../src/data/zones";
 import { detectZones } from "../src/lib/zones";
 import { placeBoostedRelevance, scorePlace } from "../src/lib/places";
 import { gazetteerFor } from "./places";
 import { placeSourcesFor } from "./placeSources";
+import { coverageStateOf, sourcesForNode, type CoverageState } from "./sourceRegistry";
+import { dedupeNearClones } from "./dedupe";
 import type { Source } from "../src/types";
 import { aiReachable, withConcurrency } from "./ai";
-import { analyzeItems, classifyGlobalScope, detectClickbait, prescreenRegional } from "./analysis";
+import {
+  analyzeItems,
+  classifyGlobalScope,
+  detectClickbait,
+  prescreenGeo,
+  prescreenRegional,
+  type ItemAnalysis,
+} from "./analysis";
 import { generateBriefing, generateBriefingStream } from "./briefing";
 import {
   clusterItems,
@@ -236,11 +256,14 @@ export function topLocalBacklog(survivors: StoredItem[], keep: number): StoredIt
 }
 
 /**
- * The source set for a pool. Topical worlds use their curated sources; a REGIONAL
- * pool (`place-<cc>`) is fed EXCLUSIVELY by that country's locally-discovered
- * outlets — the "International vs Regional" dataset switch.
+ * The source set for a pool:
+ *  - a GEOGRAPHIC pool (`geo-<nodeId>`) draws from that node's registry (world →
+ *    continent → country → region → province → locality) — the drill-down model;
+ *  - a legacy REGIONAL pool (`place-<cc>`) uses the country's discovered outlets;
+ *  - a topical world uses its curated sources.
  */
 function sourcesForWorld(worldId: string): Source[] {
+  if (isGeoPoolId(worldId)) return sourcesForNode(geoNodeIdOf(worldId));
   const cc = placeCountryOf(worldId);
   return cc ? placeSourcesFor(cc) : worldSources(worldId);
 }
@@ -275,15 +298,35 @@ async function refreshSources(worldId: string): Promise<void> {
     }
     const cc = placeCountryOf(worldId);
     const regional = !!cc && config.place.sourcesEnabled;
+    const geo = isGeoPoolId(worldId);
+    // Geo + regional pools both score a COARSE importance so the deep pass can be
+    // gated to the top-N. Only legacy regional pools also judge local/global —
+    // geo pools show everything their outlets report.
+    const capped = geo || regional;
 
     let junk = new Set<string>();
-    // Regional pools: ONE cheap title-only pass folds clickbait + local/global +
-    // a coarse importance, so we scan the flood once and later deep-analyze only
-    // the top-N local items by that score. Topical worlds keep the clickbait-only
-    // triage (their curated sources aren't a flood).
-    const coarse = new Map<string, number>(); // id -> coarse importance (regional)
+    const coarse = new Map<string, number>(); // id -> coarse importance (capped pools)
     const globals = new Set<string>();
-    if (regional && cc) {
+    if (geo) {
+      // ONE cheap title-only pass: clickbait + coarse importance (no global flag).
+      const batches = Math.ceil(untriaged.length / config.ai.triageBatchSize);
+      console.log(`[feed:${worldId}] prescreen(geo): ${untriaged.length} headline(s) in ${batches} batch(es)…`);
+      const verdicts = await prescreenGeo(
+        untriaged.map((it) => ({ id: it.id, title: it.title, summary: it.summary })),
+        geoLabel(geoNodeIdOf(worldId)),
+        progressLogger(state, "triage"),
+      );
+      for (const it of untriaged) {
+        const v = verdicts.get(it.id);
+        if (!v) continue; // absent → kept, neutral importance
+        if (config.feed.clickbaitFilter && v.junk) junk.add(it.id);
+        coarse.set(it.id, v.importance);
+      }
+      console.log(`[feed:${worldId}] prescreen(geo) flagged ${junk.size} junk of ${untriaged.length}`);
+    } else if (regional && cc) {
+      // Regional pools: ONE cheap title-only pass folds clickbait + local/global +
+      // a coarse importance, so we scan the flood once and later deep-analyze only
+      // the top-N local items by that score.
       const batches = Math.ceil(untriaged.length / config.ai.triageBatchSize);
       console.log(`[feed:${worldId}] prescreen: ${untriaged.length} headline(s) in ${batches} batch(es)…`);
       const verdicts = await prescreenRegional(
@@ -313,11 +356,11 @@ async function refreshSources(worldId: string): Promise<void> {
       st.upsert({
         item: it,
         clickbait: junk.has(it.id),
-        // Set at prescreen for regional pools so global stories are excluded from
-        // the deep-analysis backlog (pendingForAnalysis) and the local feed.
+        // Set at prescreen for legacy regional pools so global stories are excluded
+        // from the backlog + feed. Geo pools never drop globals (undefined).
         global: regional ? globals.has(it.id) : undefined,
-        // Coarse newsworthiness used ONLY to pick the top-N locals for deep analysis.
-        prescreenImportance: regional ? (coarse.get(it.id) ?? 0.5) : undefined,
+        // Coarse newsworthiness used to pick the top-N for deep analysis (capped pools).
+        prescreenImportance: capped ? (coarse.get(it.id) ?? 0.5) : undefined,
         analyzed: false, // deep analysis pending
         topic: it.topic,
         lean: it.lean,
@@ -336,6 +379,178 @@ async function refreshSources(worldId: string): Promise<void> {
   console.log(`[feed:${worldId}] refresh done in ${state.lastBuildAt - started}ms`);
 }
 
+/** Resolve an analysis onto a stored item (rep OR clone). The model's topic /
+ *  importance / summary / keywords / refined-lean VALUE are shared, but the
+ *  lean PROVENANCE + rationale are recomputed from THIS item's own source so a
+ *  clone keeps an honest attribution. `coveredBy` records the cluster size. */
+function applyAnalysisToItem(
+  target: StoredItem,
+  a: ItemAnalysis,
+  srcById: Map<string, Source>,
+  now: number,
+  coveredBy?: number,
+  cloneOf?: string,
+): StoredItem {
+  const refined = config.ai.leanRefine && a.leanRefined && a.lean !== null;
+  const lean = refined ? a.lean : target.item.lean;
+  const leanSource: "llm" | "source" = refined ? "llm" : "source";
+  const srcRationale = srcById.get(target.item.sourceId)?.leanRationale;
+  const leanRationale =
+    lean === null ? undefined : refined ? a.leanRationale || srcRationale : srcRationale;
+  return {
+    ...target,
+    analyzed: true,
+    topic: a.topic,
+    lean,
+    leanSource,
+    leanRationale,
+    importance: a.importance,
+    summary: a.summary,
+    keywords: a.keywords,
+    analyzedAt: now,
+    coveredBy: coveredBy && coveredBy > 1 ? coveredBy : target.coveredBy,
+    // A clone points at its representative so the feed shows one card per story.
+    cloneOf: cloneOf ?? target.cloneOf,
+  };
+}
+
+interface GeoCluster {
+  rep: StoredItem;
+  members: StoredItem[];
+  sourceCount: number;
+}
+
+/**
+ * Plan a GEO pool's deep analysis: near-clone DEDUP the in-window survivors, rank
+ * clusters by representative coarse (prescreen) importance, keep the TOP-N, and
+ * return those that still have un-analyzed members. The cut is over ALL survivors
+ * (analyzed + pending) so it's stable like topLocalBacklog, but at CLUSTER
+ * granularity — identical wire copy is analyzed once and fanned out to the rest.
+ */
+function planGeoAnalysis(worldId: string, keep: number): GeoCluster[] {
+  const cutoff = analyzeCutoff();
+  const survivors = getStore(worldId)
+    .all()
+    .filter((s) => !s.clickbait && s.item.publishedAt >= cutoff);
+  if (survivors.length === 0) return [];
+  const byId = new Map(survivors.map((s) => [s.item.id, s]));
+  const clusters = dedupeNearClones(
+    survivors.map((s) => ({
+      id: s.item.id,
+      sourceId: s.item.sourceId,
+      title: s.item.title,
+      summary: s.item.summary,
+      publishedAt: s.item.publishedAt,
+      importance: s.prescreenImportance ?? 0.5,
+    })),
+    { jaccardThreshold: config.geo.dedupeJaccard, windowMs: config.geo.dedupeWindowMs },
+  );
+  const ranked = clusters
+    .map((c): GeoCluster => ({
+      rep: byId.get(c.representativeId) as StoredItem,
+      members: c.memberIds.map((id) => byId.get(id)).filter((s): s is StoredItem => !!s),
+      sourceCount: c.sourceCount,
+    }))
+    .sort(
+      (a, b) =>
+        (b.rep.prescreenImportance ?? 0.5) - (a.rep.prescreenImportance ?? 0.5) ||
+        b.rep.item.publishedAt - a.rep.item.publishedAt,
+    );
+  const cut = keep > 0 ? ranked.slice(0, keep) : ranked;
+  return cut.filter((c) => c.members.some((m) => !m.analyzed));
+}
+
+/**
+ * Deep-analyze ONE chunk of a GEO pool. We only call the model on each cluster's
+ * REPRESENTATIVE (capped to maxItems), then fan its analysis out to the cluster's
+ * clones — so N near-identical copies cost ONE deep pass. Clusters whose rep is
+ * already analyzed but still have un-analyzed clones are resolved for free.
+ */
+async function analyzeGeoChunk(
+  worldId: string,
+  state: WorldState,
+  st: ReturnType<typeof getStore>,
+): Promise<{ remaining: number; progressed: number }> {
+  const plan = planGeoAnalysis(worldId, config.geo.deepAnalyzeKeep);
+  if (plan.length === 0) {
+    setPhase(state, "idle");
+    return { remaining: 0, progressed: 0 };
+  }
+  if (!(await aiReachable())) {
+    setPhase(state, "idle");
+    return { remaining: plan.length, progressed: 0 };
+  }
+
+  // Representatives still needing a model pass, capped to one chunk.
+  const repsPending = plan.filter((c) => !c.rep.analyzed);
+  const repSlice =
+    config.ai.maxItems > 0 ? repsPending.slice(0, config.ai.maxItems) : repsPending;
+  const items = repSlice.map((c) => c.rep.item);
+
+  let analyses = new Map<string, ItemAnalysis>();
+  if (items.length > 0) {
+    setPhase(state, "transcripts", 0, items.length);
+    const transcripts = await fetchTranscripts(items);
+    const batches = Math.ceil(items.length / config.ai.batchSize);
+    console.log(
+      `[feed:${worldId}] geo deep analysis: ${items.length} representative(s) ` +
+        `(of ${plan.length} clusters) in ${batches} batch(es)…`,
+    );
+    analyses = await analyzeItems(items, transcripts, progressLogger(state, "analyze"));
+  }
+
+  const srcById = new Map(sourcesForWorld(worldId).map((src) => [src.id, src]));
+  const now = Date.now();
+  let progressed = 0;
+  let fannedOut = 0;
+
+  // Only clusters whose representative now HAS an analysis (freshly produced, or
+  // already stored) can be resolved this round.
+  const repInSlice = new Set(repSlice.map((c) => c.rep.item.id));
+  for (const c of plan) {
+    const fresh = analyses.get(c.rep.item.id);
+    // The analysis to fan out: the model's fresh result, else the rep's stored one.
+    let a: ItemAnalysis | null = null;
+    if (fresh) a = fresh;
+    else if (c.rep.analyzed) {
+      a = {
+        topic: c.rep.topic,
+        lean: c.rep.lean,
+        leanRefined: c.rep.leanSource === "llm",
+        leanRationale: c.rep.leanRationale ?? "",
+        importance: c.rep.importance,
+        summary: c.rep.summary,
+        keywords: c.rep.keywords,
+      };
+    }
+    // No analysis available (rep failed this round, or wasn't in this chunk's
+    // slice) — leave the whole cluster pending so a later chunk retries it.
+    if (!a) continue;
+    for (const m of c.members) {
+      if (m.analyzed) continue;
+      const isClone = m.item.id !== c.rep.item.id;
+      st.upsert(
+        applyAnalysisToItem(m, a, srcById, now, c.sourceCount, isClone ? c.rep.item.id : undefined),
+      );
+      progressed += 1;
+      if (isClone) fannedOut += 1;
+    }
+  }
+
+  st.save();
+  state.lastBuildAt = Date.now();
+  state.viewCache.clear();
+  state.briefingCache.clear();
+
+  const remaining = planGeoAnalysis(worldId, config.geo.deepAnalyzeKeep).length;
+  if (remaining === 0) setPhase(state, "idle");
+  console.log(
+    `[feed:${worldId}] geo analyzed ${progressed} item(s) ` +
+      `(${fannedOut} fanned out from clones); ${remaining} cluster(s) still pending`,
+  );
+  return { remaining, progressed };
+}
+
 /**
  * Deep-analyze ONE chunk (config.ai.maxItems) of a world's pending backlog,
  * newest first, and persist. Returns the remaining backlog and how many we
@@ -346,6 +561,8 @@ function analyzePending(worldId: string): Promise<{ remaining: number; progresse
   if (state.analyzeInFlight) return state.analyzeInFlight;
   const st = getStore(worldId);
   state.analyzeInFlight = (async () => {
+    // GEO pools dedup near-clones and analyze one representative per cluster.
+    if (isGeoPoolId(worldId)) return analyzeGeoChunk(worldId, state, st);
     const pending = pendingForAnalysis(worldId);
     if (pending.length === 0) {
       setPhase(state, "idle");
@@ -801,6 +1018,9 @@ function augmentReactively(worldId: string): Promise<void> {
   if (state.augmentInFlight) return state.augmentInFlight;
 
   state.augmentInFlight = (async () => {
+    // GEO pools show everything their own outlets report — no geo-scope filtering,
+    // and no YouTube/zone augmentation (those extend TOPICAL worlds). Nothing to do.
+    if (isGeoPoolId(worldId)) return;
     // Regional pool: classify geo-scope (no YouTube/zones — those are international).
     if (isPlaceWorldId(worldId)) {
       await classifyRegionalScope(worldId);
@@ -983,6 +1203,7 @@ function assembleView(
       (s) =>
         !s.clickbait &&
         s.analyzed &&
+        !s.cloneOf && // near-clone copies are folded into their representative
         now - s.item.publishedAt <= config.feed.retentionMs &&
         !(dropGlobal && s.global === true),
     );
@@ -1162,7 +1383,7 @@ function storyEligible(worldId: string, now = Date.now()): StoredItem[] {
   return getStore(worldId)
     .all()
     .filter(
-      (s) => !s.clickbait && s.analyzed && now - s.item.publishedAt <= window,
+      (s) => !s.clickbait && s.analyzed && !s.cloneOf && now - s.item.publishedAt <= window,
     );
 }
 
@@ -1413,6 +1634,7 @@ export function getRelated(
         s.item.id !== id &&
         !s.clickbait &&
         s.analyzed &&
+        !s.cloneOf &&
         now - s.item.publishedAt <= config.feed.retentionMs,
     );
 
@@ -1437,6 +1659,56 @@ export function getRelated(
       .map((x) => x.s);
   }
   return ranked.map((s) => toFeedItem(s, new Set<string>(), false));
+}
+
+// --- Coverage map (drill-down navigation) -----------------------------------
+
+/** A node as the client's navigation map needs it. */
+export interface CoverageNode {
+  nodeId: string;
+  /** The pool id to request the feed for this node (`geo-<nodeId>`). */
+  poolId: string;
+  label: string;
+  level: GeoNode["level"];
+  /** Whether (and how well) this node has discovered sources. */
+  state: CoverageState;
+  /** True if the reader can drill further down from here. */
+  hasChildren: boolean;
+}
+
+export interface CoverageView {
+  /** The node currently in focus. */
+  node: CoverageNode;
+  /** Breadcrumb from the root down to (and including) the focused node. */
+  path: CoverageNode[];
+  /** The focused node's children — the drill-down options to render on the map. */
+  children: CoverageNode[];
+}
+
+function toCoverageNode(n: GeoNode): CoverageNode {
+  return {
+    nodeId: n.id,
+    poolId: poolIdForNode(n.id),
+    label: n.label,
+    level: n.level,
+    state: coverageStateOf(n.id),
+    hasChildren: childrenOf(n.id).length > 0,
+  };
+}
+
+/**
+ * The coverage view for a geographic node: itself, its breadcrumb, and its
+ * children (each with a coverage state so the map can color them). Unknown ids
+ * fall back to the world root. This powers on-demand drill-down — fetching the
+ * actual feed for a node still happens via getFeed(`geo-<nodeId>`).
+ */
+export function getCoverage(nodeId: string = GEO_ROOT_ID): CoverageView {
+  const node = geoNode(nodeId) ?? geoNode(GEO_ROOT_ID)!;
+  return {
+    node: toCoverageNode(node),
+    path: pathOf(node.id).map(toCoverageNode),
+    children: childrenOf(node.id).map(toCoverageNode),
+  };
 }
 
 /**

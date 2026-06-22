@@ -1,0 +1,24 @@
+[
+  {
+    "id": "geo-es-vigo-farodevigo",
+    "title": "Faro de Vigo",
+    "url": "https://www.farodevigo.es/rss/home.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.6,
+    "leanRationale": "Vigo: the city's main daily (oldest in Galicia).",
+    "lang": "es"
+  },
+  {
+    "id": "geo-es-vigo-atlantico",
+    "title": "Atlántico Diario",
+    "url": "https://www.atlantico.net/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.5,
+    "leanRationale": "Vigo: local daily.",
+    "lang": "es"
+  }
+]

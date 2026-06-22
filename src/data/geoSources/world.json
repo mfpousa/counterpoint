@@ -1,0 +1,35 @@
+[
+  {
+    "id": "geo-world-bbc",
+    "title": "BBC News — World",
+    "url": "https://feeds.bbci.co.uk/news/world/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.7,
+    "leanRationale": "International: UK public broadcaster, world desk.",
+    "lang": "en"
+  },
+  {
+    "id": "geo-world-aljazeera",
+    "title": "Al Jazeera",
+    "url": "https://www.aljazeera.com/xml/rss/all.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.6,
+    "leanRationale": "International: Qatar-based global broadcaster.",
+    "lang": "en"
+  },
+  {
+    "id": "geo-world-france24",
+    "title": "France 24",
+    "url": "https://www.france24.com/en/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.65,
+    "leanRationale": "International: French public broadcaster (English edition).",
+    "lang": "en"
+  }
+]

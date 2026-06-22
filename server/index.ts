@@ -15,6 +15,7 @@ import {
   clearCaches,
   getBriefing,
   getBriefingStream,
+  getCoverage,
   getFeed,
   getRelated,
   getStatus,
@@ -28,6 +29,7 @@ import { generateKnowledgeInsight, type KnowledgeCandidate } from "./knowledge";
 import { rewriteArticle, rewriteArticleStream } from "./rewrite";
 import { getStoredAnyWorld } from "./store";
 import { DEFAULT_WORLD_ID, WORLDS, isPlaceWorldId, isWorldId } from "../src/data/worlds";
+import { GEO_ROOT_ID, isGeoPoolId } from "../src/data/geo";
 import type { KnowledgeProfile, Place } from "../src/types";
 
 const app = express();
@@ -50,12 +52,14 @@ function readInterest(raw: unknown): string {
 }
 
 /**
- * Resolve a pool id from a query param / body. Accepts a topical world id OR a
- * synthetic REGIONAL pool id (`place-<cc>`, the International↔Regional switch),
- * defaulting to the front page.
+ * Resolve a pool id from a query param / body. Accepts a topical world id, a
+ * GEOGRAPHIC pool id (`geo-<nodeId>`, the drill-down map), or a legacy REGIONAL
+ * pool id (`place-<cc>`), defaulting to the front page.
  */
 function readWorld(raw: unknown): string {
-  return typeof raw === "string" && (isWorldId(raw) || isPlaceWorldId(raw)) ? raw : DEFAULT_WORLD_ID;
+  return typeof raw === "string" && (isWorldId(raw) || isGeoPoolId(raw) || isPlaceWorldId(raw))
+    ? raw
+    : DEFAULT_WORLD_ID;
 }
 
 /**
@@ -93,6 +97,18 @@ app.get("/api/worlds", (_req, res) => {
       sources: w.sources.length,
     })),
   });
+});
+
+// Coverage map for drill-down navigation: the focused geographic node, its
+// breadcrumb, and its children (each with a coverage state to color the map).
+app.get("/api/coverage", (req, res) => {
+  const node = typeof req.query.node === "string" && req.query.node ? req.query.node : GEO_ROOT_ID;
+  try {
+    res.json(getCoverage(node));
+  } catch (e) {
+    console.error("[api] /api/coverage failed:", e);
+    res.status(500).json({ error: e instanceof Error ? e.message : "coverage failed" });
+  }
 });
 
 app.get("/api/status", (req, res) => {

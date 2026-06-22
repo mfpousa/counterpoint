@@ -1,0 +1,24 @@
+[
+  {
+    "id": "geo-es-pontevedra-diario",
+    "title": "Diario de Pontevedra",
+    "url": "https://www.diariodepontevedra.es/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.55,
+    "leanRationale": "Pontevedra: provincial daily.",
+    "lang": "es"
+  },
+  {
+    "id": "geo-es-pontevedra-farodevigo-prov",
+    "title": "Faro de Vigo — Pontevedra",
+    "url": "https://www.farodevigo.es/rss/section/18101",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.55,
+    "leanRationale": "Pontevedra province coverage from Faro de Vigo.",
+    "lang": "es"
+  }
+]

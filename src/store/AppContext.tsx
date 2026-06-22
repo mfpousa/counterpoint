@@ -98,6 +98,9 @@ const Ctx = createContext<AppState | null>(null);
  * topical world (the UI gates the toggle on a set place).
  */
 function effectiveWorldId(p: Preferences): string {
+  // A geographic pool (coverage-map drill-down) overrides everything: its node's
+  // own outlets feed the pool and everything they report is shown.
+  if (p.geoPool) return p.geoPool;
   return p.scope === "regional" && p.place?.country ? placeWorldId(p.place.country) : p.worldId;
 }
 
@@ -274,7 +277,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setBusyWorld(null);
       void refreshFeed();
     }
-  }, [ready, prefs.onboarded, prefs.worldId, prefs.scope, prefs.place, refreshFeed]);
+  }, [ready, prefs.onboarded, prefs.worldId, prefs.scope, prefs.place, prefs.geoPool, refreshFeed]);
 
   // In INTERNATIONAL mode the place lens only affects the geographic BOOST (same
   // pool), so a place change just re-ranks — refetch WITHOUT clearing. Regional

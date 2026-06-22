@@ -216,5 +216,7 @@ export function toFeedItem(
     leanRationale: s.leanRationale,
     relevance,
     aiReason: s.summary || undefined,
+    // "Covered by N outlets" — only meaningful when several carried the story.
+    coveredBy: s.coveredBy && s.coveredBy > 1 ? s.coveredBy : undefined,
   };
 }
