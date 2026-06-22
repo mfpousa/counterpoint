@@ -38,13 +38,7 @@ describe("worlds", () => {
     expect(worldSources(DEFAULT_WORLD_ID)).toBe(worldById(DEFAULT_WORLD_ID).sources);
   });
 
-  it("includes a Spain world spanning the political spectrum", () => {
-    expect(isWorldId("spain")).toBe(true);
-    const leans = worldSources("spain")
-      .map((s) => s.lean)
-      .filter((l): l is number => typeof l === "number");
-    // The whole point of the Spain world: real left AND right coverage.
-    expect(leans.some((l) => l < -0.3)).toBe(true);
-    expect(leans.some((l) => l > 0.3)).toBe(true);
+  it("no longer includes the retired Spain world (replaced by the place lens)", () => {
+    expect(isWorldId("spain")).toBe(false);
   });
 });

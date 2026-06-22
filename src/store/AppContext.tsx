@@ -130,6 +130,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   worldRef.current = prefs.worldId;
   const langRef = useRef(prefs.language);
   langRef.current = prefs.language;
+  const placeRef = useRef(prefs.place ?? null);
+  placeRef.current = prefs.place ?? null;
 
   // Best-effort, non-blocking. The pool is already fresh after a feed load, so
   // we never force here (avoids a second rebuild). Streams tokens so the card
@@ -198,6 +200,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         force: opts.force,
         interest: interestRef.current,
         world: worldRef.current,
+        place: placeRef.current,
       });
       setBusyWorld(res.busyWith ?? null);
       if (res.items.length === 0 && !res.busyWith) {
@@ -252,6 +255,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [ready, prefs.onboarded, prefs.worldId, refreshFeed]);
 
+  // Re-fetch when the PLACE lens changes (skip the first run). Place is an object,
+  // so we compare a stable serialized key (country/region/locality).
+  const lastPlace = useRef<string | null>(null);
+  useEffect(() => {
+    if (!ready || !prefs.onboarded) return;
+    const key = prefs.place?.country
+      ? `${prefs.place.country}/${prefs.place.region ?? ""}/${prefs.place.locality ?? ""}`
+      : "";
+    if (lastPlace.current === null) {
+      lastPlace.current = key;
+      return;
+    }
+    if (lastPlace.current !== key) {
+      lastPlace.current = key;
+      void refreshFeed();
+    }
+  }, [ready, prefs.onboarded, prefs.place, refreshFeed]);
+
   // Re-synthesize the briefing in the new language when it changes (skip first
   // run). The feed/stories re-fetch in their own language-aware effects.
   const lastLang = useRef<string | null>(null);
@@ -275,7 +296,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // when the backend finishes an analysis chunk in the background.
   const reloadPool = useCallback(async () => {
     try {
-      const res = await fetchRankedFeed({ interest: interestRef.current, world: worldRef.current });
+      const res = await fetchRankedFeed({
+        interest: interestRef.current,
+        world: worldRef.current,
+        place: placeRef.current,
+      });
       setBusyWorld(res.busyWith ?? null);
       if (res.items.length > 0) setPool(res.items);
     } catch {

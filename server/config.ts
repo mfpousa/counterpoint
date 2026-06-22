@@ -127,6 +127,16 @@ export const config = {
     // Gap between background analysis chunks while draining the backlog.
     catchUpDelayMs: num("FEED_CATCHUP_DELAY_MS", 1500),
   },
+  place: {
+    // Geographic relevance BOOST. When a reader sets a place (country → region →
+    // locality), stories whose text mentions it get their relevance lifted toward
+    // 1 so genuinely local news surfaces from ANY feed — orthogonal to the world.
+    // 0 disables. See src/lib/places.ts (scorePlace / placeBoostedRelevance).
+    boostWeight: num("PLACE_BOOST_WEIGHT", 0.5),
+    // Place score at which the boost saturates. A locality alias hit scores 3
+    // (PLACE_LEVEL_WEIGHT.locality), so the default = one strong local mention.
+    saturateAt: num("PLACE_BOOST_SATURATE_AT", 3),
+  },
   reader: {
     // In-app "AI rewrite" reader. The backend fetches the article, extracts the
     // text, and the LLM rewrites it into a clean, readable version.

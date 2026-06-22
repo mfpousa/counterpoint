@@ -28,7 +28,7 @@ import { generateKnowledgeInsight, type KnowledgeCandidate } from "./knowledge";
 import { rewriteArticle, rewriteArticleStream } from "./rewrite";
 import { getStoredAnyWorld } from "./store";
 import { DEFAULT_WORLD_ID, WORLDS, isWorldId } from "../src/data/worlds";
-import type { KnowledgeProfile } from "../src/types";
+import type { KnowledgeProfile, Place } from "../src/types";
 
 const app = express();
 app.use(cors());
@@ -54,6 +54,30 @@ function readWorld(raw: unknown): string {
   return typeof raw === "string" && isWorldId(raw) ? raw : DEFAULT_WORLD_ID;
 }
 
+/**
+ * Parse a `place` lens from a request: a JSON string (GET query param) OR an
+ * object (POST body). Returns null for absent/malformed input or a missing
+ * country. Fields are length-capped so a hostile client can't bloat the cache key.
+ */
+function readPlace(raw: unknown): Place | null {
+  let p: Partial<Place> | null = null;
+  if (typeof raw === "string" && raw) {
+    try {
+      p = JSON.parse(raw) as Partial<Place>;
+    } catch {
+      p = null;
+    }
+  } else if (raw && typeof raw === "object") {
+    p = raw as Partial<Place>;
+  }
+  if (!p || typeof p.country !== "string" || !p.country) return null;
+  return {
+    country: p.country.toLowerCase().slice(0, 2),
+    region: typeof p.region === "string" && p.region ? p.region.slice(0, 64) : undefined,
+    locality: typeof p.locality === "string" && p.locality ? p.locality.slice(0, 80) : undefined,
+  };
+}
+
 /** The catalogue of worlds (metadata only) the client renders in its switcher. */
 app.get("/api/worlds", (_req, res) => {
   res.json({
@@ -73,7 +97,12 @@ app.get("/api/status", (req, res) => {
 
 app.get("/api/feed", async (req, res) => {
   try {
-    const feed = await getFeed(readWorld(req.query.world), false, readInterest(req.query.interest));
+    const feed = await getFeed(
+      readWorld(req.query.world),
+      false,
+      readInterest(req.query.interest),
+      readPlace(req.query.place),
+    );
     res.json(feed);
   } catch (e) {
     console.error("[api] /api/feed failed:", e);
@@ -306,7 +335,7 @@ app.post("/api/refresh", async (req, res) => {
   try {
     const world = readWorld(req.body?.world);
     clearCaches(world);
-    const feed = await getFeed(world, true, readInterest(req.body?.interest));
+    const feed = await getFeed(world, true, readInterest(req.body?.interest), readPlace(req.body?.place));
     res.json(feed);
   } catch (e) {
     console.error("[api] /api/refresh failed:", e);

@@ -12,6 +12,7 @@ import type {
   KnowledgeInsight,
   KnowledgeProfile,
   Lang,
+  Place,
   RewrittenArticle,
   Story,
   SummaryGrade,
@@ -64,22 +65,25 @@ export interface FeedResponse {
  * Throws on network/HTTP failure so the caller can surface a clear message.
  */
 export async function fetchRankedFeed(
-  opts: { force?: boolean; interest?: string; world?: string } = {},
+  opts: { force?: boolean; interest?: string; world?: string; place?: Place | null } = {},
 ): Promise<FeedResponse> {
   const base = apiBaseUrl();
   const interest = (opts.interest ?? "").trim();
   const world = (opts.world ?? "").trim();
+  // Only send a place when a country is set (the lens is otherwise "global").
+  const place = opts.place?.country ? opts.place : null;
   let res: Response;
   if (opts.force) {
     res = await fetch(`${base}/api/refresh`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ interest, world }),
+      body: JSON.stringify({ interest, world, place }),
     });
   } else {
     const params = new URLSearchParams();
     if (interest) params.set("interest", interest);
     if (world) params.set("world", world);
+    if (place) params.set("place", JSON.stringify(place));
     const qs = params.toString();
     res = await fetch(`${base}/api/feed${qs ? `?${qs}` : ""}`, { method: "GET" });
   }

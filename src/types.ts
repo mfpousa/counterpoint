@@ -90,6 +90,46 @@ export interface Zone {
 }
 
 /**
+ * A reader's chosen PLACE: a geographic lens layered OVER any world (orthogonal
+ * to the topical world). All levels below `country` are optional, so a reader can
+ * be as broad as a country or as narrow as a local council. Persisted locally.
+ */
+export interface Place {
+  /** ISO 3166-1 alpha-2, lowercased ("es", "us", "gb"). Required when set. */
+  country: string;
+  /** Registry id of a first-level admin division ("es-md" = Comunidad de Madrid). */
+  region?: string;
+  /** Free-text locality / council ("Móstoles"). Matched via the gazetteer. */
+  locality?: string;
+}
+
+/**
+ * One node in the place GAZETTEER: a country, region, or locality with the alias
+ * tokens whose presence in a story marks it as relevant to that place. The
+ * `aliases` power a relevance BOOST (so local stories surface from any feed),
+ * mirroring how `Zone.aliases` work for international zones. Generated from open
+ * datasets (GeoNames + Wikidata) by `scripts/buildGazetteer.ts` — never hand-kept.
+ */
+export interface PlaceNode {
+  /** Hierarchical id: "es", "es-md", "es-md-mostoles". */
+  id: string;
+  /** Parent node id ("es-md".parent = "es"); absent for countries. */
+  parent?: string;
+  level: "country" | "region" | "locality";
+  /** Display label, e.g. "Comunidad de Madrid". */
+  label: string;
+  /** ISO 3166-1 alpha-2 this node belongs to (denormalized for cheap filtering). */
+  country: string;
+  /**
+   * Lowercase signal tokens (names, demonyms, multilingual aliases, key local
+   * figures/landmarks) marking the place as involved in a story's text.
+   */
+  aliases: string[];
+  /** Population, when known — used to bound/rank localities. */
+  population?: number;
+}
+
+/**
  * A "world": a self-contained news universe with its OWN curated source set and
  * its OWN analyzed pool. The default world is the broad front page; niche worlds
  * surface coverage the mainstream feed crowds out (creative, deep science, ...).
@@ -411,6 +451,12 @@ export interface Preferences {
   onboarded: boolean;
   /** The active news world (set of sources). Defaults to the front page. */
   worldId: string;
+  /**
+   * Optional GEOGRAPHIC lens (country → region → council) layered over the world.
+   * Null/absent = no place lens (global). Boosts the relevance of stories that
+   * mention the place and can pull in local sources. Orthogonal to `worldId`.
+   */
+  place?: Place | null;
   /** UI + AI-output language (the app is shown in this; AI writes in it too). */
   language: Lang;
 }

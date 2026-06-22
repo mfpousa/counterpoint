@@ -70,7 +70,15 @@ export async function loadPreferences(): Promise<Preferences> {
   try {
     const raw = await AsyncStorage.getItem(KEYS.prefs);
     if (!raw) return DEFAULT_PREFERENCES;
-    return { ...DEFAULT_PREFERENCES, ...(JSON.parse(raw) as Partial<Preferences>) };
+    const merged = { ...DEFAULT_PREFERENCES, ...(JSON.parse(raw) as Partial<Preferences>) };
+    // Migration: the standalone "spain" world was retired in favor of the place
+    // lens. Send those readers to the front page and seed a Spain place so their
+    // experience is preserved (unless they already set a place).
+    if (merged.worldId === "spain") {
+      merged.worldId = DEFAULT_WORLD_ID;
+      if (!merged.place?.country) merged.place = { country: "es" };
+    }
+    return merged;
   } catch {
     return DEFAULT_PREFERENCES;
   }

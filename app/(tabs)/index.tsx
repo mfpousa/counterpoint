@@ -32,6 +32,13 @@ import type { FeedItem, Story, Topic } from "../../src/types";
 const MAX_CONTENT_WIDTH = 1180;
 const H_PAD = spacing.lg;
 
+// Per world+language story cache at MODULE scope so it SURVIVES a remount of the
+// Today screen. Backing out of a /news/[id] or /story/[id] route remounts this
+// screen; a component-local ref would be wiped, blanking the already-built
+// stories (and collapsing the scroll). Module scope keeps them on screen.
+const storiesByKey = new Map<string, Story[]>();
+const storyKeyFor = (worldId: string, language: string) => `${worldId}:${language}`;
+
 /** Pick a column count from the available content width (desktop-friendly). */
 function columnsFor(contentWidth: number): number {
   if (contentWidth >= 1040) return 3;
@@ -65,13 +72,14 @@ export default function FeedScreen() {
 
   // Synthesized stories (developing issues + deduped multi-source events) are
   // interest-independent and built from the full pool, so we fetch them
-  // alongside the feed and merge them in below.
-  const [stories, setStories] = useState<Story[]>([]);
+  // alongside the feed and merge them in below. Seeded LAZILY from the module
+  // cache so a remount (e.g. backing out of a story) shows the already-built set
+  // immediately instead of blanking to empty.
+  const [stories, setStories] = useState<Story[]>(
+    () => storiesByKey.get(storyKeyFor(worldId, prefs.language)) ?? [],
+  );
   const [loadingStories, setLoadingStories] = useState(false);
   const storiesLoadedOnce = useRef(false);
-  // Per world+language cache so switching languages (or worlds) shows the already
-  // built set INSTANTLY instead of wiping to skeletons and re-fetching from cold.
-  const storiesByKey = useRef<Map<string, Story[]>>(new Map());
   const loadStories = useCallback(
     async (force = false) => {
       setLoadingStories(true);
@@ -82,7 +90,7 @@ export default function FeedScreen() {
         // until real stories arrive, then swap them in (they eventually update).
         if (res.stories.length > 0) {
           setStories(res.stories);
-          storiesByKey.current.set(`${worldId}:${prefs.language}`, res.stories);
+          storiesByKey.set(storyKeyFor(worldId, prefs.language), res.stories);
           // Share with the routed story panel so opening a listed story is instant
           // and never dead-ends on an id that changed during a rebuild.
           cacheStories(res.stories);
@@ -96,14 +104,13 @@ export default function FeedScreen() {
   );
   useEffect(() => {
     // Show this world+language's cached stories immediately (no skeleton flash)
-    // when we've built them before; otherwise reset. Always refresh in the bg.
-    const cached = storiesByKey.current.get(`${worldId}:${prefs.language}`);
+    // when we've built them before; otherwise leave whatever's there until the
+    // background refresh lands. NEVER force-clear to [] here: that's what made
+    // stories vanish on a remount. Always refresh in the bg.
+    const cached = storiesByKey.get(storyKeyFor(worldId, prefs.language));
     if (cached) {
       setStories(cached);
       storiesLoadedOnce.current = true;
-    } else {
-      setStories([]);
-      storiesLoadedOnce.current = false;
     }
     void loadStories();
   }, [loadStories, worldId, prefs.language]);

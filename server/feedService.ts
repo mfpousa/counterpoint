@@ -12,10 +12,12 @@
 //    no new model calls.
 
 import { fetchAll } from "../src/lib/rss";
-import type { AnalysisStatus, Briefing, FeedItem, Lang, Story } from "../src/types";
+import type { AnalysisStatus, Briefing, FeedItem, Lang, Place, Story } from "../src/types";
 import { DEFAULT_WORLD_ID, worldSources } from "../src/data/worlds";
 import { ZONES, ZONES_BY_ID } from "../src/data/zones";
 import { detectZones } from "../src/lib/zones";
+import { placeBoostedRelevance, scorePlace } from "../src/lib/places";
+import { gazetteerFor } from "./places";
 import { aiReachable, withConcurrency } from "./ai";
 import { analyzeItems, detectClickbait } from "./analysis";
 import { generateBriefing, generateBriefingStream } from "./briefing";
@@ -819,15 +821,24 @@ async function ensurePool(worldId: string, force: boolean): Promise<{ busyWith: 
  * `queryVec` is the embedding of the positive intent; when absent, toFeedItem
  * falls back to keyword matching.
  */
+/** Stable cache-key suffix for a place lens (empty when no place is set). */
+function placeKey(place?: Place | null): string {
+  if (!place?.country) return "";
+  return `|@${place.country}/${place.region ?? ""}/${(place.locality ?? "").toLowerCase()}`;
+}
+
 function assembleView(
   worldId: string,
   interest: string,
   parsed: ParsedQuery,
   queryVec?: number[] | null,
+  place?: Place | null,
 ): FeedResult {
   const state = ws(worldId);
   const st = getStore(worldId);
-  const key = interestKey(interest);
+  // Key per interest AND place so an unlensed and a place-lensed view (or two
+  // different places) don't clobber each other in the cache.
+  const key = interestKey(interest) + placeKey(place);
   const cached = state.viewCache.get(key);
   if (cached && cached.builtAt === state.lastBuildAt) return cached.result;
 
@@ -851,6 +862,25 @@ function assembleView(
   }
   const pool = kept.map((s) => toFeedItem(s, tokens, hasInterest, queryVec));
 
+  // Geographic relevance BOOST: lift items whose text mentions the reader's place
+  // so genuinely local news rises through the ranking — from ANY feed, not just a
+  // local outlet. Interest-orthogonal; applied on the materialized relevance so
+  // the pure ranker (rank.ts) stays unchanged. `kept` and `pool` are index-aligned.
+  let boosted = 0;
+  if (place?.country && config.place.boostWeight > 0) {
+    const nodes = gazetteerFor(place.country);
+    if (nodes.length > 0) {
+      kept.forEach((s, i) => {
+        const text = `${s.item.title} ${s.item.summary} ${s.summary} ${s.keywords.join(" ")}`;
+        const score = scorePlace(text, place, nodes);
+        if (score > 0) {
+          pool[i].relevance = placeBoostedRelevance(pool[i].relevance ?? 0.5, score, config.place);
+          boosted += 1;
+        }
+      });
+    }
+  }
+
   const ranked = rankItems(pool);
   const result: FeedResult = {
     items: ranked,
@@ -869,8 +899,9 @@ function assembleView(
           .map(([t, n]) => `${t}:${n}`)
           .join(", ")}}`
       : "";
+  const placeNote = place?.country ? `, place-boosted ${boosted}` : "";
   console.log(
-    `[feed:${worldId}] view "${key}" (${mode}) -> ${ranked.length} items from ${pool.length} eligible${exNote}` +
+    `[feed:${worldId}] view "${key}" (${mode}) -> ${ranked.length} items from ${pool.length} eligible${exNote}${placeNote}` +
       ` in ${result.durationMs}ms`,
   );
   return result;
@@ -885,13 +916,14 @@ export async function getFeed(
   worldId: string = DEFAULT_WORLD_ID,
   force = false,
   interest = config.feed.interest,
+  place?: Place | null,
 ): Promise<FeedResult> {
   const { busyWith } = await ensurePool(worldId, force);
   const parsed = await interpretQuery(interest);
   // Embed the POSITIVE intent (not the raw query): embedding "not israel" would
   // sit right next to Israel coverage, which is the opposite of what's wanted.
   const queryVec = await embedQuery(parsed.positive);
-  const result = assembleView(worldId, interest, parsed, queryVec);
+  const result = assembleView(worldId, interest, parsed, queryVec, place);
   return { ...result, busyWith };
 }
 

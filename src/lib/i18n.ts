@@ -91,6 +91,13 @@ const en: Dict = {
   "settings.language": "Language",
   "settings.languageSub":
     "Show the app — and AI summaries — in this language, even when the source article is written in another.",
+  "settings.place": "Place",
+  "settings.placeSub":
+    "Get news relevant to where you are. We lift stories about your country, region or town to the top — across every source. Leave as Global for worldwide news.",
+  "settings.placeGlobal": "Global",
+  "settings.placeRegionAll": "All regions",
+  "settings.placeLocality": "Town / council",
+  "settings.placeLocalityPlaceholder": "e.g. Móstoles",
   "settings.data": "Data",
   "settings.refreshNow": "Refresh feed now",
   "settings.resetToday": "Reset today's progress",
@@ -112,7 +119,6 @@ const en: Dict = {
   "world.curious": "Science & Curiosity",
   "world.games": "Videogames",
   "world.films": "Films",
-  "world.spain": "Spain",
   // lean
   "lean.left": "Left",
   "lean.lean-left": "Lean left",
@@ -347,6 +353,13 @@ const es: Dict = {
   "settings.language": "Idioma",
   "settings.languageSub":
     "Muestra la app — y los resúmenes de IA — en este idioma, aunque el artículo original esté escrito en otro.",
+  "settings.place": "Lugar",
+  "settings.placeSub":
+    "Recibe noticias relevantes para donde estás. Subimos al principio las historias sobre tu país, comunidad o municipio — en todas las fuentes. Déjalo en Global para noticias de todo el mundo.",
+  "settings.placeGlobal": "Global",
+  "settings.placeRegionAll": "Todas las comunidades",
+  "settings.placeLocality": "Municipio / ayuntamiento",
+  "settings.placeLocalityPlaceholder": "p. ej. Móstoles",
   "settings.data": "Datos",
   "settings.refreshNow": "Actualizar feed ahora",
   "settings.resetToday": "Restablecer el progreso de hoy",
@@ -368,7 +381,6 @@ const es: Dict = {
   "world.curious": "Ciencia y curiosidad",
   "world.games": "Videojuegos",
   "world.films": "Cine",
-  "world.spain": "España",
   // lean
   "lean.left": "Izquierda",
   "lean.lean-left": "Centro-izquierda",
