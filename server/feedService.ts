@@ -194,12 +194,15 @@ function analyzeCutoff(now = Date.now()): number {
   return now - config.feed.analyzeMaxAgeMs;
 }
 
-/** The recency-ordered backlog of items still needing deep analysis. */
+/** The recency-ordered backlog of items still needing deep analysis. Items the
+ *  cheap triage pass already judged GLOBAL (in a regional pool) are excluded —
+ *  they'd be filtered out of the local feed anyway, so we never pay the expensive
+ *  pass on them. */
 function pendingForAnalysis(worldId: string): StoredItem[] {
   const cutoff = analyzeCutoff();
   return getStore(worldId)
     .all()
-    .filter((s) => !s.clickbait && !s.analyzed && s.item.publishedAt >= cutoff)
+    .filter((s) => !s.clickbait && !s.analyzed && s.global !== true && s.item.publishedAt >= cutoff)
     .sort((a, b) => b.item.publishedAt - a.item.publishedAt);
 }
 
@@ -248,10 +251,37 @@ async function refreshSources(worldId: string): Promise<void> {
       junk = await detectClickbait(untriaged, progressLogger(state, "triage"));
       console.log(`[feed:${worldId}] triage flagged ${junk.size}/${untriaged.length} as clickbait/junk`);
     }
+
+    // REGIONAL pools: judge local-vs-global from the HEADLINE now (cheap, title-
+    // only) and drop the obvious internationals BEFORE the expensive deep pass —
+    // local outlets republish a lot of globally-covered news. Conservative: the
+    // prompt keeps anything it's unsure about. Only non-junk items are worth the
+    // check. Topical worlds skip this (global flag stays undefined).
+    const cc = placeCountryOf(worldId);
+    let globals = new Set<string>();
+    if (cc && config.place.sourcesEnabled) {
+      const localCandidates = untriaged.filter((it) => !junk.has(it.id));
+      if (localCandidates.length > 0) {
+        console.log(`[feed:${worldId}] geo-scope: classifying ${localCandidates.length} headline(s) local/global…`);
+        globals = await classifyGlobalScope(
+          localCandidates.map((it) => ({ id: it.id, title: it.title, summary: it.summary })),
+          placeLabelFor(cc),
+          progressLogger(state, "triage"),
+        );
+        console.log(
+          `[feed:${worldId}] geo-scope flagged ${globals.size}/${localCandidates.length} as global ` +
+            `(dropped before deep analysis)`,
+        );
+      }
+    }
+
     for (const it of untriaged) {
       st.upsert({
         item: it,
         clickbait: junk.has(it.id),
+        // Set at triage for regional pools so the global stories are excluded from
+        // the deep-analysis backlog (pendingForAnalysis) and the local feed.
+        global: cc ? globals.has(it.id) : undefined,
         analyzed: false, // deep analysis pending
         topic: it.topic,
         lean: it.lean,
