@@ -185,16 +185,16 @@ export default function FeedScreen() {
     [issueByArticle],
   );
 
-  // ALL synthesized stories (developing + event) present in the current feed.
-  // They live INSIDE their topic sections, interleaved with articles and treated
-  // like them. Their member articles are deduped out of the article stream (that
-  // coverage now lives in the story card itself).
-  const feedStories = useMemo(() => {
+  // Synthesized SINGLE-EVENT stories present in the current feed. These live
+  // INSIDE their topic sections alongside articles (their member articles are
+  // deduped out — the synthesis card stands in for them). Ongoing/DEVELOPING
+  // issues do NOT go here; they surface in the "last hour" band below.
+  const synthStories = useMemo(() => {
     const feedIds = new Set(feed.map((it) => it.id));
-    return stories.filter((s) => s.sources.some((src) => feedIds.has(src.id)));
+    return stories.filter((s) => !s.developing && s.sources.some((src) => feedIds.has(src.id)));
   }, [feed, stories]);
 
-  // Per-topic stream: story cards (ongoing + synthesized) interleaved with the
+  // Per-topic stream: synthesized event story cards interleaved with the
   // standalone articles that no story absorbed, ordered by recency (read articles
   // sink to the bottom). Stories sort by their latest update.
   type Entry =
@@ -202,11 +202,11 @@ export default function FeedScreen() {
     | { kind: "item"; item: FeedItem; topic: Topic; at: number; done: boolean };
   const sections = useMemo(() => {
     const absorbed = new Set<string>();
-    for (const s of feedStories) for (const src of s.sources) absorbed.add(src.id);
+    for (const s of synthStories) for (const src of s.sources) absorbed.add(src.id);
     const standalone = feed.filter((it) => !absorbed.has(it.id));
 
     const entries: Entry[] = [
-      ...feedStories.map(
+      ...synthStories.map(
         (story): Entry => ({ kind: "story", story, topic: story.topic, at: story.updatedAt, done: false }),
       ),
       ...standalone.map(
@@ -237,7 +237,7 @@ export default function FeedScreen() {
       topic: t,
       entries: (byTopic.get(t) as Entry[]).slice().sort(order),
     }));
-  }, [feed, feedStories, completedSet]);
+  }, [feed, synthStories, completedSet]);
 
   const unreadCount = useMemo(
     () =>
@@ -249,12 +249,22 @@ export default function FeedScreen() {
     selected !== "all" && sections.some((s) => s.topic === selected) ? selected : "all";
   const visibleSections =
     activeSelected === "all" ? sections : sections.filter((s) => s.topic === activeSelected);
-  // "Last minute": stories moving right now (recent activity, or new coverage
-  // since the reader last opened them), honoring the active topic filter.
+  // "Last hour": ONGOING (developing) issues moving right now — recent activity
+  // or new coverage since the reader last opened them. Synthesized single-event
+  // stories never appear here (they live in their topic sections). Honors the
+  // active topic filter AND the search: when a steering interest is set, restrict
+  // to developing issues present in the (relevance-narrowed) feed so the band
+  // honours the search like the article stream; otherwise surface all active ones.
   const visibleLastMinute = useMemo(() => {
-    const lm = lastMinuteStories(stories, storyViews);
+    const searching = (prefs.interestPrompt ?? "").trim().length > 0;
+    let developing = stories.filter((s) => s.developing);
+    if (searching) {
+      const feedIds = new Set(feed.map((it) => it.id));
+      developing = developing.filter((s) => s.sources.some((src) => feedIds.has(src.id)));
+    }
+    const lm = lastMinuteStories(developing, storyViews);
     return activeSelected === "all" ? lm : lm.filter((s) => s.topic === activeSelected);
-  }, [stories, storyViews, activeSelected]);
+  }, [stories, feed, storyViews, activeSelected, prefs.interestPrompt]);
 
   // Responsive layout math.
   const contentW = Math.min(width, MAX_CONTENT_WIDTH) - H_PAD * 2;
