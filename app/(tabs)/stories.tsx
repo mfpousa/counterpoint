@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -41,12 +41,19 @@ export default function StoriesScreen() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
+  // The world the reader is currently viewing. A fetch is only applied if this
+  // STILL matches when it resolves — an in-flight request for the world we just
+  // switched away from must not overwrite the current world's stories (which
+  // would surface foreign stories in "Last minute").
+  const currentWorldRef = useRef(worldId);
+  currentWorldRef.current = worldId;
   const load = useCallback(
     async (force = false) => {
       setLoading(true);
       setError(null);
       try {
         const res = await fetchStories({ world: worldId, force });
+        if (currentWorldRef.current !== worldId) return;
         setStories(res.stories);
         setBusy(res.busyWith ?? null);
         if (res.stories.length === 0 && !res.busyWith) {
@@ -56,9 +63,11 @@ export default function StoriesScreen() {
           );
         }
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Failed to load stories.");
+        if (currentWorldRef.current === worldId) {
+          setError(e instanceof Error ? e.message : "Failed to load stories.");
+        }
       } finally {
-        setLoading(false);
+        if (currentWorldRef.current === worldId) setLoading(false);
       }
     },
     [worldId],

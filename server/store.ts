@@ -184,8 +184,19 @@ export function getStoredAnyWorld(id: string, preferWorld?: string): StoredItem 
     const hit = getStore(preferWorld).get(id);
     if (hit) return hit;
   }
+  // Topical worlds (their stores may not be instantiated yet on a fresh process).
   for (const w of WORLDS) {
+    if (w.id === preferWorld) continue;
     const hit = getStore(w.id).get(id);
+    if (hit) return hit;
+  }
+  // Any OTHER instantiated pool the process has loaded — GEO pools (`geo-<node>`)
+  // and REGIONAL pools (`place-<cc>`) live here, NOT in WORLDS. Without this scan
+  // an item opened from the coverage-map / a regional pool 404s ("item not found")
+  // because preferWorld + the WORLDS loop never cover those pools.
+  for (const [worldId, store] of stores) {
+    if (worldId === preferWorld) continue; // already checked above
+    const hit = store.get(id);
     if (hit) return hit;
   }
   return undefined;

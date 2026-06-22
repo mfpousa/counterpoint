@@ -137,9 +137,10 @@ export async function fetchCoverage(node?: string): Promise<CoverageView> {
  * for in-app reading. Throws with a clear message on failure so the reader UI
  * can surface it (paywall, model offline, item aged out, ...).
  */
-export async function fetchRewrite(id: string, lang?: Lang): Promise<RewrittenArticle> {
+export async function fetchRewrite(id: string, lang?: Lang, world?: string): Promise<RewrittenArticle> {
   const params = new URLSearchParams({ id });
   if (lang) params.set("lang", lang);
+  if (world) params.set("world", world);
   const res = await fetch(`${apiBaseUrl()}/api/rewrite?${params.toString()}`, {
     method: "GET",
   });

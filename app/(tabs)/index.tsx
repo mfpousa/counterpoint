@@ -82,37 +82,54 @@ export default function FeedScreen() {
   );
   const [loadingStories, setLoadingStories] = useState(false);
   const storiesLoadedOnce = useRef(false);
+  // The story set the reader is currently looking at (world + language). A fetch
+  // is only applied if this STILL matches when it resolves — otherwise an
+  // in-flight request for the world we just switched AWAY from could overwrite
+  // the current world's stories (cross-world contamination in "Last minute").
+  const currentKey = storyKeyFor(feedWorldId, prefs.language);
+  const currentKeyRef = useRef(currentKey);
+  currentKeyRef.current = currentKey;
   const loadStories = useCallback(
     async (force = false) => {
+      const key = storyKeyFor(feedWorldId, prefs.language);
       setLoadingStories(true);
       try {
         const res = await fetchStories({ world: feedWorldId, force, lang: prefs.language });
+        // Drop a response the reader has since navigated away from (world/language
+        // changed mid-flight) so it can't bleed another world's stories into view.
+        if (currentKeyRef.current !== key) return;
         // Never WIPE a populated set while the backend is mid-rebuild: /api/stories
         // can transiently return [] during synthesis. Keep showing the stale set
         // until real stories arrive, then swap them in (they eventually update).
         if (res.stories.length > 0) {
           setStories(res.stories);
-          storiesByKey.set(storyKeyFor(feedWorldId, prefs.language), res.stories);
+          storiesByKey.set(key, res.stories);
           // Share with the routed story panel so opening a listed story is instant
           // and never dead-ends on an id that changed during a rebuild.
           cacheStories(res.stories);
         }
         storiesLoadedOnce.current = true;
       } finally {
-        setLoadingStories(false);
+        // Only clear the spinner if we're still on the same world/language (the new
+        // world's own load owns its spinner once we've switched).
+        if (currentKeyRef.current === key) setLoadingStories(false);
       }
     },
     [feedWorldId, prefs.language],
   );
   useEffect(() => {
     // Show this world+language's cached stories immediately (no skeleton flash)
-    // when we've built them before; otherwise leave whatever's there until the
-    // background refresh lands. NEVER force-clear to [] here: that's what made
-    // stories vanish on a remount. Always refresh in the bg.
+    // when we've built them before. Otherwise CLEAR to empty: a remount keeps the
+    // module cache so the same world stays populated, but a genuine switch to a
+    // world we haven't built yet must not leave the previous world's stories on
+    // screen (that's what surfaced foreign stories in "Last minute").
     const cached = storiesByKey.get(storyKeyFor(feedWorldId, prefs.language));
     if (cached) {
       setStories(cached);
       storiesLoadedOnce.current = true;
+    } else {
+      setStories([]);
+      storiesLoadedOnce.current = false;
     }
     void loadStories();
   }, [loadStories, feedWorldId, prefs.language]);

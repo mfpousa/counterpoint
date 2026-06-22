@@ -34,7 +34,11 @@ const READ_WIDTH = 720;
 export default function NewsReader() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
-  const { pool, worldId, prefs, summaries, gradeAndRecord, progress } = useApp();
+  // Use the EFFECTIVE pool id (feedWorldId), not the topical worldId: an item
+  // opened from a GEO pool (coverage map) or REGIONAL pool is stored under that
+  // pool, so the rewrite/related lookups must target it or they 404 ("item not
+  // found"). worldId (topical) would miss those pools entirely.
+  const { pool, feedWorldId, prefs, summaries, gradeAndRecord, progress } = useApp();
   const t = useT();
 
   const [loading, setLoading] = useState(false);
@@ -62,7 +66,7 @@ export default function NewsReader() {
 
     // Non-streaming fallback (streaming unsupported here, or it errored).
     const plain = () => {
-      fetchRewrite(id, prefs.language)
+      fetchRewrite(id, prefs.language, feedWorldId)
         .then((a) => {
           if (!cancelled) setArticle(a);
         })
@@ -76,7 +80,7 @@ export default function NewsReader() {
 
     // Stream the rewrite so the reader shows the model writing in real time.
     const handle = streamRewrite(id, {
-      world: worldId,
+      world: feedWorldId,
       lang: prefs.language,
       onDelta: (d) => {
         if (!cancelled) setStreamed((p) => p + d);
@@ -97,14 +101,14 @@ export default function NewsReader() {
     });
     if (!handle) plain();
 
-    fetchRelated(id, { world: worldId }).then((r) => {
+    fetchRelated(id, { world: feedWorldId }).then((r) => {
       if (!cancelled) setRelated(r);
     });
     return () => {
       cancelled = true;
       handle?.cancel();
     };
-  }, [id, worldId, prefs.language]);
+  }, [id, feedWorldId, prefs.language]);
 
   // Paragraphs to show WHILE streaming (before the final cleaned article lands).
   const streamingParas = streamed
