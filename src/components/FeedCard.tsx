@@ -65,6 +65,18 @@ function ScoreBadge({ relevance }: { relevance: number }) {
   );
 }
 
+/** Badge for a PROVISIONAL item — fetched + triaged but not yet deep-analyzed.
+ *  Signals the card will fill in (topic/summary/lean) once analysis lands. */
+function AnalyzingBadge() {
+  const t = useT();
+  return (
+    <View style={styles.analyzingBadge}>
+      <Ionicons name="sparkles" size={11} color={colors.textDim} />
+      <Text style={styles.analyzingText}>{t("card.analyzing")}</Text>
+    </View>
+  );
+}
+
 export function FeedCard({
   item,
   done,
@@ -117,7 +129,11 @@ export function FeedCard({
             <Text style={styles.ytText}>{t("card.youtube")}</Text>
           </View>
         )}
-        {typeof item.relevance === "number" && <ScoreBadge relevance={item.relevance} />}
+        {item.enrichment === "provisional" ? (
+          <AnalyzingBadge />
+        ) : (
+          typeof item.relevance === "number" && <ScoreBadge relevance={item.relevance} />
+        )}
         <View style={{ flex: 1 }} />
         <LeanBadge lean={item.lean} source={item.leanSource} rationale={item.leanRationale} />
       </View>
@@ -237,6 +253,24 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   scoreText: { fontSize: font.tiny, fontWeight: "800" },
+  analyzingBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+  },
+  analyzingText: {
+    color: colors.textDim,
+    fontSize: font.tiny,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
   ytBadge: {
     flexDirection: "row",
     alignItems: "center",

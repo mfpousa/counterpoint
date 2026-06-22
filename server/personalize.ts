@@ -192,12 +192,20 @@ export function toFeedItem(
   tokens: Set<string>,
   hasInterest: boolean,
   queryVec?: number[] | null,
+  provisional = false,
 ): FeedItem {
   const match =
     hasInterest && queryVec && s.embedding
       ? semanticMatch(queryVec, s.embedding)
       : interestMatch(tokens, s);
-  const relevance = personalizedRelevance(s.importance, match, hasInterest);
+  // PROVISIONAL items aren't deep-analyzed yet (importance is 0), so base their
+  // relevance on the cheap prescreen importance instead — capped below 0.6 so a
+  // strongly-relevant ANALYZED item still wins the top of the feed. Topical worlds
+  // have no prescreen score; fall back to a modest default.
+  const importance = provisional
+    ? Math.min(0.6, s.prescreenImportance ?? 0.4)
+    : s.importance;
+  const relevance = personalizedRelevance(importance, match, hasInterest);
   return {
     ...s.item,
     // Decode any leftover HTML entities (e.g. `&#039;`) so titles/summaries read
@@ -218,5 +226,6 @@ export function toFeedItem(
     aiReason: s.summary || undefined,
     // "Covered by N outlets" — only meaningful when several carried the story.
     coveredBy: s.coveredBy && s.coveredBy > 1 ? s.coveredBy : undefined,
+    enrichment: provisional ? "provisional" : "analyzed",
   };
 }

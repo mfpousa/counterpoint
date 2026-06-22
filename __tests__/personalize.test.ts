@@ -15,6 +15,7 @@ function makeStored(over: {
   topic?: Topic;
   summary?: string;
   publishedAt?: number;
+  prescreenImportance?: number;
 }): StoredItem {
   const topic = over.topic ?? "technology";
   return {
@@ -42,6 +43,9 @@ function makeStored(over: {
     summary: over.summary ?? "",
     keywords: over.keywords ?? [],
     analyzedAt: 0,
+    ...(over.prescreenImportance !== undefined
+      ? { prescreenImportance: over.prescreenImportance }
+      : {}),
   };
 }
 
@@ -99,5 +103,25 @@ describe("toFeedItem", () => {
   it("uses importance directly when no interest is set", () => {
     const fi = toFeedItem(makeStored({ importance: 0.42 }), interestTokens(""), false);
     expect(fi.relevance).toBe(0.42);
+  });
+
+  it("tags analyzed items with enrichment 'analyzed'", () => {
+    const fi = toFeedItem(makeStored({ importance: 0.5 }), interestTokens(""), false);
+    expect(fi.enrichment).toBe("analyzed");
+  });
+
+  it("scores a PROVISIONAL item from its prescreen importance, capped below 0.6", () => {
+    // importance is ignored for provisional; prescreen 0.9 saturates the 0.6 cap.
+    const item = makeStored({ importance: 0, prescreenImportance: 0.9, summary: "" });
+    const fi = toFeedItem(item, interestTokens(""), false, null, true);
+    expect(fi.enrichment).toBe("provisional");
+    expect(fi.relevance).toBe(0.6);
+    // No deep summary yet → no AI reason fabricated.
+    expect(fi.aiReason).toBeUndefined();
+  });
+
+  it("falls back to a modest 0.4 relevance for provisional items without a prescreen score", () => {
+    const fi = toFeedItem(makeStored({ importance: 0 }), interestTokens(""), false, null, true);
+    expect(fi.relevance).toBe(0.4);
   });
 });

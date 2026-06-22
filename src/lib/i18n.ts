@@ -153,6 +153,7 @@ const en: Dict = {
   "card.revise": "Revise",
   "card.min": "{n} min",
   "card.youtube": "YouTube",
+  "card.analyzing": "Analyzing…",
   // reader
   "reader.writing": "Writing in real time…",
   "reader.minRead": "{n} min read",
@@ -429,6 +430,7 @@ const es: Dict = {
   "card.revise": "Repasar",
   "card.min": "{n} min",
   "card.youtube": "YouTube",
+  "card.analyzing": "Analizando…",
   // reader
   "reader.writing": "Escribiendo en tiempo real…",
   "reader.minRead": "{n} min de lectura",

@@ -126,6 +126,16 @@ export const config = {
     analyzeMaxAgeMs: num("FEED_ANALYZE_MAX_AGE_MS", 3 * 24 * 60 * 60 * 1000),
     // Gap between background analysis chunks while draining the backlog.
     catchUpDelayMs: num("FEED_CATCHUP_DELAY_MS", 1500),
+    // REACTIVE LOADING. Serve fetched + cheaply-triaged items that haven't been
+    // deep-analyzed yet ("provisional") so the feed is usable in seconds instead
+    // of waiting for the model to chew through the whole corpus. They carry the
+    // source headline/summary + source lean prior + coarse importance, rank below
+    // analyzed items, and upgrade in place as analysis lands. Disable with
+    // FEED_PROVISIONAL_OFF=1.
+    serveProvisional: !bool("FEED_PROVISIONAL_OFF"),
+    // Cap on provisional items appended to a view (importance/recency ordered) so
+    // a flood of un-analyzed local items can't swamp the feed.
+    provisionalMax: num("FEED_PROVISIONAL_MAX", 120),
   },
   place: {
     // Geographic relevance BOOST. When a reader sets a place (country → region →

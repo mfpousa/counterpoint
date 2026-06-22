@@ -138,11 +138,23 @@ function ws(worldId: string): WorldState {
   return s;
 }
 
-// GLOBAL single-build lock: deep analysis is expensive, so only ONE world may be
-// building (foreground OR draining its backlog) at any moment. While held,
-// requests for a DIFFERENT world serve that world's existing pool and report
-// `busyWith` instead of starting a competing build.
-let buildingWorld: string | null = null;
+// GLOBAL model mutex. Deep analysis, triage, and embedding all hit the SAME local
+// model server, which serves one heavy request at a time, so we serialize those
+// passes across ALL worlds to avoid overloading it. Crucially the lock is held
+// only for ONE pass and released BETWEEN chunks — so a world switch can interleave
+// its own fetch/triage/first chunk instead of waiting for another world's entire
+// backlog to drain. This is what makes switching worlds responsive while a big
+// drain is in progress (the old single-build lock blocked it for minutes/hours).
+let modelChain: Promise<unknown> = Promise.resolve();
+function withModelLock<T>(fn: () => Promise<T>): Promise<T> {
+  const run = modelChain.then(fn, fn);
+  // Keep the chain alive regardless of any individual pass failing.
+  modelChain = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
 
 function setPhase(state: WorldState, phase: BuildPhase, done = 0, total = 0): void {
   state.status = { phase, done, total };
@@ -164,8 +176,9 @@ export function getStatus(worldId: string = DEFAULT_WORLD_ID): AnalysisStatus {
     state.status.phase !== "idle" ||
     state.buildInFlight !== null ||
     state.analyzeInFlight !== null ||
-    buildingWorld === worldId;
-  const busyWith = buildingWorld && buildingWorld !== worldId ? buildingWorld : null;
+    state.catchUpTimer !== null;
+  // Worlds no longer block each other (model passes serialize on a mutex but each
+  // world builds independently), so nothing is ever "busy with" another world.
   return {
     phase: state.status.phase,
     active,
@@ -174,7 +187,7 @@ export function getStatus(worldId: string = DEFAULT_WORLD_ID): AnalysisStatus {
     pending,
     analyzed,
     world: worldId,
-    busyWith,
+    busyWith: null,
   };
 }
 
@@ -310,10 +323,12 @@ async function refreshSources(worldId: string): Promise<void> {
       // ONE cheap title-only pass: clickbait + coarse importance (no global flag).
       const batches = Math.ceil(untriaged.length / config.ai.triageBatchSize);
       console.log(`[feed:${worldId}] prescreen(geo): ${untriaged.length} headline(s) in ${batches} batch(es)…`);
-      const verdicts = await prescreenGeo(
-        untriaged.map((it) => ({ id: it.id, title: it.title, summary: it.summary })),
-        geoLabel(geoNodeIdOf(worldId)),
-        progressLogger(state, "triage"),
+      const verdicts = await withModelLock(() =>
+        prescreenGeo(
+          untriaged.map((it) => ({ id: it.id, title: it.title, summary: it.summary })),
+          geoLabel(geoNodeIdOf(worldId)),
+          progressLogger(state, "triage"),
+        ),
       );
       for (const it of untriaged) {
         const v = verdicts.get(it.id);
@@ -328,10 +343,12 @@ async function refreshSources(worldId: string): Promise<void> {
       // the top-N local items by that score.
       const batches = Math.ceil(untriaged.length / config.ai.triageBatchSize);
       console.log(`[feed:${worldId}] prescreen: ${untriaged.length} headline(s) in ${batches} batch(es)…`);
-      const verdicts = await prescreenRegional(
-        untriaged.map((it) => ({ id: it.id, title: it.title, summary: it.summary })),
-        placeLabelFor(cc),
-        progressLogger(state, "triage"),
+      const verdicts = await withModelLock(() =>
+        prescreenRegional(
+          untriaged.map((it) => ({ id: it.id, title: it.title, summary: it.summary })),
+          placeLabelFor(cc),
+          progressLogger(state, "triage"),
+        ),
       );
       for (const it of untriaged) {
         const v = verdicts.get(it.id);
@@ -347,7 +364,7 @@ async function refreshSources(worldId: string): Promise<void> {
     } else if (config.feed.clickbaitFilter) {
       const batches = Math.ceil(untriaged.length / config.ai.triageBatchSize);
       console.log(`[feed:${worldId}] triage: ${untriaged.length} headline(s) in ${batches} batch(es)…`);
-      junk = await detectClickbait(untriaged, progressLogger(state, "triage"));
+      junk = await withModelLock(() => detectClickbait(untriaged, progressLogger(state, "triage")));
       console.log(`[feed:${worldId}] triage flagged ${junk.size}/${untriaged.length} as clickbait/junk`);
     }
 
@@ -495,7 +512,9 @@ async function analyzeGeoChunk(
       `[feed:${worldId}] geo deep analysis: ${items.length} representative(s) ` +
         `(of ${plan.length} clusters) in ${batches} batch(es)…`,
     );
-    analyses = await analyzeItems(items, transcripts, progressLogger(state, "analyze"));
+    analyses = await withModelLock(() =>
+      analyzeItems(items, transcripts, progressLogger(state, "analyze")),
+    );
   }
 
   const srcById = new Map(sourcesForWorld(worldId).map((src) => [src.id, src]));
@@ -585,7 +604,9 @@ function analyzePending(worldId: string): Promise<{ remaining: number; progresse
       `[feed:${worldId}] deep analysis: ${items.length} of ${pending.length} pending in ${batches} batch(es)` +
         ` (concurrency ${config.ai.concurrency})…`,
     );
-    const analyses = await analyzeItems(items, transcripts, progressLogger(state, "analyze"));
+    const analyses = await withModelLock(() =>
+      analyzeItems(items, transcripts, progressLogger(state, "analyze")),
+    );
 
     // Source-level lean rationales (the curated prior) for the "source" provenance
     // path and as a fallback when the model omits its own rationale.
@@ -664,7 +685,7 @@ function embedPending(worldId: string): Promise<{ remaining: number; progressed:
     const slice = config.ai.maxItems > 0 ? pending.slice(0, config.ai.maxItems) : pending;
     const texts = slice.map((s) => itemEmbedText(s.item.title, s.summary, s.keywords));
     console.log(`[feed:${worldId}] embedding ${slice.length} of ${pending.length} item(s)…`);
-    const vecs = await embedTexts(texts);
+    const vecs = await withModelLock(() => embedTexts(texts));
 
     let progressed = 0;
     slice.forEach((s, i) => {
@@ -1032,20 +1053,10 @@ function augmentReactively(worldId: string): Promise<void> {
 
     getStore(worldId).save();
 
-    // Analyze the new items exactly like any other pending item, under the lock.
-    if (buildingWorld) return; // busy elsewhere; the next drain will pick them up
-    buildingWorld = worldId;
-    try {
-      const a = await analyzePending(worldId);
-      const e = await embedPending(worldId);
-      const moreWork =
-        (a.remaining > 0 && a.progressed > 0) || (e.remaining > 0 && e.progressed > 0);
-      if (moreWork) scheduleCatchUp(worldId);
-      else if (buildingWorld === worldId) buildingWorld = null;
-    } catch (err) {
-      if (buildingWorld === worldId) buildingWorld = null;
-      throw err;
-    }
+    // Analyze the newly-added items in the background, like any other pending
+    // item. analyzePending is per-world re-entrancy-guarded and its model passes
+    // serialize on the global mutex, so this needs no cross-world lock.
+    scheduleCatchUp(worldId);
   })()
     .catch((e) => {
       console.warn(`[augment:${worldId}] reactive augmentation failed:`, e);
@@ -1057,7 +1068,9 @@ function augmentReactively(worldId: string): Promise<void> {
 }
 
 /** Schedule a background chunk to keep chewing through a world's analysis +
- *  embedding backlogs. Holds the GLOBAL build lock until the backlog clears. */
+ *  embedding backlogs. Each chunk's model pass serializes on the global mutex,
+ *  and the loop yields between chunks so other worlds can interleave their own
+ *  passes (a world switch isn't blocked by this world's full drain). */
 function scheduleCatchUp(worldId: string): void {
   const state = ws(worldId);
   if (state.catchUpTimer) return;
@@ -1075,48 +1088,37 @@ function scheduleCatchUp(worldId: string): void {
         } else {
           if (a.remaining > 0) console.warn(`[feed:${worldId}] catch-up stalled with ${a.remaining} pending`);
           else console.log(`[feed:${worldId}] analysis + embedding backlog cleared`);
-          // Backlog drained (or stalled) — release the global build lock so
-          // another world may refresh.
-          if (buildingWorld === worldId) buildingWorld = null;
           // The pool is now fully analyzed — reactively extend the stories with
           // relevant YouTube videos and international (per-zone) coverage.
           void augmentReactively(worldId);
         }
       } catch (err) {
         console.warn(`[feed:${worldId}] catch-up failed:`, err);
-        if (buildingWorld === worldId) buildingWorld = null;
       }
     })();
   }, config.feed.catchUpDelayMs);
 }
 
 /**
- * Bring a world's store up to date, then analyze the FIRST chunk so the feed is
- * usable quickly. Any remaining backlog is drained in the background (which keeps
- * the global build lock held until it clears).
+ * Bring a world's store up to date (fetch + cheap triage) so PROVISIONAL items
+ * are immediately servable, then drain the deep-analysis backlog in the
+ * BACKGROUND. The cold-start response only waits on this fetch + triage — never
+ * on the (slow) model analysis — so the feed is usable in seconds and enriches
+ * live as each background chunk lands.
  */
 async function buildPool(worldId: string): Promise<void> {
   await refreshSources(worldId);
-  const a = await analyzePending(worldId);
-  const e = await embedPending(worldId);
-  const moreWork = (a.remaining > 0 && a.progressed > 0) || (e.remaining > 0 && e.progressed > 0);
-  if (moreWork) {
-    console.log(
-      `[feed:${worldId}] backlog — ${a.remaining} to analyze, ${e.remaining} to embed; continuing in background`,
-    );
-    scheduleCatchUp(worldId);
-  } else if (buildingWorld === worldId) {
-    // No background work scheduled — release the lock now.
-    buildingWorld = null;
-    // Pool fully analyzed in one pass — run reactive augmentation in the background.
-    void augmentReactively(worldId);
-  }
+  // Deep analysis + embedding + augmentation run in the background, one model
+  // pass at a time (global mutex), so they never block the response or starve
+  // another world that the reader just switched to.
+  scheduleCatchUp(worldId);
 }
 
 /**
- * Ensure a world's pool is fresh (TTL) or forced, honoring the GLOBAL single-build
- * lock. Returns which OTHER world (if any) is currently busy — in which case THIS
- * world was NOT rebuilt and serves whatever it already has.
+ * Ensure a world's pool is fresh (TTL) or forced. Each world builds INDEPENDENTLY
+ * now (model passes serialize on the global mutex), so worlds never block each
+ * other — switching is responsive. `busyWith` is always null, kept only for API
+ * compatibility with the client/status shape.
  */
 async function ensurePool(worldId: string, force: boolean): Promise<{ busyWith: string | null }> {
   const state = ws(worldId);
@@ -1134,26 +1136,21 @@ async function ensurePool(worldId: string, force: boolean): Promise<{ busyWith: 
     Date.now() - state.lastBuildAt < config.server.feedTtlMs;
   if (fresh) return { busyWith: null };
 
-  // A DIFFERENT world holds the global build lock — we can't rebuild right now;
-  // serve whatever this world already has and report who's busy.
-  if (buildingWorld && buildingWorld !== worldId) return { busyWith: buildingWorld };
-
-  // A build for THIS world is already running (cold foreground or background
-  // catch-up). Block ONLY on a cold start (nothing to show yet); otherwise
-  // return immediately and let the in-flight build surface progress live.
-  if (state.buildInFlight || buildingWorld === worldId) {
-    if (!hasContent && state.buildInFlight) await state.buildInFlight;
+  // A (re)build for THIS world is already running. Block ONLY on a cold start
+  // (nothing to show yet); otherwise return immediately and let the in-flight
+  // build surface provisional + newly-analyzed items live.
+  if (state.buildInFlight) {
+    if (!hasContent) await state.buildInFlight;
     return { busyWith: null };
   }
 
-  // Acquire the global lock and (re)build.
-  buildingWorld = worldId;
   const build = buildPool(worldId).finally(() => {
     state.buildInFlight = null;
   });
   state.buildInFlight = build;
-  // Cold start must wait so the response has something to return. A WARM refresh
-  // rebuilds in the background so the current feed remains instantly available.
+  // Cold start must wait so the response has something to return — but buildPool
+  // only awaits fetch + triage, so this resolves with PROVISIONAL items in
+  // seconds; deep analysis continues in the background.
   if (!hasContent) await build;
   return { busyWith: null };
 }
@@ -1208,8 +1205,35 @@ function assembleView(
   const pool = kept.map((s) => toFeedItem(s, tokens, hasInterest, queryVec));
 
   const ranked = rankItems(pool);
+
+  // REACTIVE LOADING: append items that are fetched + triaged but NOT yet deep-
+  // analyzed, so the feed is usable in seconds instead of waiting for the model.
+  // They're drawn from the SAME backlog the analyzer will work through (already
+  // filtered for clickbait/global/recency), capped and importance-ordered so a
+  // flood of locals can't swamp the feed, and ranked strictly BELOW analyzed
+  // items. As each analysis chunk lands, those items graduate from this set into
+  // `ranked` above and upgrade in place on the client.
+  let provisional: FeedItem[] = [];
+  if (config.feed.serveProvisional) {
+    const pend = pendingForAnalysis(worldId)
+      .filter(
+        (s) =>
+          !s.cloneOf &&
+          now - s.item.publishedAt <= config.feed.retentionMs &&
+          !(dropGlobal && s.global === true),
+      )
+      .sort(
+        (a, b) =>
+          (b.prescreenImportance ?? 0.5) - (a.prescreenImportance ?? 0.5) ||
+          b.item.publishedAt - a.item.publishedAt,
+      )
+      .slice(0, config.feed.provisionalMax);
+    const { kept: pkept } = partitionByExclusion(pend, parsed.exclude);
+    provisional = rankItems(pkept.map((s) => toFeedItem(s, tokens, hasInterest, queryVec, true)));
+  }
+
   const result: FeedResult = {
-    items: ranked,
+    items: [...ranked, ...provisional],
     builtAt: state.lastBuildAt,
     fetched: st.size(),
     enriched: pool.length,
@@ -1225,8 +1249,9 @@ function assembleView(
           .map(([t, n]) => `${t}:${n}`)
           .join(", ")}}`
       : "";
+  const provNote = provisional.length > 0 ? ` (+${provisional.length} provisional)` : "";
   console.log(
-    `[feed:${worldId}] view "${key}" (${mode}) -> ${ranked.length} items from ${pool.length} eligible${exNote}` +
+    `[feed:${worldId}] view "${key}" (${mode}) -> ${ranked.length} items from ${pool.length} eligible${provNote}${exNote}` +
       ` in ${result.durationMs}ms`,
   );
   return result;

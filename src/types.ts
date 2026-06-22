@@ -210,6 +210,16 @@ export interface FeedItem {
    * the item stands alone.
    */
   coveredBy?: number;
+  /**
+   * Enrichment stage of this item, for reactive (progressive) loading:
+   *  - "provisional": fetched + cheaply triaged but NOT yet deep-analyzed. Carries
+   *    the source headline/summary, the source-level lean prior, and a coarse
+   *    importance. Shown immediately so the feed is usable in seconds; upgraded in
+   *    place once analysis lands.
+   *  - "analyzed": the model has produced topic/summary/refined lean/keywords.
+   * Absent on older items is treated as "analyzed".
+   */
+  enrichment?: "provisional" | "analyzed";
 }
 
 /** One storyline within the daily briefing. */
