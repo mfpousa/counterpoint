@@ -33,33 +33,29 @@ function parseArgs(argv: string[]): Args {
 }
 
 /**
- * SPARQL: news OUTLETS tied to a country.
+ * SPARQL: news OUTLETS tied to a country — tuned for the WDQS time budget.
  *
- * Broad on purpose — outlets are modelled inconsistently on Wikidata:
- *  - type: newspaper / online newspaper / news agency / TV / radio station
- *    (all reached via the P279* subclass chain), and
- *  - country: P17 (country) OR P495 (country of origin) OR P159 (headquarters)
- *    whose own P17 is the country. We UNION all three so we don't miss outlets
- *    that only set one of them.
+ * Lessons from a 504: the unbounded `P31/P279*` subclass walk + a 3-way country
+ * UNION + a `P131` region join is too heavy. So we keep it CHEAP:
+ *  - direct `wdt:P31` against an explicit list of the common outlet types
+ *    (the frequent newspaper subclasses are listed directly, no `P279*` walk),
+ *  - country via `P17` OR `P495` only (drop the expensive HQ->country hop),
+ *  - no region join here (recover region later, it caused row blow-up + cost).
  */
 function query(qid: string, lang: string): string {
   return `
-    SELECT DISTINCT ?outlet ?outletLabel ?website ?regionLabel WHERE {
+    SELECT DISTINCT ?outlet ?outletLabel ?website WHERE {
       VALUES ?type {
         wd:Q11032     # newspaper
+        wd:Q1110794   # daily newspaper
         wd:Q1153191   # online newspaper
         wd:Q192283    # news agency
         wd:Q1616075   # television station
         wd:Q14350     # radio station
       }
-      ?outlet wdt:P31/wdt:P279* ?type .
-      {
-        { ?outlet wdt:P17 wd:${qid} . }            # country
-        UNION { ?outlet wdt:P495 wd:${qid} . }      # country of origin
-        UNION { ?outlet wdt:P159 ?hq . ?hq wdt:P17 wd:${qid} . }  # HQ -> country
-      }
+      ?outlet wdt:P31 ?type .
+      { ?outlet wdt:P17 wd:${qid} . } UNION { ?outlet wdt:P495 wd:${qid} . }
       OPTIONAL { ?outlet wdt:P856 ?website. } # official website
-      OPTIONAL { ?outlet wdt:P131 ?region. }  # located in admin entity
       SERVICE wikibase:label { bd:serviceParam wikibase:language "${lang},en". }
     }
     ORDER BY ?outletLabel
@@ -69,7 +65,6 @@ function query(qid: string, lang: string): string {
 interface Binding {
   outletLabel?: { value: string };
   website?: { value: string };
-  regionLabel?: { value: string };
 }
 
 /** A discovery candidate — deliberately NOT a finished Source (no lean, no feed). */
@@ -83,10 +78,27 @@ interface SourceCandidate {
   needsRssDiscovery: boolean;
 }
 
+/** WDQS 5xx (esp. 504) are frequently transient — retry with backoff. */
+async function fetchWdqs(url: string, attempts = 3): Promise<Response> {
+  for (let i = 1; i <= attempts; i++) {
+    const res = await fetch(url, {
+      headers: { "User-Agent": UA, Accept: "application/sparql-results+json" },
+    });
+    if (res.ok) return res;
+    if (res.status >= 500 && i < attempts) {
+      const waitMs = 2000 * i;
+      console.error(`WDQS ${res.status} ${res.statusText} — retry ${i}/${attempts - 1} in ${waitMs}ms…`);
+      await new Promise((r) => setTimeout(r, waitMs));
+      continue;
+    }
+    throw new Error(`WDQS ${res.status} ${res.statusText}`);
+  }
+  throw new Error("WDQS: exhausted retries");
+}
+
 async function run(args: Args): Promise<SourceCandidate[]> {
   const url = `${WDQS}?query=${encodeURIComponent(query(args.qid, args.lang))}&format=json`;
-  const res = await fetch(url, { headers: { "User-Agent": UA, Accept: "application/sparql-results+json" } });
-  if (!res.ok) throw new Error(`WDQS ${res.status} ${res.statusText}`);
+  const res = await fetchWdqs(url);
   const json = (await res.json()) as { results: { bindings: Binding[] } };
 
   const bindings = json.results.bindings;
@@ -103,7 +115,7 @@ async function run(args: Args): Promise<SourceCandidate[]> {
       byTitle.set(title, {
         title,
         homepage: b.website?.value ?? null,
-        region: b.regionLabel?.value ?? null,
+        region: null, // recovered in a later pass; omitted here for WDQS perf
         lean: null,
         leanRationale: "Unrated — Wikidata-discovered; requires HUMAN lean review before use.",
         needsRssDiscovery: !!b.website?.value,
