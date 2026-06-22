@@ -43,7 +43,6 @@ export const DEFAULT_PREFERENCES: Preferences = {
   driftThreshold: 0.25,
   onboarded: false,
   worldId: DEFAULT_WORLD_ID,
-  scope: "international",
   language: "en",
 };
 
@@ -72,13 +71,9 @@ export async function loadPreferences(): Promise<Preferences> {
     const raw = await AsyncStorage.getItem(KEYS.prefs);
     if (!raw) return DEFAULT_PREFERENCES;
     const merged = { ...DEFAULT_PREFERENCES, ...(JSON.parse(raw) as Partial<Preferences>) };
-    // Migration: the standalone "spain" world was retired in favor of the place
-    // lens. Send those readers to the front page and seed a Spain place so their
-    // experience is preserved (unless they already set a place).
-    if (merged.worldId === "spain") {
-      merged.worldId = DEFAULT_WORLD_ID;
-      if (!merged.place?.country) merged.place = { country: "es" };
-    }
+    // Migration: the retired "spain" world → front page. (The old place lens was
+    // removed; regional news now comes from the geo drill-down pools.)
+    if (merged.worldId === "spain") merged.worldId = DEFAULT_WORLD_ID;
     return merged;
   } catch {
     return DEFAULT_PREFERENCES;

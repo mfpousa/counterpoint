@@ -12,7 +12,7 @@ import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { fetchCoverage, type CoverageNode, type CoverageState, type CoverageView } from "../lib/api";
-import { geoNodeIdOf, GEO_ROOT_ID } from "../data/geo";
+import { geoNodeIdOf, isGeoNode, GEO_ROOT_ID } from "../data/geo";
 import { useT } from "../store/AppContext";
 import { colors, font, radius, spacing } from "../theme";
 
@@ -25,16 +25,29 @@ function stateColor(state: CoverageState): string {
 
 export function GeoNavigator({
   activePoolId,
+  home,
   onSelect,
+  onSetHome,
 }: {
   /** The currently-selected geo pool id (prefs.geoPool), if any. */
   activePoolId?: string;
+  /** The reader's saved HOME node id (prefs.geoHome) — where the navigator opens
+   *  by default when no pool is actively selected. Purely positional. */
+  home?: string;
   /** Select a pool (a node's `poolId`), or pass undefined to leave geo mode. */
   onSelect: (poolId?: string) => void;
+  /** Pin the given node id as the reader's home (the lightweight "picker"). */
+  onSetHome?: (nodeId: string) => void;
 }) {
   const t = useT();
-  // We browse from the active node (or the world root when none is selected).
-  const browseNode = (activePoolId && geoNodeIdOf(activePoolId)) || GEO_ROOT_ID;
+  // "Where you are": an explicitly-selected pool wins; otherwise open at the saved
+  // home node (if still valid), else the world root.
+  const currentNode =
+    (activePoolId && geoNodeIdOf(activePoolId)) ||
+    (home && isGeoNode(home) ? home : null) ||
+    GEO_ROOT_ID;
+  // We browse from (and show the children of) the current node.
+  const browseNode = currentNode;
   const [view, setView] = useState<CoverageView | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
@@ -70,7 +83,11 @@ export function GeoNavigator({
       accessibilityState={{ selected: active }}
       accessibilityLabel={`${node.label} — ${stateLabel(node.state)}`}
     >
-      <View style={[styles.dot, { backgroundColor: stateColor(node.state) }]} />
+      {active ? (
+        <Ionicons name="location" size={12} color={colors.bg} />
+      ) : (
+        <View style={[styles.dot, { backgroundColor: stateColor(node.state) }]} />
+      )}
       <Text style={[styles.label, active && styles.labelActive]} numberOfLines={1}>
         {node.label}
       </Text>
@@ -89,6 +106,24 @@ export function GeoNavigator({
       <View style={styles.header}>
         <Ionicons name="map-outline" size={14} color={colors.textDim} />
         <Text style={styles.title}>{t("geo.title")}</Text>
+        {/* Pin the current node as home (where the navigator opens by default). */}
+        {onSetHome && currentNode !== GEO_ROOT_ID ? (
+          <Pressable
+            onPress={() => onSetHome(currentNode)}
+            style={styles.exit}
+            accessibilityRole="button"
+            accessibilityLabel={t("geo.setHome")}
+          >
+            <Ionicons
+              name={home === currentNode ? "home" : "home-outline"}
+              size={12}
+              color={home === currentNode ? colors.accent : colors.textDim}
+            />
+            <Text style={styles.exitText}>
+              {home === currentNode ? t("geo.home") : t("geo.setHome")}
+            </Text>
+          </Pressable>
+        ) : null}
         {activePoolId ? (
           <Pressable onPress={() => onSelect(undefined)} style={styles.exit} accessibilityRole="button">
             <Ionicons name="close" size={12} color={colors.textDim} />
@@ -97,12 +132,11 @@ export function GeoNavigator({
         ) : null}
       </View>
 
-      {/* Breadcrumb: tap any ancestor to jump back up (also selects it). */}
+      {/* Breadcrumb: shows where you are (the deepest node is highlighted with a
+          pin); tap any ancestor to jump back up (also selects it). */}
       {view && view.path.length > 0 && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
-          {view.path.map((n, i) =>
-            chip(n, !!activePoolId && n.poolId === activePoolId && i === view.path.length - 1, `p-${n.nodeId}`),
-          )}
+          {view.path.map((n) => chip(n, n.nodeId === currentNode, `p-${n.nodeId}`))}
         </ScrollView>
       )}
 
@@ -116,7 +150,7 @@ export function GeoNavigator({
       {error && !loading && <Text style={styles.statusText}>{t("geo.error")}</Text>}
       {!loading && !error && view && view.children.length > 0 && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
-          {view.children.map((n) => chip(n, n.poolId === activePoolId, `c-${n.nodeId}`))}
+          {view.children.map((n) => chip(n, n.nodeId === currentNode, `c-${n.nodeId}`))}
         </ScrollView>
       )}
     </View>

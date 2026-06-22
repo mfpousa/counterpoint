@@ -10,7 +10,6 @@ import React, {
   useState,
 } from "react";
 import { fetchBriefing, fetchRankedFeed, fetchStatus, gradeSummary, streamBriefing } from "../lib/api";
-import { placeWorldId } from "../data/worlds";
 import { buildFeed } from "../lib/buildFeed";
 import { translate } from "../lib/i18n";
 import { PASS_SCORE } from "../lib/knowledge";
@@ -92,16 +91,12 @@ interface AppState {
 const Ctx = createContext<AppState | null>(null);
 
 /**
- * The EFFECTIVE pool id for the current prefs. Regional mode switches the dataset
- * to the country's local-only pool (`place-<cc>`); otherwise the topical world.
- * Regional needs a country to be meaningful — without one it falls back to the
- * topical world (the UI gates the toggle on a set place).
+ * The EFFECTIVE pool id for the current prefs. A geographic pool (the coverage-map
+ * drill-down, `geo-<nodeId>`) overrides the topical world when one is selected;
+ * its node's own outlets feed the pool and everything they report is shown.
  */
 function effectiveWorldId(p: Preferences): string {
-  // A geographic pool (coverage-map drill-down) overrides everything: its node's
-  // own outlets feed the pool and everything they report is shown.
-  if (p.geoPool) return p.geoPool;
-  return p.scope === "regional" && p.place?.country ? placeWorldId(p.place.country) : p.worldId;
+  return p.geoPool ?? p.worldId;
 }
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
@@ -149,8 +144,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   worldRef.current = effectiveWorldId(prefs);
   const langRef = useRef(prefs.language);
   langRef.current = prefs.language;
-  const placeRef = useRef(prefs.place ?? null);
-  placeRef.current = prefs.place ?? null;
 
   // Best-effort, non-blocking. The pool is already fresh after a feed load, so
   // we never force here (avoids a second rebuild). Streams tokens so the card
@@ -219,7 +212,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         force: opts.force,
         interest: interestRef.current,
         world: worldRef.current,
-        place: placeRef.current,
       });
       setBusyWorld(res.busyWith ?? null);
       if (res.items.length === 0 && !res.busyWith) {
@@ -277,29 +269,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setBusyWorld(null);
       void refreshFeed();
     }
-  }, [ready, prefs.onboarded, prefs.worldId, prefs.scope, prefs.place, prefs.geoPool, refreshFeed]);
-
-  // In INTERNATIONAL mode the place lens only affects the geographic BOOST (same
-  // pool), so a place change just re-ranks — refetch WITHOUT clearing. Regional
-  // place changes are handled by the effective-pool effect above.
-  const lastPlaceIntl = useRef<string | null>(null);
-  useEffect(() => {
-    if (!ready || !prefs.onboarded) return;
-    const key =
-      prefs.scope === "regional"
-        ? ""
-        : prefs.place?.country
-          ? `${prefs.place.country}/${prefs.place.region ?? ""}/${prefs.place.locality ?? ""}`
-          : "";
-    if (lastPlaceIntl.current === null) {
-      lastPlaceIntl.current = key;
-      return;
-    }
-    if (lastPlaceIntl.current !== key) {
-      lastPlaceIntl.current = key;
-      void refreshFeed();
-    }
-  }, [ready, prefs.onboarded, prefs.scope, prefs.place, refreshFeed]);
+  }, [ready, prefs.onboarded, prefs.worldId, prefs.geoPool, refreshFeed]);
 
   // Re-synthesize the briefing in the new language when it changes (skip first
   // run). The feed/stories re-fetch in their own language-aware effects.
@@ -327,7 +297,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const res = await fetchRankedFeed({
         interest: interestRef.current,
         world: worldRef.current,
-        place: placeRef.current,
       });
       setBusyWorld(res.busyWith ?? null);
       if (res.items.length > 0) setPool(res.items);

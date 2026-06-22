@@ -4,7 +4,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useApp, useT } from "../../src/store/AppContext";
 import { LANGUAGES } from "../../src/lib/i18n";
-import { regionsFor, seededCountries } from "../../src/data/places";
 import { resetAll } from "../../src/storage/storage";
 import { colors, font, radius, spacing } from "../../src/theme";
 import type { Kind, Topic } from "../../src/types";
@@ -53,32 +52,6 @@ export default function SettingsScreen() {
     void updatePrefs({ includeKinds: next });
   };
 
-  // Place lens (country -> region -> locality). Country/region come from the
-  // shared gazetteer seed; locality is free text (matched server-side).
-  const place = prefs.place ?? null;
-  const countries = seededCountries();
-  const regions = place?.country ? regionsFor(place.country) : [];
-  const [localityDraft, setLocalityDraft] = useState(place?.locality ?? "");
-
-  const selectCountry = (code: string | null) => {
-    setLocalityDraft("");
-    // Switching country invalidates any region/locality from another country.
-    void updatePrefs({ place: code ? { country: code } : null });
-  };
-  const selectRegion = (regionId: string | null) => {
-    if (!place?.country) return;
-    void updatePrefs({
-      place: { country: place.country, region: regionId ?? undefined, locality: place.locality },
-    });
-  };
-  const saveLocality = () => {
-    if (!place?.country) return;
-    const locality = localityDraft.trim();
-    void updatePrefs({
-      place: { country: place.country, region: place.region, locality: locality || undefined },
-    });
-  };
-
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.bg }}
@@ -107,73 +80,6 @@ export default function SettingsScreen() {
             </Pressable>
           ))}
         </View>
-      </View>
-
-      <View style={styles.card}>
-        <View style={styles.rowBetween}>
-          <Text style={styles.h}>{t("settings.place")}</Text>
-          <Ionicons name="location" size={18} color={colors.accent} />
-        </View>
-        <Text style={styles.sub}>{t("settings.placeSub")}</Text>
-        <View style={styles.wrap}>
-          <Pressable
-            onPress={() => selectCountry(null)}
-            style={[styles.pill, !place?.country && styles.pillActive]}
-          >
-            <Text style={[styles.pillText, !place?.country && styles.pillTextActive]}>
-              {t("settings.placeGlobal")}
-            </Text>
-          </Pressable>
-          {countries.map((c) => (
-            <Pressable
-              key={c.code}
-              onPress={() => selectCountry(c.code)}
-              style={[styles.pill, place?.country === c.code && styles.pillActive]}
-            >
-              <Text style={[styles.pillText, place?.country === c.code && styles.pillTextActive]}>
-                {c.label}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-        {place?.country && regions.length > 0 && (
-          <View style={styles.wrap}>
-            <Pressable
-              onPress={() => selectRegion(null)}
-              style={[styles.pill, !place.region && styles.pillActive]}
-            >
-              <Text style={[styles.pillText, !place.region && styles.pillTextActive]}>
-                {t("settings.placeRegionAll")}
-              </Text>
-            </Pressable>
-            {regions.map((r) => (
-              <Pressable
-                key={r.id}
-                onPress={() => selectRegion(r.id)}
-                style={[styles.pill, place.region === r.id && styles.pillActive]}
-              >
-                <Text style={[styles.pillText, place.region === r.id && styles.pillTextActive]}>
-                  {r.label}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        )}
-        {place?.country && (
-          <>
-            <Text style={styles.sub}>{t("settings.placeLocality")}</Text>
-            <TextInput
-              style={styles.localityInput}
-              value={localityDraft}
-              onChangeText={setLocalityDraft}
-              onBlur={saveLocality}
-              onSubmitEditing={saveLocality}
-              placeholder={t("settings.placeLocalityPlaceholder")}
-              placeholderTextColor={colors.textFaint}
-              returnKeyType="done"
-            />
-          </>
-        )}
       </View>
 
       <View style={styles.card}>
@@ -371,16 +277,6 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     fontSize: font.body,
     minHeight: 64,
-  },
-  localityInput: {
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    color: colors.text,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    fontSize: font.body,
   },
   presetPill: {
     paddingHorizontal: spacing.md,

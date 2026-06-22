@@ -307,24 +307,15 @@ export default function FeedScreen() {
         {/* World switcher: pick which news universe to browse. */}
         <WorldSwitcher worldId={worldId} busyWorld={busyWorld} onSelect={setWorld} />
 
-        {/* International vs Regional: switch the whole dataset between the world's
-            global sources and the reader's place-local outlets. */}
-        <ScopeToggle
-          scope={prefs.scope ?? "international"}
-          hasPlace={!!prefs.place?.country}
-          onChange={(s) => {
-            if (s !== (prefs.scope ?? "international")) void updatePrefs({ scope: s });
-          }}
-          t={t}
-        />
-
         {/* Coverage drill-down: browse by source geography (world → … → council).
             Selecting a node makes its outlets the feed pool. */}
         <GeoNavigator
           activePoolId={prefs.geoPool}
+          home={prefs.geoHome}
           onSelect={(poolId) => {
             if (poolId !== prefs.geoPool) void updatePrefs({ geoPool: poolId });
           }}
+          onSetHome={(nodeId) => void updatePrefs({ geoHome: nodeId })}
         />
 
         {/* Only one world refreshes at a time. Surface this only when the
@@ -569,88 +560,7 @@ function FilterChip({
   );
 }
 
-/** International ↔ Regional dataset switch. Regional needs a place; without one
- *  it's disabled with a hint to set one in Settings. */
-function ScopeToggle({
-  scope,
-  hasPlace,
-  onChange,
-  t,
-}: {
-  scope: "international" | "regional";
-  hasPlace: boolean;
-  onChange: (s: "international" | "regional") => void;
-  t: (key: string, params?: Record<string, string | number>) => string;
-}) {
-  const seg = (
-    key: "international" | "regional",
-    icon: keyof typeof Ionicons.glyphMap,
-    disabled = false,
-  ) => {
-    const active = scope === key;
-    return (
-      <Pressable
-        key={key}
-        onPress={() => {
-          if (!disabled) onChange(key);
-        }}
-        disabled={disabled}
-        accessibilityRole="button"
-        accessibilityState={{ selected: active, disabled }}
-        style={[styles.scopeSeg, active && styles.scopeSegActive, disabled && styles.scopeSegDisabled]}
-      >
-        <Ionicons
-          name={icon}
-          size={14}
-          color={active ? colors.bg : disabled ? colors.textFaint : colors.textDim}
-        />
-        <Text
-          style={[
-            styles.scopeSegText,
-            active && styles.scopeSegTextActive,
-            disabled && { color: colors.textFaint },
-          ]}
-        >
-          {t(`feed.scope.${key}`)}
-        </Text>
-      </Pressable>
-    );
-  };
-  return (
-    <View>
-      <View style={styles.scopeToggle}>
-        {seg("international", "earth")}
-        {seg("regional", "location", !hasPlace)}
-      </View>
-      {!hasPlace && <Text style={styles.scopeHint}>{t("feed.scope.needPlace")}</Text>}
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
-  scopeToggle: {
-    flexDirection: "row",
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    padding: 3,
-    gap: 3,
-  },
-  scopeSeg: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: spacing.xs,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.pill,
-  },
-  scopeSegActive: { backgroundColor: colors.accent },
-  scopeSegDisabled: { opacity: 0.6 },
-  scopeSegText: { color: colors.textDim, fontSize: font.small, fontWeight: "700" },
-  scopeSegTextActive: { color: colors.bg },
-  scopeHint: { color: colors.textFaint, fontSize: font.tiny, marginTop: spacing.xs, textAlign: "center" },
   headerRow: { flexDirection: "row", alignItems: "flex-start", gap: spacing.md },
   title: { color: colors.text, fontSize: font.h1, fontWeight: "800" },
   subtitle: { color: colors.textDim, fontSize: font.small, marginTop: 2 },

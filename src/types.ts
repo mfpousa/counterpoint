@@ -459,25 +459,18 @@ export interface Preferences {
   /** The active news world (set of sources). Defaults to the front page. */
   worldId: string;
   /**
-   * Optional GEOGRAPHIC lens (country → region → council) layered over the world.
-   * Null/absent = no place lens (global). Boosts the relevance of stories that
-   * mention the place and can pull in local sources. Orthogonal to `worldId`.
-   */
-  place?: Place | null;
-  /**
-   * Feed DATASET mode. "international" (default) browses the topical world's
-   * curated/global sources; "regional" switches to a LOCAL-ONLY pool fed by the
-   * place country's discovered outlets, with global stories filtered out by the
-   * AI geo-scope pass. Requires `place.country` to be meaningful.
-   */
-  scope?: "international" | "regional";
-  /**
    * Selected GEOGRAPHIC POOL id (`geo-<nodeId>`) from the coverage-map drill-down
    * (world → continent → country → region → province → locality). When set, it is
    * the EFFECTIVE pool — its node's own outlets feed it and everything they report
-   * is shown. Overrides `worldId`/`scope`. Absent = use the topical world / scope.
+   * is shown. Overrides `worldId`. Absent = use the topical world.
    */
   geoPool?: string;
+  /**
+   * HOME geographic node id (`geo` tree node, e.g. "es-galicia-pontevedra-vigo").
+   * Purely positional: it sets where the coverage-map navigator OPENS by default
+   * when no pool is actively selected. It does NOT filter or boost results.
+   */
+  geoHome?: string;
   /** UI + AI-output language (the app is shown in this; AI writes in it too). */
   language: Lang;
 }
