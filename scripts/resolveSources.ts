@@ -60,9 +60,11 @@ function query(qid: string, lang: string): string {
       ?outlet wdt:P31 ?type .
       { ?outlet wdt:P17 wd:${qid} . } UNION { ?outlet wdt:P495 wd:${qid} . }
       OPTIONAL { ?outlet wdt:P856 ?website. } # official website
-      SERVICE wikibase:label { bd:serviceParam wikibase:language "${lang},en". }
+      SERVICE wikibase:label {
+        bd:serviceParam wikibase:language "${lang},en".
+        ?outlet rdfs:label ?outletLabel.  # bind label EXPLICITLY (auto-magic is unreliable)
+      }
     }
-    ORDER BY ?outletLabel
     LIMIT 1000`;
 }
 
@@ -131,6 +133,10 @@ async function run(args: Args): Promise<SourceCandidate[]> {
     `Wikidata returned ${bindings.length} row(s); ` +
     `${skippedUnlabeled} skipped (unlabeled QIDs); ${byTitle.size} unique outlet(s).`,
   );
+  // If everything was skipped, show a raw row so the binding shape is visible.
+  if (byTitle.size === 0 && bindings.length > 0) {
+    console.error("First raw binding:", JSON.stringify(bindings[0], null, 2));
+  }
   return [...byTitle.values()];
 }
 
