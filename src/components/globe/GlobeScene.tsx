@@ -10,14 +10,13 @@
 // zoom are driven by refs the wrapper mutates from gestures, applied here in the
 // per-frame loop so the gesture layer never has to re-render React.
 
-import React, { useRef } from "react";
+import React, { memo, useRef } from "react";
 import type { MutableRefObject } from "react";
 import { useFrame, type ThreeEvent } from "@react-three/fiber";
 import { AdditiveBlending, BackSide, DoubleSide } from "three";
 import type { Group, Mesh } from "three";
 import { colors } from "../../theme";
 import type { Vec3 } from "../../lib/globeLayout";
-import type { LandGeometry } from "../../lib/geoShapes";
 
 /** One geographic entity to render on the globe (a continent/country/region). */
 export interface GlobeEntityData {
@@ -100,41 +99,121 @@ function GlobeEntity({
   );
 }
 
-/** The real landmasses: one merged, sphere-wrapped mesh built from the GeoJSON
- *  borders, with a metallic "land" material distinct from the ocean beneath. */
-function Land({ data }: { data: LandGeometry }) {
-  // NON-INDEXED triangle soup, built via r3f's own three instance (JSX). No index
-  // buffer at all — expo-gl's WebGL1 context may lack 32-bit index support, which
-  // silently dropped the draw. Outward normals come from geoShapes (= unit position)
-  // so a lit material shades correctly. frustumCulled off so a stray vertex can't
-  // cull the whole landmass.
+/** One drillable place rendered as its TRUE country shape on the sphere. `entityId`
+ *  is the coverage node the shape acts on (null → inert background land). ALL land
+ *  always renders so continents stay visible; the current level's shapes light up,
+ *  glow + lift on hover, and are clickable. NON-INDEXED geometry + outward normals
+ *  (built in geoShapes) so it draws on expo-gl's WebGL1 context without a 32-bit
+ *  index buffer or GL derivatives. */
+export interface GlobeCountry {
+  key: string;
+  positions: Float32Array;
+  normals: Float32Array;
+  entityId: string | null;
+  selectable: boolean;
+  active: boolean;
+  current: boolean;
+}
+
+const LAND_INERT = "#3b4a5e"; // the rest of the world (not selectable at this level)
+const LAND_HERE = "#48637f"; // the place we're currently inside
+const LAND_DRILL = "#5d7b9c"; // a child you can drill into
+const LAND_READY = "#6f93c4"; // a child that has its own feed
+
+const CountryMesh = memo(function CountryMesh({
+  c,
+  focused,
+  onFocus,
+  onActivate,
+}: {
+  c: GlobeCountry;
+  focused: boolean;
+  onFocus: (id: string | null) => void;
+  onActivate: (id: string) => void;
+}) {
+  const interactive = c.entityId !== null;
+  const hot = focused || c.active;
+  let color = LAND_INERT;
+  if (c.current) color = LAND_HERE;
+  if (interactive) color = c.selectable ? LAND_READY : LAND_DRILL;
   return (
-    <mesh frustumCulled={false}>
+    <mesh
+      scale={hot ? 1.012 : 1}
+      frustumCulled={false}
+      onPointerOver={
+        interactive
+          ? (e: ThreeEvent<PointerEvent>) => {
+              e.stopPropagation();
+              onFocus(c.entityId);
+            }
+          : undefined
+      }
+      onPointerOut={interactive ? () => onFocus(null) : undefined}
+      onClick={
+        interactive
+          ? (e: ThreeEvent<MouseEvent>) => {
+              e.stopPropagation();
+              onActivate(c.entityId as string);
+            }
+          : undefined
+      }
+    >
       <bufferGeometry>
-        <bufferAttribute attach="attributes-position" args={[data.positions, 3]} />
-        <bufferAttribute attach="attributes-normal" args={[data.normals, 3]} />
+        <bufferAttribute attach="attributes-position" args={[c.positions, 3]} />
+        <bufferAttribute attach="attributes-normal" args={[c.normals, 3]} />
       </bufferGeometry>
-      {/* DIAGNOSTIC: unlit basic material — always visible regardless of normals,
-          lighting, or GL derivative support. If continents show with this, the
-          geometry renders fine and the earlier invisibility was the lit material. */}
-      <meshBasicMaterial color="#9fb4c9" side={DoubleSide} />
+      <meshStandardMaterial
+        color={color}
+        metalness={0.45}
+        roughness={0.5}
+        emissive={hot ? colors.accent : OFF}
+        emissiveIntensity={c.active ? 0.5 : focused ? 0.9 : 0}
+        side={DoubleSide}
+      />
     </mesh>
+  );
+});
+
+/** All country shapes; the current level's are interactive, the rest are dim land. */
+function Countries({
+  data,
+  focusedId,
+  onFocus,
+  onActivate,
+}: {
+  data: GlobeCountry[];
+  focusedId: string | null;
+  onFocus: (id: string | null) => void;
+  onActivate: (id: string) => void;
+}) {
+  return (
+    <>
+      {data.map((c) => (
+        <CountryMesh
+          key={c.key}
+          c={c}
+          focused={focusedId !== null && focusedId === c.entityId}
+          onFocus={onFocus}
+          onActivate={onActivate}
+        />
+      ))}
+    </>
   );
 }
 
 export function GlobeScene({
-  entities,
+  countries,
+  gizmos,
   focusedId,
   onFocus,
   onActivate,
-  land,
   refs,
 }: {
-  entities: GlobeEntityData[];
+  countries: GlobeCountry[];
+  gizmos: GlobeEntityData[];
   focusedId: string | null;
   onFocus: (id: string | null) => void;
   onActivate: (id: string) => void;
-  land: LandGeometry | null;
   refs: GlobeViewRefs;
 }) {
   const group = useRef<Group>(null);
@@ -177,9 +256,16 @@ export function GlobeScene({
           <icosahedronGeometry args={[PLANET_RADIUS, 5]} />
           <meshStandardMaterial color="#173049" metalness={0.55} roughness={0.32} />
         </mesh>
-        {/* The real landmasses on top of the ocean (radius 1.0 > ocean 0.94). */}
-        {land && <Land data={land} />}
-        {entities.map((d) => (
+        {/* Real country shapes on top of the ocean (radius 1.0 > ocean 0.94): the
+            current level's are interactive, the rest are dim background land. */}
+        <Countries
+          data={countries}
+          focusedId={focusedId}
+          onFocus={onFocus}
+          onActivate={onActivate}
+        />
+        {/* Gizmos: small markers for places with no border shape (regions/localities). */}
+        {gizmos.map((d) => (
           <GlobeEntity
             key={d.id}
             data={d}

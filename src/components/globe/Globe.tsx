@@ -30,15 +30,20 @@ import { fetchCoverage, type CoverageNode, type CoverageView } from "../../lib/a
 import { geoNodeIdOf, GEO_ROOT_ID } from "../../data/geo";
 import { layoutLevel, tangentRing, type Vec3 } from "../../lib/globeLayout";
 import {
-  buildLandGeometry,
+  buildCountryShapes,
   computeCentroids,
+  type CountryShape,
   type GeoCentroids,
-  type LandGeometry,
 } from "../../lib/geoShapes";
 import countries110m from "../../data/world/countries-110m.json";
 import { useT } from "../../store/AppContext";
 import { colors, font, radius, spacing } from "../../theme";
-import { GlobeScene, type GlobeEntityData, type GlobeViewRefs } from "./GlobeScene";
+import {
+  GlobeScene,
+  type GlobeCountry,
+  type GlobeEntityData,
+  type GlobeViewRefs,
+} from "./GlobeScene";
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 const ZOOM_MIN = 0.6;
@@ -110,10 +115,10 @@ export function Globe({
 
   // Build the merged land mesh + per-country/continent pin anchors from the bundled
   // world borders. Done once (memoised) and only when the globe is actually mounted.
-  const worldGeo = useMemo<{ land: LandGeometry; centroids: GeoCentroids } | null>(() => {
+  const worldGeo = useMemo<{ shapes: CountryShape[]; centroids: GeoCentroids } | null>(() => {
     try {
-      const geo = countries110m as unknown as Parameters<typeof buildLandGeometry>[0];
-      return { land: buildLandGeometry(geo, LAND_RADIUS), centroids: computeCentroids(geo) };
+      const geo = countries110m as unknown as Parameters<typeof buildCountryShapes>[0];
+      return { shapes: buildCountryShapes(geo, LAND_RADIUS), centroids: computeCentroids(geo) };
     } catch (e) {
       console.warn("[globe] world borders unavailable:", e);
       return null;
@@ -132,8 +137,14 @@ export function Globe({
     // Region pins have no real coordinates, so fan them in a ring around their
     // country's centroid instead of stacking them on one point.
     let regionRing: Map<string, Vec3> | null = null;
-    if (centroids && view?.node.level === "country") {
-      const base = centroids.byIso2.get(view.node.nodeId);
+    const subCountryIso =
+      view?.node.level === "country"
+        ? view.node.nodeId
+        : view?.node.level === "region"
+          ? view.node.nodeId.split("-")[0]
+          : null;
+    if (centroids && subCountryIso) {
+      const base = centroids.byIso2.get(subCountryIso);
       if (base) {
         const ids = children.map((c) => c.nodeId).sort();
         const ring = tangentRing(base, ids.length);
@@ -157,6 +168,43 @@ export function Globe({
       hasChildren: c.hasChildren,
     }));
   }, [view, browse, activePoolId, worldGeo]);
+
+  // Bind each country's border shape to the current level's coverage child it stands
+  // for (a continent groups many countries; a country is one) so the SHAPE becomes
+  // the hover/click target. All other land renders inert so the continents show.
+  const countries: GlobeCountry[] = useMemo(() => {
+    const shapes = worldGeo?.shapes ?? [];
+    const children = view?.children ?? [];
+    const byIso = new Map<string, CoverageNode>();
+    const byCont = new Map<string, CoverageNode>();
+    for (const c of children) {
+      if (c.level === "country") byIso.set(c.nodeId, c);
+      else if (c.level === "continent") byCont.set(c.nodeId, c);
+    }
+    const currentIso =
+      view?.node.level === "country"
+        ? view.node.nodeId
+        : view?.node.level === "region"
+          ? view.node.nodeId.split("-")[0]
+          : null;
+    return shapes.map((s, i) => {
+      const child = (s.iso2 ? byIso.get(s.iso2) : undefined) ?? byCont.get(s.continent);
+      return {
+        key: `${s.iso2 ?? "x"}-${i}`,
+        positions: s.positions,
+        normals: s.normals,
+        entityId: child ? child.nodeId : null,
+        selectable: child ? child.state === "ready" : false,
+        active: !!child && !!activePoolId && child.poolId === activePoolId,
+        current: !!currentIso && s.iso2 === currentIso,
+      };
+    });
+  }, [worldGeo, view, activePoolId]);
+
+  // Children with no border shape (regions/localities) fall back to small gizmos.
+  const childLevel = view?.children?.[0]?.level ?? null;
+  const gizmos: GlobeEntityData[] =
+    childLevel === "continent" || childLevel === "country" ? [] : entities;
 
   const focused = entities.find((e) => e.id === focusedId) ?? null;
   const atRoot = browse === GEO_ROOT_ID;
@@ -233,11 +281,11 @@ export function Globe({
           onPointerMissed={() => setFocusedId(null)}
         >
           <GlobeScene
-            entities={entities}
+            countries={countries}
+            gizmos={gizmos}
             focusedId={focusedId}
             onFocus={setFocusedId}
             onActivate={activate}
-            land={worldGeo?.land ?? null}
             refs={refs}
           />
         </Canvas>
@@ -311,11 +359,6 @@ export function Globe({
             <Text style={styles.errorText}>{t("geo.error")}</Text>
           </View>
         )}
-
-        {/* TEMP diagnostic: how many land triangles got built (remove once shapes show). */}
-        <Text style={styles.debug}>
-          {worldGeo ? `land ${Math.floor(worldGeo.land.positions.length / 9)} tris` : "land: none"}
-        </Text>
       </View>
     </View>
   );
@@ -390,11 +433,4 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   errorText: { color: colors.textDim, fontSize: font.small },
-  debug: {
-    position: "absolute",
-    left: spacing.sm,
-    top: 44,
-    color: colors.textFaint,
-    fontSize: font.tiny,
-  },
 });

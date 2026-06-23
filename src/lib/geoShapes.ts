@@ -102,6 +102,41 @@ export function buildLandGeometry(geo: GeoJson, radius = 1): LandGeometry {
   return { positions: new Float32Array(pos), normals: new Float32Array(norm) };
 }
 
+/** One INTERACTIVE land shape per feature (country): its own non-indexed geometry
+ *  plus the keys we bind hover/click to — ISO-2 code and continent slug. */
+export interface CountryShape {
+  iso2: string | null;
+  continent: string;
+  positions: Float32Array;
+  normals: Float32Array;
+}
+
+/** Build a separate sphere-wrapped mesh per country so each can be hovered/clicked
+ *  on its own (unlike the single merged buildLandGeometry). Features that triangulate
+ *  to nothing are skipped. */
+export function buildCountryShapes(geo: GeoJson, radius = 1): CountryShape[] {
+  const out: CountryShape[] = [];
+  for (const f of geo.features) {
+    const g = f.geometry;
+    if (!g) continue;
+    const pos: number[] = [];
+    const norm: number[] = [];
+    if (g.type === "Polygon") {
+      addPolygon(g.coordinates as Ring[], radius, pos, norm);
+    } else if (g.type === "MultiPolygon") {
+      for (const poly of g.coordinates as Ring[][]) addPolygon(poly, radius, pos, norm);
+    }
+    if (pos.length === 0) continue;
+    out.push({
+      iso2: iso2Of(f.properties),
+      continent: continentSlug(String(f.properties.CONTINENT ?? "")),
+      positions: new Float32Array(pos),
+      normals: new Float32Array(norm),
+    });
+  }
+  return out;
+}
+
 /** Average direction of every vertex in a feature (good enough to anchor a pin). */
 function featureCentroidDir(f: GeoFeature): Vec3 | null {
   const g = f.geometry;
