@@ -13,7 +13,15 @@
 //
 // Gestures + zoom buttons cover PC and mobile. Per-frame work lives in GlobeScene.
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
   Keyboard,
@@ -109,6 +117,27 @@ function normRegion(s: string): string {
     .replace(/\s+/g, " ");
 }
 
+/** A floating "you are pointing here" pin that tracks the cursor. Its POSITION is updated
+ *  imperatively (move) so dragging the mouse never re-renders the globe scene; only its
+ *  visibility/label come from props. Hidden when no place is hovered (label null). */
+const CursorPin = forwardRef<{ move: (x: number, y: number) => void }, { label: string | null }>(
+  function CursorPin({ label }, ref) {
+    const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+    useImperativeHandle(ref, () => ({ move: (x, y) => setPos({ x, y }) }), []);
+    if (!label || !pos) return null;
+    return (
+      <View style={[styles.cursorPin, { left: pos.x, top: pos.y }]} pointerEvents="none">
+        <Ionicons name="location" size={30} color={colors.accent} style={styles.cursorPinIcon} />
+        <View style={styles.cursorPinLabel}>
+          <Text style={styles.cursorPinText} numberOfLines={1}>
+            {label}
+          </Text>
+        </View>
+      </View>
+    );
+  },
+);
+
 export function Globe({
   activePoolId,
   home,
@@ -183,6 +212,8 @@ export function Globe({
   const lastDrag = useRef({ x: 0, y: 0 });
   const pinchDist = useRef(0);
   const canvasH = useRef(0); // measured canvas height (px) for surface-correct drag gain
+  const canvasW = useRef(0); // measured canvas width (px) for the cursor-pin placement
+  const pinRef = useRef<{ move: (x: number, y: number) => void }>(null);
 
   // Follow an externally-committed pool so the globe opens where the feed is.
   useEffect(() => {
@@ -544,6 +575,13 @@ export function Globe({
   const atRoot = browse === GEO_ROOT_ID;
   const nodeLabel = view?.node.label ?? t("geo.world");
 
+  // Float the place pin AT the cursor. The position is pushed IMPERATIVELY to the pin
+  // (NDC -1..1 → px in the measured canvas) so per-move updates re-render only the pin,
+  // never the globe scene + its hundreds of country meshes.
+  const onHoverMove = useCallback((ndcX: number, ndcY: number) => {
+    pinRef.current?.move(((ndcX + 1) / 2) * canvasW.current, ((1 - ndcY) / 2) * canvasH.current);
+  }, []);
+
   const childById = (id: string): CoverageNode | undefined =>
     (view?.children ?? []).find((c) => c.nodeId === id);
 
@@ -645,6 +683,7 @@ export function Globe({
         style={[styles.canvasWrap, hero ? styles.canvasHero : { height }, WEB_TOUCH]}
         onLayout={(e) => {
           canvasH.current = e.nativeEvent.layout.height;
+          canvasW.current = e.nativeEvent.layout.width;
         }}
         {...panResponder.panHandlers}
       >
@@ -665,6 +704,7 @@ export function Globe({
             focusedId={focusedId}
             onFocus={setFocusedId}
             onActivate={activate}
+            onHoverMove={onHoverMove}
             refs={refs}
           />
         </Canvas>
@@ -764,24 +804,10 @@ export function Globe({
           ) : null}
         </View>
 
-        {/* Bottom bar: focused entity + enter, world/international, and zoom. */}
+        {/* Bottom bar: world/international + zoom (the hovered place now shows on the
+            cursor-following pin instead of a fixed label here). */}
         <View style={styles.bottomBar} pointerEvents="box-none">
-          {focused ? (
-            <Pressable
-              onPress={() => activate(focused.id)}
-              style={[styles.enterBtn, focused.active && styles.enterBtnActive]}
-              accessibilityRole="button"
-            >
-              <Ionicons
-                name={focused.hasChildren ? "enter-outline" : "checkmark"}
-                size={13}
-                color={colors.bg}
-              />
-              <Text style={styles.enterText} numberOfLines={1}>
-                {focused.label}
-              </Text>
-            </Pressable>
-          ) : atRoot && onSelectWorld ? (
+          {atRoot && onSelectWorld ? (
             <Pressable
               onPress={onSelectWorld}
               style={[styles.enterBtn, worldActive && styles.enterBtnActive]}
@@ -826,6 +852,11 @@ export function Globe({
             ))}
           </View>
         )}
+
+        {/* Cursor-following place pin: a floating marker + label for the HOVERED place,
+            replacing the old fixed bottom label. pointerEvents none so clicks fall through
+            to the globe (which selects). Position is pushed imperatively (onHoverMove). */}
+        <CursorPin ref={pinRef} label={focused?.label ?? null} />
 
         {loading && (
           <View style={styles.center} pointerEvents="none">
@@ -1003,4 +1034,34 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   errorText: { color: colors.textDim, fontSize: font.small },
+  cursorPin: {
+    position: "absolute",
+    flexDirection: "row",
+    alignItems: "center",
+    // Anchor the pin's bottom tip at the cursor (the location glyph is ~30px with its tip
+    // at the bottom-centre), so the marker points exactly at the hovered place.
+    transform: [{ translateX: -15 }, { translateY: -30 }],
+  },
+  cursorPinIcon: {
+    textShadowColor: "rgba(0,0,0,0.55)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  cursorPinLabel: {
+    marginLeft: -2,
+    marginBottom: 14, // lift the tag toward the pin's round head
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface + "F2",
+    borderWidth: 1,
+    borderColor: colors.border,
+    maxWidth: 220,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 6,
+  },
+  cursorPinText: { color: colors.text, fontSize: font.small, fontWeight: "800" },
 });

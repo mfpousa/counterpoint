@@ -112,7 +112,7 @@ interface WorldState {
   briefingInFlight: Map<string, Promise<Briefing | null>>;
   /** Synthesized cross-source stories, keyed by language (valid while
    *  builtAt === lastBuildAt). */
-  storiesCache: Map<string, { builtAt: number; stories: Story[] }>;
+  storiesCache: Map<string, { builtAt: number; builtWallAt: number; stories: Story[] }>;
   storiesInFlight: Map<string, Promise<Story[]>>;
   /** Fetched-but-not-yet-prescreened items, drained in chunks by the catch-up
    *  loop so a flood doesn't block the cold-start feed. */
@@ -1764,7 +1764,14 @@ export async function getStories(
   // For the world this advances when ANY contributing pool rebuilds (see helper).
   const buildVersion = storiesBuildVersion(worldId);
   const cachedForLang = state.storiesCache.get(lang);
-  if (cachedForLang && cachedForLang.builtAt === buildVersion) {
+  // Reuse the cache when the build is unchanged OR (throttle) when it was rebuilt very
+  // recently — re-clustering + cross-source synthesis is expensive, so we don't redo it
+  // on every pool tick during a drain (the feed updates live regardless). Force rebuilds.
+  if (
+    cachedForLang &&
+    (cachedForLang.builtAt === buildVersion ||
+      (!force && Date.now() - cachedForLang.builtWallAt < config.stories.minRebuildMs))
+  ) {
     return { stories: cachedForLang.stories, busyWith };
   }
   const inFlight = state.storiesInFlight.get(lang);
@@ -1823,6 +1830,37 @@ export async function getStories(
       })
       .slice(0, config.stories.maxIssues);
 
+    // DIAGNOSTIC: why ongoing stories appear/vanish across rebuilds. Per build, count how
+    // many issues PASSED the developing gate, how many were RANKED OUT by maxIssues, and
+    // for the failures, WHICH gate (events/span/sources/active) rejected them.
+    {
+      const dnow = Date.now();
+      let pass = 0;
+      let fEvents = 0;
+      let fSpan = 0;
+      let fSources = 0;
+      let fActive = 0;
+      for (const iss of issues) {
+        const okEvents = iss.clusters.length >= config.stories.issueMinEvents;
+        const okSpan = iss.latestAt - iss.earliestAt >= config.stories.issueMinSpanMs;
+        const okSources = coverageOf(iss.members) >= config.stories.issueMinSources;
+        const okActive = dnow - iss.latestAt <= config.stories.issueActiveMs;
+        if (okEvents && okSpan && okSources && okActive) pass += 1;
+        else {
+          if (!okEvents) fEvents += 1;
+          if (!okSpan) fSpan += 1;
+          if (!okSources) fSources += 1;
+          if (!okActive) fActive += 1;
+        }
+      }
+      console.log(
+        `[stories:${worldId}] eligible=${eligible.length} clusters=${clusters.length} ` +
+          `issues=${issues.length} developing=${pass} kept=${developing.length} ` +
+          `rankedOut=${Math.max(0, pass - developing.length)} ` +
+          `(failed gates \u2014 events:${fEvents} span:${fSpan} sources:${fSources} active:${fActive})`,
+      );
+    }
+
     // Every multi-source cluster becomes an event story — INCLUDING those that
     // belong to a developing issue. We no longer hide issue members; instead the
     // client tags each story/article with a link up to its ongoing issue. The
@@ -1856,7 +1894,7 @@ export async function getStories(
         `${issues.length} issues; ${developing.length} developing + ${topEvents.length} event spec(s)`,
     );
     if (specs.length === 0) {
-      state.storiesCache.set(lang, { builtAt: builtAtSnapshot, stories: [] });
+      state.storiesCache.set(lang, { builtAt: builtAtSnapshot, builtWallAt: Date.now(), stories: [] });
       return [];
     }
 
@@ -1925,7 +1963,7 @@ export async function getStories(
       `[stories:${worldId}] ${result.length} stor${result.length === 1 ? "y" : "ies"} ` +
         `(${synthed.length} synthesized in ${((Date.now() - started) / 1000).toFixed(0)}s, ${reused.length} cached)`,
     );
-    state.storiesCache.set(lang, { builtAt: builtAtSnapshot, stories: result });
+    state.storiesCache.set(lang, { builtAt: builtAtSnapshot, builtWallAt: Date.now(), stories: result });
     return result;
   })().finally(() => {
     state.storiesInFlight.delete(lang);

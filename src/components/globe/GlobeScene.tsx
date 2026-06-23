@@ -51,6 +51,9 @@ export interface GlobeViewRefs {
 const PLANET_RADIUS = 0.975; // ocean sphere — a small gap below the land (1.0) so the flat triangles don't clip through, while still hugging
 const ENTITY_RADIUS = 1.05;
 const ALERT_RADIUS = 1.06; // alert pings sit just above everything else
+const ZOOM_MIN = 0.6; // matches the wrapper's gesture/button clamp
+const ZOOM_MAX = 2.6;
+const WHEEL_PULL = 0.14; // how strongly scroll-zoom-in pulls the cursor's point to centre
 const OFF = "#000000";
 
 function entityColor(d: GlobeEntityData): string {
@@ -310,6 +313,7 @@ export function GlobeScene({
   focusedId,
   onFocus,
   onActivate,
+  onHoverMove,
   refs,
   rightInset = 0,
 }: {
@@ -326,6 +330,8 @@ export function GlobeScene({
   focusedId: string | null;
   onFocus: (id: string | null) => void;
   onActivate: (id: string) => void;
+  /** Cursor position (NDC, -1..1) while a place is hovered — drives the floating pin. */
+  onHoverMove?: (x: number, y: number) => void;
   refs: GlobeViewRefs;
   /** Width (px) the side panel covers on the RIGHT (desktop). The globe eases LEFT by
    *  half this so the focused content stays centred in the visible area. 0 = no shift. */
@@ -375,6 +381,25 @@ export function GlobeScene({
     g.position.x += (targetX - g.position.x) * 0.12;
   });
 
+  // Scroll-wheel zoom that pulls the point under the cursor toward the view centre as it
+  // zooms in (the classic "zoom to pointer"). Manual zoom cancels any in-flight fly-to;
+  // when a place is selected the frame loop still clamps the nudge to its bounds.
+  const onWheel = (e: ThreeEvent<WheelEvent>) => {
+    e.stopPropagation();
+    refs.target.current = null;
+    const zoomIn = e.deltaY < 0;
+    refs.zoom.current = Math.max(
+      ZOOM_MIN,
+      Math.min(ZOOM_MAX, refs.zoom.current * (zoomIn ? 1.12 : 1 / 1.12)),
+    );
+    if (zoomIn) {
+      // e.pointer is NDC (x right, y up, 0 = centre): rotate so the pointed point
+      // shifts toward the centre (drag the content away from the cursor).
+      refs.rot.current.yaw -= e.pointer.x * WHEEL_PULL;
+      refs.rot.current.pitch += e.pointer.y * WHEEL_PULL;
+    }
+  };
+
   return (
     <>
       {/* A hemisphere + key/rim lights so the metal reads as a lit, COLOURED sphere
@@ -397,8 +422,16 @@ export function GlobeScene({
             depthWrite={false}
           />
         </mesh>
-        {/* The planet — a faceted icosahedron, deep ocean blue with a metallic sheen. */}
-        <mesh>
+        {/* The planet — a faceted icosahedron, deep ocean blue with a metallic sheen.
+            Also the scroll-zoom target: it's always under the cursor (behind the land). */}
+        <mesh
+          onWheel={onWheel}
+          onPointerMove={(e: ThreeEvent<PointerEvent>) => {
+            // Report the cursor (NDC) so the host can float a pin+label at it — only while
+            // a place is hovered, so it doesn't churn over empty ocean.
+            if (focusedId !== null) onHoverMove?.(e.pointer.x, e.pointer.y);
+          }}
+        >
           <icosahedronGeometry args={[PLANET_RADIUS, 5]} />
           <meshStandardMaterial color="#173049" metalness={0.55} roughness={0.32} />
         </mesh>

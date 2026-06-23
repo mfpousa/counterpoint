@@ -5,7 +5,8 @@
 // re-ranks the cached pool. The store is a flat JSON file; writes are atomic
 // (temp file + rename) and corruption is non-fatal (we start empty).
 
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
+import { mkdir, rename, writeFile } from "node:fs/promises";
 import { basename, dirname, extname, isAbsolute, resolve } from "node:path";
 import type { FeedItem, LeanSource, Topic } from "../src/types";
 import { DEFAULT_WORLD_ID, WORLDS } from "../src/data/worlds";
@@ -71,6 +72,9 @@ interface StoreFile {
 }
 
 const STORE_VERSION = 1;
+// Coalesce rapid saves (deep analysis rewrites the WHOLE store — embeddings and all —
+// every chunk) into ONE async write; doing it synchronously per chunk froze the server.
+const SAVE_DEBOUNCE_MS = 1500;
 
 /**
  * A single world's analyzed pool: an in-memory Map backed by its OWN JSON file.
@@ -81,6 +85,9 @@ const STORE_VERSION = 1;
 class WorldStore {
   private store = new Map<string, StoredItem>();
   private loaded = false;
+  private saveTimer: ReturnType<typeof setTimeout> | null = null;
+  private saving = false;
+  private saveAgain = false;
   constructor(readonly worldId: string) {}
 
   private filePath(): string {
@@ -109,17 +116,38 @@ class WorldStore {
     }
   }
 
-  /** Persist this world's store to disk atomically. */
+  /** Persist atomically + ASYNCHRONOUSLY, coalescing rapid calls. Analysis rewrites the
+   *  whole store every chunk; doing that synchronously per chunk blocked the event loop,
+   *  so we debounce and write off the hot path. Fire-and-forget (callers don't await). */
   save(): void {
+    if (this.saveTimer) return; // a write is already scheduled; it captures the latest state
+    this.saveTimer = setTimeout(() => {
+      this.saveTimer = null;
+      void this.flush();
+    }, SAVE_DEBOUNCE_MS);
+  }
+
+  private async flush(): Promise<void> {
+    if (this.saving) {
+      this.saveAgain = true; // a write is in flight; remember to re-save the newer state
+      return;
+    }
+    this.saving = true;
     const path = this.filePath();
     try {
-      mkdirSync(dirname(path), { recursive: true });
+      await mkdir(dirname(path), { recursive: true });
       const data: StoreFile = { version: STORE_VERSION, items: [...this.store.values()] };
       const tmp = `${path}.tmp`;
-      writeFileSync(tmp, JSON.stringify(data), "utf8");
-      renameSync(tmp, path);
+      await writeFile(tmp, JSON.stringify(data), "utf8");
+      await rename(tmp, path);
     } catch (e) {
       console.warn(`[store:${this.worldId}] failed to persist: ${e instanceof Error ? e.message : e}`);
+    } finally {
+      this.saving = false;
+      if (this.saveAgain) {
+        this.saveAgain = false;
+        this.save();
+      }
     }
   }
 

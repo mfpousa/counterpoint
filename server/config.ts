@@ -271,6 +271,10 @@ export const config = {
     minSources: num("STORIES_MIN_SOURCES", 2),
     // Most synthesized stories to produce per world (bounds LLM cost).
     maxStories: num("STORIES_MAX", 12),
+    // Throttle: once stories are synthesized, don't rebuild them more often than this
+    // (ms) even as the pool ticks over during a drain — re-clustering + cross-source
+    // synthesis is expensive, and the feed updates live regardless.
+    minRebuildMs: num("STORIES_MIN_REBUILD_MS", 15000),
     // Cap on source articles fed into a single synthesis prompt (keeps it in budget).
     maxClusterSources: num("STORIES_MAX_SOURCES", 6),
     // How many related stories to cross-link from each story.
