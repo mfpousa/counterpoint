@@ -477,6 +477,7 @@ export function Globe({
             outline={regionOutline}
             gizmos={gizmos}
             alerts={alerts}
+            autoSpin={browse === GEO_ROOT_ID && !activePoolId}
             focusedId={focusedId}
             onFocus={setFocusedId}
             onActivate={activate}

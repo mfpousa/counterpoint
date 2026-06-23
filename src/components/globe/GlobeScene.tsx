@@ -45,7 +45,7 @@ export interface GlobeViewRefs {
   target: MutableRefObject<{ yaw: number; pitch: number; zoom: number } | null>;
 }
 
-const PLANET_RADIUS = 0.94; // ocean sphere — sits BELOW the land shell (radius 1.0)
+const PLANET_RADIUS = 0.99; // ocean sphere — JUST below the land shell (1.0) so land hugs it
 const ENTITY_RADIUS = 1.05;
 const ALERT_RADIUS = 1.06; // alert pings sit just above everything else
 const OFF = "#000000";
@@ -121,9 +121,10 @@ export interface GlobeCountry {
 }
 
 const LAND_INERT = "#3b4a5e"; // the rest of the world (not selectable at this level)
-const LAND_HERE = "#48637f"; // the place we're currently inside
 const LAND_DRILL = "#5d7b9c"; // a child you can drill into
 const LAND_READY = "#6f93c4"; // a child that has its own feed
+const LAND_HERE = "#88a6cc"; // the place we're currently inside — clearly lighter
+const LAND_ACTIVE = "#a7c8ff"; // the committed feed — brightest, glows
 
 const CountryMesh = memo(function CountryMesh({
   c,
@@ -137,13 +138,14 @@ const CountryMesh = memo(function CountryMesh({
   onActivate: (id: string) => void;
 }) {
   const interactive = c.entityId !== null;
-  const hot = focused || c.active;
+  const hot = focused || c.active || c.current;
   let color = LAND_INERT;
-  if (c.current) color = LAND_HERE;
   if (interactive) color = c.selectable ? LAND_READY : LAND_DRILL;
+  if (c.current) color = LAND_HERE; // the place we're inside — stands out from neighbours
+  if (c.active) color = LAND_ACTIVE; // the committed feed — brightest
   return (
     <mesh
-      scale={hot ? 1.012 : 1}
+      scale={focused || c.active ? 1.03 : 1}
       frustumCulled={false}
       onPointerOver={
         interactive
@@ -172,7 +174,7 @@ const CountryMesh = memo(function CountryMesh({
         metalness={0.45}
         roughness={0.5}
         emissive={hot ? colors.accent : OFF}
-        emissiveIntensity={c.active ? 0.5 : focused ? 0.9 : 0}
+        emissiveIntensity={c.active ? 0.9 : focused ? 0.95 : c.current ? 0.6 : 0}
         side={DoubleSide}
       />
     </mesh>
@@ -280,6 +282,7 @@ export function GlobeScene({
   outline,
   gizmos,
   alerts,
+  autoSpin,
   focusedId,
   onFocus,
   onActivate,
@@ -291,6 +294,8 @@ export function GlobeScene({
   outline: Float32Array | null;
   gizmos: GlobeEntityData[];
   alerts: GeoAlert[];
+  /** Idle auto-rotate ONLY on the pristine world landing; stops once a place is chosen. */
+  autoSpin: boolean;
   focusedId: string | null;
   onFocus: (id: string | null) => void;
   onActivate: (id: string) => void;
@@ -312,8 +317,8 @@ export function GlobeScene({
       refs.rot.current.yaw += dy * 0.12;
       refs.rot.current.pitch += (tgt.pitch - refs.rot.current.pitch) * 0.12;
       refs.zoom.current += (tgt.zoom - refs.zoom.current) * 0.12;
-    } else if (!refs.dragging.current) {
-      refs.rot.current.yaw += delta * 0.05; // idle auto-spin
+    } else if (autoSpin && focusedId === null && !refs.dragging.current) {
+      refs.rot.current.yaw += delta * 0.05; // idle auto-spin (landing only)
     }
     g.rotation.y = refs.rot.current.yaw;
     g.rotation.x = Math.max(-1.2, Math.min(1.2, refs.rot.current.pitch));
