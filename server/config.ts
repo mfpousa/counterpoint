@@ -71,7 +71,18 @@ export const config = {
     batchSize: num("AI_BATCH_SIZE", 8),
     // Larger batches for the cheap title-only clickbait triage pass.
     triageBatchSize: num("AI_TRIAGE_BATCH_SIZE", 40),
-    concurrency: num("AI_CONCURRENCY", 2),
+    // How many requests a single STAGE fans out at once (in-batch). With multiple
+    // model instances behind baseUrl, set this up to maxConcurrency so ONE foreground
+    // analysis pass can saturate them.
+    concurrency: num("AI_CONCURRENCY", 3),
+    // TOTAL concurrent model requests allowed across the WHOLE server = the number of
+    // parallel model instances behind AI_BASE_URL. The global request gate (ai.ts)
+    // bounds in-flight requests to this so we use every instance but never overload one.
+    maxConcurrency: num("AI_MAX_CONCURRENCY", 3),
+    // Slots the gate RESERVES for INTERACTIVE work (deep analysis, cold start, search)
+    // so BACKGROUND catch-up drains (bulk prescreen / embeddings) can never occupy every
+    // instance and starve foreground delivery. background in-flight <= maxConcurrency - this.
+    reserveInteractive: num("AI_RESERVE_INTERACTIVE", 1),
     // Items deeply analyzed per CHUNK — deliberately SMALL so the first
     // synthesized feed/stories land in SECONDS, not after one long pass. The
     // background catch-up loop (scheduleCatchUp) then drains the rest in more

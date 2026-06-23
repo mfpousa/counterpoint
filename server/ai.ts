@@ -6,7 +6,81 @@
 // Everything degrades gracefully: a failed/malformed response yields an empty
 // result so callers keep their priors.
 
+import { AsyncLocalStorage } from "node:async_hooks";
 import { config } from "./config";
+
+// --- Global model-request gate -------------------------------------------------
+// config.ai.maxConcurrency model instances sit behind config.ai.baseUrl, so that
+// many requests can stream AT ONCE. This gate bounds TOTAL in-flight model requests
+// to that number and lets INTERACTIVE work (deep analysis, cold start, search) jump
+// AHEAD of BACKGROUND catch-up drains (bulk prescreen / embedding) — reserving
+// config.ai.reserveInteractive slots so background can never occupy every instance
+// and starve foreground delivery. Priority rides on AsyncLocalStorage so callers
+// just wrap a scope with withModelPriority(); every request reads the ambient value.
+
+type ModelPriority = "interactive" | "background";
+const priorityStore = new AsyncLocalStorage<ModelPriority>();
+
+/** Run `fn` — and EVERY model request it issues — at the given priority. */
+export function withModelPriority<T>(priority: ModelPriority, fn: () => Promise<T>): Promise<T> {
+  return priorityStore.run(priority, fn);
+}
+function currentModelPriority(): ModelPriority {
+  // Default to interactive: cold start, search and direct analysis are foreground;
+  // only the background catch-up drains explicitly mark themselves "background".
+  return priorityStore.getStore() ?? "interactive";
+}
+
+let activeTotal = 0;
+let activeBackground = 0;
+const slotWaiters: { priority: ModelPriority; wake: () => void }[] = [];
+
+function maxBackgroundSlots(): number {
+  return Math.max(0, config.ai.maxConcurrency - config.ai.reserveInteractive);
+}
+function canStartSlot(priority: ModelPriority): boolean {
+  if (activeTotal >= config.ai.maxConcurrency) return false;
+  if (priority === "background" && activeBackground >= maxBackgroundSlots()) return false;
+  return true;
+}
+function takeSlot(priority: ModelPriority): void {
+  activeTotal += 1;
+  if (priority === "background") activeBackground += 1;
+}
+function pumpSlots(): void {
+  // Wake INTERACTIVE waiters before BACKGROUND ones, each only if a slot is free for it.
+  for (;;) {
+    let i = slotWaiters.findIndex((w) => w.priority === "interactive" && canStartSlot("interactive"));
+    if (i < 0) i = slotWaiters.findIndex((w) => w.priority === "background" && canStartSlot("background"));
+    if (i < 0) break;
+    const [w] = slotWaiters.splice(i, 1);
+    takeSlot(w.priority);
+    w.wake();
+  }
+}
+function acquireModelSlot(priority: ModelPriority): Promise<void> {
+  if (canStartSlot(priority)) {
+    takeSlot(priority);
+    return Promise.resolve();
+  }
+  return new Promise<void>((wake) => slotWaiters.push({ priority, wake }));
+}
+function releaseModelSlot(priority: ModelPriority): void {
+  activeTotal -= 1;
+  if (priority === "background") activeBackground -= 1;
+  pumpSlots();
+}
+
+/** Acquire a model-request slot at the AMBIENT priority, run `fn`, then release. */
+export async function withModelSlot<T>(fn: () => Promise<T>): Promise<T> {
+  const priority = currentModelPriority();
+  await acquireModelSlot(priority);
+  try {
+    return await fn();
+  } finally {
+    releaseModelSlot(priority);
+  }
+}
 
 /** Pull the first JSON array/object out of a model response (handles ``` fences). */
 export function extractJson(content: string): unknown {
@@ -111,6 +185,11 @@ export async function chatRaw(
   let content = "";
   let raw = ""; // full decoded body, for the non-streaming fallback
 
+  // Hold one model-instance slot for the WHOLE streamed round-trip; interactive
+  // work jumps ahead of background drains (see the request gate above). Released
+  // in the finally below so the slot frees the instant this request ends.
+  const priority = currentModelPriority();
+  await acquireModelSlot(priority);
   try {
     const res = await fetch(`${config.ai.baseUrl}/chat/completions`, {
       method: "POST",
@@ -220,6 +299,7 @@ export async function chatRaw(
     return content;
   } finally {
     if (timer) clearTimeout(timer);
+    releaseModelSlot(priority);
   }
 }
 

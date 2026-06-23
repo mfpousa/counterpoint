@@ -7,6 +7,7 @@
 // gracefully: if no embedding model is loaded, callers fall back to keyword
 // matching and the app keeps working.
 
+import { withModelSlot } from "./ai";
 import { config } from "./config";
 
 let warnedUnavailable = false;
@@ -20,41 +21,45 @@ function warnOnce(why: string): void {
   );
 }
 
-/** Embed one batch via /v1/embeddings. Returns one vector per input (null on failure). */
-async function embedBatch(input: string[]): Promise<(number[] | null)[]> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), config.ai.timeoutMs);
-  try {
-    const res = await fetch(`${config.ai.baseUrl}/embeddings`, {
-      method: "POST",
-      signal: controller.signal,
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${config.ai.apiKey}`,
-      },
-      body: JSON.stringify({ model: config.ai.embedModel, input }),
-    });
-    if (!res.ok) {
-      warnOnce(`HTTP ${res.status}`);
+/** Embed one batch via /v1/embeddings. Returns one vector per input (null on failure).
+ *  Goes through the shared model-request gate (ai.ts) so it shares the instance
+ *  budget and yields to interactive work like any chat request. */
+function embedBatch(input: string[]): Promise<(number[] | null)[]> {
+  return withModelSlot(async () => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), config.ai.timeoutMs);
+    try {
+      const res = await fetch(`${config.ai.baseUrl}/embeddings`, {
+        method: "POST",
+        signal: controller.signal,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${config.ai.apiKey}`,
+        },
+        body: JSON.stringify({ model: config.ai.embedModel, input }),
+      });
+      if (!res.ok) {
+        warnOnce(`HTTP ${res.status}`);
+        return input.map(() => null);
+      }
+      const json = (await res.json()) as {
+        data?: { embedding?: number[]; index?: number }[];
+      };
+      const rows = json.data ?? [];
+      // Map by the server-reported index so order is preserved even if reordered.
+      const out: (number[] | null)[] = input.map(() => null);
+      rows.forEach((row, i) => {
+        const idx = typeof row.index === "number" ? row.index : i;
+        if (Array.isArray(row.embedding) && idx >= 0 && idx < out.length) out[idx] = row.embedding;
+      });
+      return out;
+    } catch (e) {
+      warnOnce(e instanceof Error ? e.message : String(e));
       return input.map(() => null);
+    } finally {
+      clearTimeout(timer);
     }
-    const json = (await res.json()) as {
-      data?: { embedding?: number[]; index?: number }[];
-    };
-    const rows = json.data ?? [];
-    // Map by the server-reported index so order is preserved even if reordered.
-    const out: (number[] | null)[] = input.map(() => null);
-    rows.forEach((row, i) => {
-      const idx = typeof row.index === "number" ? row.index : i;
-      if (Array.isArray(row.embedding) && idx >= 0 && idx < out.length) out[idx] = row.embedding;
-    });
-    return out;
-  } catch (e) {
-    warnOnce(e instanceof Error ? e.message : String(e));
-    return input.map(() => null);
-  } finally {
-    clearTimeout(timer);
-  }
+  });
 }
 
 /**
