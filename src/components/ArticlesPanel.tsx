@@ -106,22 +106,40 @@ export function ArticlesPanel({
   if (wide) {
     const translateX = anim.interpolate({ inputRange: [0, 1], outputRange: [width + 24, 0] });
     return (
-      <Animated.View
-        style={[styles.deskPanel, { width, transform: [{ translateX }] }]}
-        pointerEvents={open ? "auto" : "none"}
-      >
-        <View style={[styles.header, { paddingTop: topInset + spacing.sm }]}>
-          <Text style={styles.title} numberOfLines={1}>
-            {peekTitle}
-          </Text>
-          <Pressable onPress={onClose} hitSlop={8} style={styles.closeBtn} accessibilityRole="button">
-            <Ionicons name="close" size={18} color={colors.text} />
+      <>
+        <Animated.View
+          style={[styles.deskPanel, { width, transform: [{ translateX }] }]}
+          pointerEvents={open ? "auto" : "none"}
+        >
+          <View style={[styles.header, { paddingTop: topInset + spacing.sm }]}>
+            <Text style={styles.title} numberOfLines={1}>
+              {peekTitle}
+            </Text>
+            <Pressable onPress={onClose} hitSlop={8} style={styles.closeBtn} accessibilityRole="button">
+              <Ionicons name="close" size={18} color={colors.text} />
+            </Pressable>
+          </View>
+          <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} refreshControl={refresh}>
+            {children}
+          </ScrollView>
+        </Animated.View>
+        {/* Desktop has no peek state, so when closed leave a tab on the right edge to
+            REOPEN the panel (otherwise it slides off-screen with no way back). */}
+        {!open && (
+          <Pressable
+            style={styles.reopenTab}
+            onPress={onExpand}
+            accessibilityRole="button"
+            accessibilityLabel="Open articles"
+          >
+            <Ionicons name="chevron-back" size={16} color={colors.textDim} />
+            <Ionicons name="newspaper" size={15} color={colors.accent} />
+            <Text style={styles.reopenText} numberOfLines={1}>
+              {peekTitle}
+            </Text>
           </Pressable>
-        </View>
-        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} refreshControl={refresh}>
-          {children}
-        </ScrollView>
-      </Animated.View>
+        )}
+      </>
     );
   }
 
@@ -195,6 +213,24 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   title: { flex: 1, color: colors.text, fontSize: font.h3, fontWeight: "800" },
+  reopenTab: {
+    position: "absolute",
+    right: 0,
+    top: "42%",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    maxWidth: 220,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderTopLeftRadius: radius.pill,
+    borderBottomLeftRadius: radius.pill,
+    backgroundColor: colors.bg + "F2",
+    borderWidth: 1,
+    borderRightWidth: 0,
+    borderColor: colors.border,
+  },
+  reopenText: { color: colors.text, fontSize: font.small, fontWeight: "700", flexShrink: 1 },
   closeBtn: {
     width: 32,
     height: 32,

@@ -129,6 +129,14 @@ interface WorldState {
   lastWatchedAt: number;
   /** True when the catch-up loop stopped for lack of a viewer (resumes on return). */
   catchUpPaused: boolean;
+  /** Cached near-clone DEDUP for a GEO pool, keyed by survivor COUNT. The dedup is
+   *  O(n²) and used to run on EVERY status poll + view build (the server stuttered while
+   *  busy). Analysis only flips `analyzed` flags — it never adds/removes items — so the
+   *  cluster STRUCTURE is stable until prescreen/prune change the set; we re-resolve to
+   *  live items each call, so the un-analyzed filter stays fresh. */
+  geoDedup:
+    | { key: number; clusters: { repId: string; memberIds: string[]; sourceCount: number }[] }
+    | null;
 }
 
 const worldStates = new Map<string, WorldState>();
@@ -154,6 +162,7 @@ function ws(worldId: string): WorldState {
       catchUpTimer: null,
       lastWatchedAt: 0,
       catchUpPaused: false,
+      geoDedup: null,
     };
     worldStates.set(worldId, s);
   }
@@ -478,6 +487,8 @@ async function prescreenAndStore(worldId: string, items: FeedItem[]): Promise<vo
       analyzedAt: 0,
     });
   }
+  // The survivor set just grew — drop the cached near-clone dedup so it's rebuilt once.
+  state.geoDedup = null;
 }
 
 /**
@@ -608,29 +619,52 @@ interface GeoCluster {
  * granularity — identical wire copy is analyzed once and fanned out to the rest.
  */
 function planGeoAnalysis(worldId: string, keep: number): GeoCluster[] {
+  const state = ws(worldId);
   const cutoff = analyzeCutoff();
   const survivors = getStore(worldId)
     .all()
     .filter((s) => !s.clickbait && s.item.publishedAt >= cutoff);
-  if (survivors.length === 0) return [];
+  if (survivors.length === 0) {
+    state.geoDedup = null;
+    return [];
+  }
   const byId = new Map(survivors.map((s) => [s.item.id, s]));
-  const clusters = dedupeNearClones(
-    survivors.map((s) => ({
-      id: s.item.id,
-      sourceId: s.item.sourceId,
-      title: s.item.title,
-      summary: s.item.summary,
-      publishedAt: s.item.publishedAt,
-      importance: s.prescreenImportance ?? 0.5,
-    })),
-    { jaccardThreshold: config.geo.dedupeJaccard, windowMs: config.geo.dedupeWindowMs },
-  );
-  const ranked = clusters
-    .map((c): GeoCluster => ({
-      rep: byId.get(c.representativeId) as StoredItem,
-      members: c.memberIds.map((id) => byId.get(id)).filter((s): s is StoredItem => !!s),
-      sourceCount: c.sourceCount,
-    }))
+
+  // Reuse the cached dedup STRUCTURE while the survivor set is unchanged (see WorldState
+  // .geoDedup). Only the expensive O(n²) dedup is cached; the rank + un-analyzed filter
+  // below re-resolve against the LIVE store every call, so they reflect fresh analysis.
+  let cached = state.geoDedup;
+  if (!cached || cached.key !== survivors.length) {
+    const clusters = dedupeNearClones(
+      survivors.map((s) => ({
+        id: s.item.id,
+        sourceId: s.item.sourceId,
+        title: s.item.title,
+        summary: s.item.summary,
+        publishedAt: s.item.publishedAt,
+        importance: s.prescreenImportance ?? 0.5,
+      })),
+      { jaccardThreshold: config.geo.dedupeJaccard, windowMs: config.geo.dedupeWindowMs },
+    );
+    cached = {
+      key: survivors.length,
+      clusters: clusters.map((c) => ({
+        repId: c.representativeId,
+        memberIds: c.memberIds,
+        sourceCount: c.sourceCount,
+      })),
+    };
+    state.geoDedup = cached;
+  }
+
+  const ranked = cached.clusters
+    .map((c): GeoCluster | null => {
+      const rep = byId.get(c.repId);
+      if (!rep) return null;
+      const members = c.memberIds.map((id) => byId.get(id)).filter((s): s is StoredItem => !!s);
+      return { rep, members, sourceCount: c.sourceCount };
+    })
+    .filter((c): c is GeoCluster => c !== null)
     .sort(
       (a, b) =>
         (b.rep.prescreenImportance ?? 0.5) - (a.rep.prescreenImportance ?? 0.5) ||
