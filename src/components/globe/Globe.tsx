@@ -401,7 +401,10 @@ export function Globe({
   const activate = (id: string) => {
     const node = childById(id);
     if (!node) return;
-    if (node.state === "ready") onSelect(node.poolId);
+    if (node.state === "ready") {
+      onSelect(node.poolId);
+      onOpenArticles?.(); // selecting a covered place reveals the articles panel
+    }
     if (node.hasChildren) setBrowse(node.nodeId);
   };
 
@@ -456,9 +459,13 @@ export function Globe({
     [],
   );
 
+  const hero = variant === "hero";
   return (
-    <View style={styles.wrap}>
-      <View style={[styles.canvasWrap, { height }]} {...panResponder.panHandlers}>
+    <View style={[styles.wrap, hero && styles.wrapHero]}>
+      <View
+        style={[styles.canvasWrap, hero ? styles.canvasHero : { height }]}
+        {...panResponder.panHandlers}
+      >
         <Canvas
           camera={{ position: [0, 0, 3.2], fov: 45 }}
           onPointerMissed={() => setFocusedId(null)}
@@ -599,6 +606,7 @@ export function Globe({
 
 const styles = StyleSheet.create({
   wrap: { gap: spacing.xs },
+  wrapHero: { flex: 1, gap: 0 },
   canvasWrap: {
     borderRadius: radius.lg,
     overflow: "hidden",
@@ -606,6 +614,8 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.bg,
   },
+  // Full-bleed landing: fill the screen, drop the card chrome.
+  canvasHero: { flex: 1, borderRadius: 0, borderWidth: 0, overflow: "hidden", backgroundColor: colors.bg },
   searchWrap: {
     position: "absolute",
     top: spacing.xl,

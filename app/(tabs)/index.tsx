@@ -21,7 +21,8 @@ import { FadeInView } from "../../src/components/anim";
 import { BriefingCard } from "../../src/components/BriefingCard";
 import { AnalysisProgress } from "../../src/components/AnalysisProgress";
 import { WorldSwitcher } from "../../src/components/WorldSwitcher";
-import { GeoBrowser } from "../../src/components/GeoBrowser";
+import { Globe } from "../../src/components/globe/Globe";
+import { ArticlesPanel, type PanelState } from "../../src/components/ArticlesPanel";
 import { GEO_ROOT_ID, poolIdForNode } from "../../src/data/geo";
 import { DEFAULT_WORLD_ID } from "../../src/data/worlds";
 import { fetchStories } from "../../src/lib/api";
@@ -312,8 +313,13 @@ export default function FeedScreen() {
     return activeSelected === "all" ? lm : lm.filter((s) => s.topic === activeSelected);
   }, [stories, feed, storyViews, activeSelected, prefs.interestPrompt]);
 
-  // Responsive layout math.
-  const contentW = Math.min(width, MAX_CONTENT_WIDTH) - H_PAD * 2;
+  const [panelState, setPanelState] = useState<PanelState>("hidden");
+
+  // Responsive layout math — the feed now lives in the side/sheet panel, so card
+  // sizing is driven by the PANEL width, not the full viewport.
+  const isWide = width >= 820;
+  const panelW = isWide ? Math.min(480, Math.max(360, Math.round(width * 0.42))) : width;
+  const contentW = panelW - H_PAD * 2;
   const cols = columnsFor(contentW);
   const GAP = spacing.lg;
   const cardW = cols === 1 ? contentW : Math.floor((contentW - GAP * (cols - 1)) / cols);
@@ -321,44 +327,52 @@ export default function FeedScreen() {
   const atQuota = progress.consumedMin >= prefs.dailyQuotaMin;
 
   return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: colors.bg }}
-      contentContainerStyle={{
-        paddingTop: insets.top + spacing.md,
-        paddingBottom: spacing.xxl,
-        paddingHorizontal: H_PAD,
-        alignItems: "center",
-      }}
-      refreshControl={
-        <RefreshControl
-          refreshing={loadingFeed}
-          onRefresh={() => {
-            void refreshFeed({ force: true });
-            void loadStories(true);
-          }}
-          tintColor={colors.accent}
-        />
-      }
-    >
-      <View style={{ width: contentW, gap: spacing.md }}>
+    <View style={styles.root}>
+      {/* Full-screen globe landing + centered place search — the branding anchor. */}
+      <Globe
+        variant="hero"
+        activePoolId={prefs.geoPool}
+        home={prefs.geoHome}
+        stories={stories}
+        worldActive={worldId === DEFAULT_WORLD_ID && !prefs.geoPool}
+        onSelectWorld={() => {
+          setWorld(DEFAULT_WORLD_ID);
+          setPanelState(isWide ? "open" : "peek");
+        }}
+        onSelect={(poolId) => {
+          // World root = the Front Page (clear any geographic override).
+          const next = !poolId || poolId === poolIdForNode(GEO_ROOT_ID) ? undefined : poolId;
+          if (next !== prefs.geoPool) void updatePrefs({ geoPool: next });
+        }}
+        onSetHome={(nodeId) => void updatePrefs({ geoHome: nodeId })}
+        onOpenArticles={() => setPanelState(isWide ? "open" : "peek")}
+      />
+
+      {/* Articles surface: desktop right slide-in / mobile bottom pull-up sheet. */}
+      <ArticlesPanel
+        state={panelState}
+        wide={isWide}
+        width={panelW}
+        topInset={insets.top}
+        peekTitle={t("feed.title")}
+        peekSubtitle={
+          unreadCount > 0
+            ? t(unreadCount === 1 ? "feed.summaryOne" : "feed.summary", {
+                count: unreadCount,
+                topics: sections.length,
+              })
+            : t("feed.caughtUp")
+        }
+        refreshing={loadingFeed}
+        onRefresh={() => {
+          void refreshFeed({ force: true });
+          void loadStories(true);
+        }}
+        onExpand={() => setPanelState("open")}
+        onClose={() => setPanelState(isWide ? "hidden" : "peek")}
+      >
         {/* World switcher: pick which news universe to browse (front page = World). */}
         <WorldSwitcher worldId={worldId} busyWorld={busyWorld} onSelect={setWorld} />
-
-        {/* Coverage drill-down: browse by source geography (World → … → council).
-            The World root means "no geographic override" — i.e. the chosen world. */}
-        <GeoBrowser
-          activePoolId={prefs.geoPool}
-          home={prefs.geoHome}
-          stories={stories}
-          worldActive={worldId === DEFAULT_WORLD_ID && !prefs.geoPool}
-          onSelectWorld={() => setWorld(DEFAULT_WORLD_ID)}
-          onSelect={(poolId) => {
-            // World root = the Front Page (clear any geographic override).
-            const next = !poolId || poolId === poolIdForNode(GEO_ROOT_ID) ? undefined : poolId;
-            if (next !== prefs.geoPool) void updatePrefs({ geoPool: next });
-          }}
-          onSetHome={(nodeId) => void updatePrefs({ geoHome: nodeId })}
-        />
 
         {/* Only one world refreshes at a time. Surface this only when the
             selected world has nothing to show because another is hogging the lock. */}
@@ -601,8 +615,8 @@ export default function FeedScreen() {
             );
           })
         )}
-      </View>
-    </ScrollView>
+      </ArticlesPanel>
+    </View>
   );
 }
 
@@ -637,6 +651,7 @@ function FilterChip({
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.bg },
   headerRow: { flexDirection: "row", alignItems: "flex-start", gap: spacing.md },
   title: { color: colors.text, fontSize: font.h1, fontWeight: "800" },
   subtitle: { color: colors.textDim, fontSize: font.small, marginTop: 2 },
