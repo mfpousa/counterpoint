@@ -866,17 +866,6 @@ export function Globe({
                 ))}
               </View>
             )}
-            {/* Open the world/front-page feed directly — no place needed. */}
-            {placeQuery.length === 0 && onSelectWorld && (
-              <Pressable
-                onPress={goWorld}
-                style={styles.frontPageBtn}
-                accessibilityRole="button"
-              >
-                <Ionicons name="newspaper" size={14} color={colors.accent} />
-                <Text style={styles.frontPageText}>{t("world.frontpage")}</Text>
-              </Pressable>
-            )}
           </View>
         )}
 
@@ -1119,23 +1108,6 @@ const styles = StyleSheet.create({
   },
   searchResultText: {
     flex: 1,
-    color: colors.text,
-    fontSize: font.small,
-    fontWeight: "700",
-  },
-  frontPageBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.xs,
-    marginTop: spacing.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 7,
-    borderRadius: radius.pill,
-    backgroundColor: colors.surface + "E6",
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  frontPageText: {
     color: colors.text,
     fontSize: font.small,
     fontWeight: "700",
