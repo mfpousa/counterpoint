@@ -65,19 +65,22 @@ describe("geoShapes (GeoJSON → sphere geometry)", () => {
     expect(iso2Of({ ISO_A2: "-99", ISO_A2_EH: "ES" })).toBe("es");
   });
 
-  it("buildLandGeometry returns sphere-projected triangles", () => {
-    const { positions, indices } = buildLandGeometry(FIXTURE, 1);
-    expect(positions.length % 3).toBe(0);
-    expect(indices.length % 3).toBe(0); // whole triangles
-    expect(indices.length).toBeGreaterThan(0);
-    // Every vertex sits on the unit sphere.
+  it("buildLandGeometry returns a non-indexed sphere-projected triangle soup", () => {
+    const { positions, normals } = buildLandGeometry(FIXTURE, 1);
+    expect(positions.length % 9).toBe(0); // whole triangles (3 verts × 3 floats)
+    expect(positions.length).toBeGreaterThan(0);
+    // Non-indexed: one normal per position vertex.
+    expect(normals.length).toBe(positions.length);
+    // Every vertex sits on the unit sphere, and its normal is the matching outward dir.
     for (let i = 0; i < positions.length; i += 3) {
       const len = lengthOf({ x: positions[i], y: positions[i + 1], z: positions[i + 2] });
       expect(len).toBeCloseTo(1, 6);
+      expect(lengthOf({ x: normals[i], y: normals[i + 1], z: normals[i + 2] })).toBeCloseTo(1, 6);
+      // normal == normalized position (radius 1 here, so they match directly)
+      expect(normals[i]).toBeCloseTo(positions[i], 6);
+      expect(normals[i + 1]).toBeCloseTo(positions[i + 1], 6);
+      expect(normals[i + 2]).toBeCloseTo(positions[i + 2], 6);
     }
-    // Indices stay in range.
-    const vertexCount = positions.length / 3;
-    for (const idx of indices) expect(idx).toBeLessThan(vertexCount);
   });
 
   it("radius scales the projected vertices", () => {

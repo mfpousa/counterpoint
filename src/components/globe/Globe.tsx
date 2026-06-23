@@ -314,7 +314,7 @@ export function Globe({
 
         {/* TEMP diagnostic: how many land triangles got built (remove once shapes show). */}
         <Text style={styles.debug}>
-          {worldGeo ? `land ${Math.floor(worldGeo.land.indices.length / 3)} tris` : "land: none"}
+          {worldGeo ? `land ${Math.floor(worldGeo.land.positions.length / 9)} tris` : "land: none"}
         </Text>
       </View>
     </View>

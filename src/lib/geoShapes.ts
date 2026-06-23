@@ -23,10 +23,13 @@ export interface GeoJson {
   features: GeoFeature[];
 }
 
-/** Merged, sphere-projected triangle soup for ALL land (one BufferGeometry). */
+/** Merged, sphere-projected triangle soup for ALL land (one BufferGeometry).
+ *  NON-INDEXED (positions expanded per-vertex) so we never need a 32-bit index
+ *  buffer, which expo-gl's WebGL1 context may not support. `normals` are the
+ *  outward sphere normals so the land lights correctly without GL derivatives. */
 export interface LandGeometry {
   positions: Float32Array;
-  indices: Uint32Array;
+  normals: Float32Array;
 }
 
 /** Where to anchor a pin for each country (by ISO alpha-2) and continent (slug). */
@@ -57,8 +60,8 @@ export function iso2Of(props: Record<string, unknown>): string | null {
 type Ring = [number, number][];
 
 /** Triangulate one polygon (outer ring + optional holes) onto the sphere, appending
- *  to the shared position/index arrays. */
-function addPolygon(rings: Ring[], radius: number, outPos: number[], outIdx: number[]): void {
+ *  EXPANDED (non-indexed) triangle vertices + outward normals to the shared arrays. */
+function addPolygon(rings: Ring[], radius: number, outPos: number[], outNorm: number[]): void {
   if (rings.length === 0) return;
   const flat: number[] = [];
   const holes: number[] = [];
@@ -72,28 +75,31 @@ function addPolygon(rings: Ring[], radius: number, outPos: number[], outIdx: num
   });
   if (flat.length < 6) return; // need at least a triangle
   const tris = earcut(flat, holes.length ? holes : undefined, 2);
-  const base = outPos.length / 3;
-  for (let i = 0; i < flat.length; i += 2) {
-    const v = latLonToVec3(flat[i + 1], flat[i]); // (lat, lon)
+  // Expand each triangle index into its own vertex so the geometry needs NO index
+  // buffer at all (dodges the unsupported 32-bit index path on expo-gl).
+  for (const idx of tris) {
+    const lon = flat[idx * 2];
+    const lat = flat[idx * 2 + 1];
+    const v = latLonToVec3(lat, lon); // unit dir on the sphere
     outPos.push(v.x * radius, v.y * radius, v.z * radius);
+    outNorm.push(v.x, v.y, v.z); // outward normal == unit position for a sphere shell
   }
-  for (const t of tris) outIdx.push(base + t);
 }
 
 /** Build one merged, sphere-wrapped land geometry from a country FeatureCollection. */
 export function buildLandGeometry(geo: GeoJson, radius = 1): LandGeometry {
   const pos: number[] = [];
-  const idx: number[] = [];
+  const norm: number[] = [];
   for (const f of geo.features) {
     const g = f.geometry;
     if (!g) continue;
     if (g.type === "Polygon") {
-      addPolygon(g.coordinates as Ring[], radius, pos, idx);
+      addPolygon(g.coordinates as Ring[], radius, pos, norm);
     } else if (g.type === "MultiPolygon") {
-      for (const poly of g.coordinates as Ring[][]) addPolygon(poly, radius, pos, idx);
+      for (const poly of g.coordinates as Ring[][]) addPolygon(poly, radius, pos, norm);
     }
   }
-  return { positions: new Float32Array(pos), indices: new Uint32Array(idx) };
+  return { positions: new Float32Array(pos), normals: new Float32Array(norm) };
 }
 
 /** Average direction of every vertex in a feature (good enough to anchor a pin). */

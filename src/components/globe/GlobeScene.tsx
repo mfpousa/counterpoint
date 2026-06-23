@@ -103,16 +103,16 @@ function GlobeEntity({
 /** The real landmasses: one merged, sphere-wrapped mesh built from the GeoJSON
  *  borders, with a metallic "land" material distinct from the ocean beneath. */
 function Land({ data }: { data: LandGeometry }) {
-  // Build the geometry with r3f's OWN three instance (JSX) — a manually `new
-  // BufferGeometry()` can be silently rejected if a second copy of three slips in.
-  // No vertex normals needed: flatShading derives per-face normals in-shader (also
-  // dodging earcut's inverted winding). frustumCulled off so a stray/NaN vertex in
-  // the merged geometry can't cull the entire landmass.
+  // NON-INDEXED triangle soup, built via r3f's own three instance (JSX). No index
+  // buffer at all — expo-gl's WebGL1 context may lack 32-bit index support, which
+  // silently dropped the draw. Outward normals come from geoShapes (= unit position)
+  // so a lit material shades correctly. frustumCulled off so a stray vertex can't
+  // cull the whole landmass.
   return (
     <mesh frustumCulled={false}>
       <bufferGeometry>
         <bufferAttribute attach="attributes-position" args={[data.positions, 3]} />
-        <bufferAttribute attach="index" args={[data.indices, 1]} />
+        <bufferAttribute attach="attributes-normal" args={[data.normals, 3]} />
       </bufferGeometry>
       {/* DIAGNOSTIC: unlit basic material — always visible regardless of normals,
           lighting, or GL derivative support. If continents show with this, the
