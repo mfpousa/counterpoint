@@ -1,0 +1,125 @@
+[
+  {
+    "id": "uz-tmb-tv",
+    "title": "TMB TV",
+    "url": "http://www.tmb.tv/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "uz"
+  },
+  {
+    "id": "uz-qoraqolpog-iston-xabar-agentligi",
+    "title": "Qoraqolpog'iston xabar agentligi",
+    "url": "https://kknews.uz/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "uz",
+    "region": "UZ-QR",
+    "regionLabel": "Qoraqalpogʻiston"
+  },
+  {
+    "id": "uz-zamin-uz",
+    "title": "zamin.uz",
+    "url": "https://zamin.uz/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "uz"
+  },
+  {
+    "id": "uz-uzdaily-uz",
+    "title": "uzdaily.uz",
+    "url": "https://www.uzdaily.uz/ru/rss/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "uz"
+  },
+  {
+    "id": "uz-gazeta-uz",
+    "title": "gazeta.uz",
+    "url": "https://www.gazeta.uz/oz/rss/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "uz"
+  },
+  {
+    "id": "uz-nuz-uz",
+    "title": "nuz.uz",
+    "url": "https://nuz.uz/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "uz"
+  },
+  {
+    "id": "uz-uznews-uz",
+    "title": "uznews.uz",
+    "url": "http://uznews.uz/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "uz"
+  },
+  {
+    "id": "uz-review-uz",
+    "title": "review.uz",
+    "url": "http://www.review.uz/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "uz"
+  },
+  {
+    "id": "uz-ozodlik-org",
+    "title": "ozodlik.org",
+    "url": "http://rus.ozodlik.org/api/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "uz"
+  },
+  {
+    "id": "uz-amerikaovozi-com",
+    "title": "amerikaovozi.com",
+    "url": "http://amerikaovozi.com/api/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "uz"
+  },
+  {
+    "id": "uz-uzhurriyat-uz",
+    "title": "uzhurriyat.uz",
+    "url": "https://uzhurriyat.uz/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "uz"
+  }
+]

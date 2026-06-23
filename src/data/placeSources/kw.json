@@ -1,0 +1,79 @@
+[
+  {
+    "id": "kw-src",
+    "title": "جريدة جرائم ومحاكم الإلكترونية",
+    "url": "https://cckwt.cc/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "kw-dostor-org",
+    "title": "dostor.org",
+    "url": "https://www.dostor.org/rss.aspx",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "kw-khaleejtimes-com",
+    "title": "khaleejtimes.com",
+    "url": "https://www.khaleejtimes.com/api/v1/collections/top-section.rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "kw-kuwaitnews-com",
+    "title": "kuwaitnews.com",
+    "url": "https://kuwaitnews.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "kw-al-forqan-net",
+    "title": "al-forqan.net",
+    "url": "https://al-forqan.net/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "kw-alkhabarkw-com",
+    "title": "alkhabarkw.com",
+    "url": "https://alkhabarkw.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "kw-anhaar-com",
+    "title": "anhaar.com",
+    "url": "https://anhaar.com/?feed=rss2",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  }
+]

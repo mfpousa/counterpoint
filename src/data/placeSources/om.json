@@ -1,0 +1,70 @@
+[
+  {
+    "id": "om-merge-104-8",
+    "title": "Merge 104.8",
+    "url": "https://radiomerge.fm/merge/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar",
+    "region": "OM-MA",
+    "regionLabel": "محافظة مسقط"
+  },
+  {
+    "id": "om-virgin-radio-oman",
+    "title": "Virgin Radio Oman",
+    "url": "http://virginradiooman.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "om-al-wisal",
+    "title": "Al Wisal",
+    "url": "https://wisal.fm/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "om-src",
+    "title": "جريدة الرؤية",
+    "url": "https://alroya.om/rss/category/all",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "om-timesofoman-com",
+    "title": "timesofoman.com",
+    "url": "https://timesofoman.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "om-omanet-om",
+    "title": "omanet.om",
+    "url": "https://omanet.om/en/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  }
+]

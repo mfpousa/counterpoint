@@ -1,0 +1,79 @@
+[
+  {
+    "id": "ky-daily-ky",
+    "title": "daily.ky",
+    "url": "https://daily.ky/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "ky-caymaniantimes-ky",
+    "title": "caymaniantimes.ky",
+    "url": "http://www.caymaniantimes.ky/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "ky-caymannewsservice-com",
+    "title": "caymannewsservice.com",
+    "url": "https://caymannewsservice.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "ky-cnsbusiness-com",
+    "title": "cnsbusiness.com",
+    "url": "https://cnsbusiness.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "ky-caymancompass-com",
+    "title": "caymancompass.com",
+    "url": "http://caymancompass.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "ky-journal-ky",
+    "title": "journal.ky",
+    "url": "https://www.caymancompass.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "ky-caymanreporter-com",
+    "title": "caymanreporter.com",
+    "url": "https://caymanreporter.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  }
+]

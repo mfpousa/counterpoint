@@ -1,0 +1,151 @@
+[
+  {
+    "id": "vn-vtv1",
+    "title": "VTV1",
+    "url": "https://vtv.vn/rss/home.rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "vi",
+    "region": "VN-HN",
+    "regionLabel": "Hà Nội"
+  },
+  {
+    "id": "vn-ai-truyen-hinh-thanh-pho-ho-chi-minh",
+    "title": "Đài Truyền hình Thành phố Hồ Chí Minh",
+    "url": "https://htv.vn/home.rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "vi",
+    "region": "VN-SG",
+    "regionLabel": "Thành phố Hồ Chí Minh"
+  },
+  {
+    "id": "vn-tuoi-tre-bao",
+    "title": "Tuổi Trẻ (báo)",
+    "url": "https://tuoitre.vn/home.rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "vi"
+  },
+  {
+    "id": "vn-dan-tri-bao",
+    "title": "Dân trí (báo)",
+    "url": "https://dantri.com.vn/rss/home.rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "vi"
+  },
+  {
+    "id": "vn-fbnc",
+    "title": "FBNC",
+    "url": "https://fbnc.vn/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "vi"
+  },
+  {
+    "id": "vn-nguoi-lao-ong",
+    "title": "Người lao động",
+    "url": "https://nld.com.vn/rss/home.rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "vi"
+  },
+  {
+    "id": "vn-yeah1-tv",
+    "title": "YeaH1 TV",
+    "url": "https://yeah1.com/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "vi"
+  },
+  {
+    "id": "vn-tuoi-tre-cuoi",
+    "title": "Tuổi Trẻ Cười",
+    "url": "https://cuoi.tuoitre.vn/home.rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "vi"
+  },
+  {
+    "id": "vn-vietnamplus",
+    "title": "VietnamPlus",
+    "url": "https://www.vietnamplus.vn/rss/home.rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "vi"
+  },
+  {
+    "id": "vn-ai-phat-thanh-truyen-hinh-lao-cai",
+    "title": "Đài Phát thanh - Truyền hình Lào Cai",
+    "url": "https://baolaocai.vn/rss/home.rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "vi",
+    "region": "VN-02",
+    "regionLabel": "Lào Cai"
+  },
+  {
+    "id": "vn-baotreonline-com",
+    "title": "baotreonline.com",
+    "url": "https://baotreonline.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "vi"
+  },
+  {
+    "id": "vn-trieuthanhweeklymagazine-com",
+    "title": "trieuthanhweeklymagazine.com",
+    "url": "https://trieuthanhweeklymagazine.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "vi"
+  },
+  {
+    "id": "vn-nguoivietdallas-com",
+    "title": "nguoivietdallas.com",
+    "url": "https://www.nguoivietdallas.com/lich?format=rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "vi"
+  }
+]

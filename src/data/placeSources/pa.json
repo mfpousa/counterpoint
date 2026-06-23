@@ -1,0 +1,222 @@
+[
+  {
+    "id": "pa-nex-panama",
+    "title": "NEX (Panamá)",
+    "url": "https://nexpanama.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "es"
+  },
+  {
+    "id": "pa-tvmax",
+    "title": "TVMax",
+    "url": "http://www.tvmax-9.com/rss/category/section/2000/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "es"
+  },
+  {
+    "id": "pa-critica-libre",
+    "title": "Crítica Libre",
+    "url": "https://www.critica.com.pa/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "es"
+  },
+  {
+    "id": "pa-tvn-2-com",
+    "title": "tvn-2.com",
+    "url": "http://tvn-2.com/rss/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "es"
+  },
+  {
+    "id": "pa-panamaamerica-com-pa",
+    "title": "panamaamerica.com.pa",
+    "url": "https://www.panamaamerica.com.pa/rss/recent/index.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "es"
+  },
+  {
+    "id": "pa-diaadia-com-pa",
+    "title": "diaadia.com.pa",
+    "url": "http://diaadia.com.pa/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "es"
+  },
+  {
+    "id": "pa-newsroompanama-com",
+    "title": "newsroompanama.com",
+    "url": "https://newsroompanama.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "es"
+  },
+  {
+    "id": "pa-radiochiriqui-com",
+    "title": "radiochiriqui.com",
+    "url": "https://radiochiriqui.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "es"
+  },
+  {
+    "id": "pa-ensegundos-com-pa",
+    "title": "ensegundos.com.pa",
+    "url": "https://ensegundos.com.pa/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "es"
+  },
+  {
+    "id": "pa-tucomunidad-com-pa",
+    "title": "tucomunidad.com.pa",
+    "url": "https://tucomunidad.com.pa/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "es"
+  },
+  {
+    "id": "pa-ondascentrales-com",
+    "title": "ondascentrales.com",
+    "url": "https://www.ondascentrales.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "es"
+  },
+  {
+    "id": "pa-lagacetadepanama-com",
+    "title": "lagacetadepanama.com",
+    "url": "https://www.lagacetadepanama.com/rss/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "es"
+  },
+  {
+    "id": "pa-radiotemblor-org",
+    "title": "radiotemblor.org",
+    "url": "https://www.radiotemblor.org/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "es"
+  },
+  {
+    "id": "pa-thebocasbreeze-com",
+    "title": "thebocasbreeze.com",
+    "url": "https://thebocasbreeze.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "es"
+  },
+  {
+    "id": "pa-portobelostereo-net",
+    "title": "portobelostereo.net",
+    "url": "http://www.portobelostereo.net/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "es"
+  },
+  {
+    "id": "pa-nuevanacion-com",
+    "title": "nuevanacion.com",
+    "url": "https://nuevanacion.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "es"
+  },
+  {
+    "id": "pa-furiaca-com",
+    "title": "furiaca.com",
+    "url": "https://furiaca.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "es"
+  },
+  {
+    "id": "pa-panamatoday-com",
+    "title": "panamatoday.com",
+    "url": "https://www.panamatoday.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "es"
+  },
+  {
+    "id": "pa-vamaganews-wordpress-com",
+    "title": "vamaganews.wordpress.com",
+    "url": "https://vamaganews.wpcomstaging.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "es"
+  },
+  {
+    "id": "pa-prnoticiaspanama-com",
+    "title": "prnoticiaspanama.com",
+    "url": "https://prnoticiaspanama.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "es"
+  }
+]

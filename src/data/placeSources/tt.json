@@ -1,0 +1,101 @@
+[
+  {
+    "id": "tt-sky-99-5",
+    "title": "Sky 99.5",
+    "url": "https://sky995fm.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "tt-the-vibe-ct-105-1-fm",
+    "title": "The Vibe CT 105.1 FM",
+    "url": "https://vibect1051.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "tt-mix-90-1fm",
+    "title": "Mix 90.1FM",
+    "url": "https://mix901fm.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "tt-trinidadtribune-com",
+    "title": "trinidadtribune.com",
+    "url": "http://www.trinidadtribune.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "tt-cnc3-co-tt",
+    "title": "cnc3.co.tt",
+    "url": "https://www.cnc3.co.tt/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "tt-sweettntmagazine-com",
+    "title": "sweettntmagazine.com",
+    "url": "https://sweettntmagazine.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "tt-newsday-co-tt",
+    "title": "newsday.co.tt",
+    "url": "https://newsday.co.tt/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "tt-i955fm-com",
+    "title": "i955fm.com",
+    "url": "http://i955fm.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "tt-power102fm-com",
+    "title": "power102fm.com",
+    "url": "https://power102fm.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  }
+]

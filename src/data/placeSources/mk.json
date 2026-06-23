@@ -1,0 +1,90 @@
+[
+  {
+    "id": "mk-src",
+    "title": "Дневник (дневен весник)",
+    "url": "http://www.dnevnik.com.mk/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "mk"
+  },
+  {
+    "id": "mk-src-2",
+    "title": "Нова Македонија",
+    "url": "https://novamakedonija.com.mk/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "mk"
+  },
+  {
+    "id": "mk-src-3",
+    "title": "Вечер",
+    "url": "http://vecer.mk/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "mk"
+  },
+  {
+    "id": "mk-src-4",
+    "title": "Телма",
+    "url": "https://telma.com.mk/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "mk"
+  },
+  {
+    "id": "mk-tv-plus",
+    "title": "TV Plus",
+    "url": "http://tvplus.mk/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "mk"
+  },
+  {
+    "id": "mk-src-5",
+    "title": "Слободен печат",
+    "url": "https://www.slobodenpecat.mk/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "mk"
+  },
+  {
+    "id": "mk-tv-21",
+    "title": "TV 21",
+    "url": "https://mk.tv21.tv/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "mk"
+  },
+  {
+    "id": "mk-roma-press",
+    "title": "Roma Press",
+    "url": "https://romapress.mk/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "mk"
+  }
+]

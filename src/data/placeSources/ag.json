@@ -1,0 +1,57 @@
+[
+  {
+    "id": "ag-antigua-observer",
+    "title": "Antigua Observer",
+    "url": "https://antiguaobserver.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "ag-coingeek",
+    "title": "CoinGeek",
+    "url": "https://coingeek.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "ag-antiguanewsroom-com",
+    "title": "antiguanewsroom.com",
+    "url": "http://antiguanewsroom.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "ag-abstvradio-com",
+    "title": "abstvradio.com",
+    "url": "https://abstvradio.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "ag-radiozdk-com",
+    "title": "radiozdk.com",
+    "url": "https://radiozdk.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  }
+]

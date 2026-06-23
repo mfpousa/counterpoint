@@ -1,0 +1,68 @@
+[
+  {
+    "id": "kn-stkittsgazette-com",
+    "title": "stkittsgazette.com",
+    "url": "http://www.stkittsgazette.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "kn-nevispages-com",
+    "title": "nevispages.com",
+    "url": "https://www.nevispages.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "kn-timescaribbeanonline-com",
+    "title": "timescaribbeanonline.com",
+    "url": "https://timescaribbeanonline.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "kn-vonradio-com",
+    "title": "vonradio.com",
+    "url": "https://vonradio.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "kn-zizonline-com",
+    "title": "zizonline.com",
+    "url": "https://zizonline.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "kn-sknpulse-com",
+    "title": "sknpulse.com",
+    "url": "https://sknpulse.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  }
+]

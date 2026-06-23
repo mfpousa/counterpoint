@@ -1,0 +1,112 @@
+[
+  {
+    "id": "jm-gospel-ja-fm",
+    "title": "Gospel JA FM",
+    "url": "https://www.gospelja.com/?feed=rss2",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "jm-jamaicainquirer-com",
+    "title": "jamaicainquirer.com",
+    "url": "http://www.jamaicainquirer.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "jm-jamaicaobserver-com",
+    "title": "jamaicaobserver.com",
+    "url": "http://www.jamaicaobserver.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "jm-jis-gov-jm",
+    "title": "jis.gov.jm",
+    "url": "https://jis.gov.jm/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "jm-iriefm-net",
+    "title": "iriefm.net",
+    "url": "http://iriefm.net/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "jm-jamaica-star-com",
+    "title": "jamaica-star.com",
+    "url": "http://jamaica-star.com/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "jm-mckoysnews-com",
+    "title": "mckoysnews.com",
+    "url": "https://mckoysnews.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "jm-jamaicans-com",
+    "title": "jamaicans.com",
+    "url": "https://jamaicans.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "jm-go-jamaica-com",
+    "title": "go-jamaica.com",
+    "url": "http://www.go-jamaica.com/news/feed/news.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "jm-bessfm-com",
+    "title": "bessfm.com",
+    "url": "https://www.bessfm.com/blog-feed.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  }
+]

@@ -1,0 +1,68 @@
+[
+  {
+    "id": "aw-24ora",
+    "title": "24ora",
+    "url": "https://24ora.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "nl"
+  },
+  {
+    "id": "aw-masnoticia-com",
+    "title": "masnoticia.com",
+    "url": "https://masnoticia.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "nl"
+  },
+  {
+    "id": "aw-awe24-com",
+    "title": "awe24.com",
+    "url": "https://www.awe24.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "nl"
+  },
+  {
+    "id": "aw-noticiacla-com",
+    "title": "noticiacla.com",
+    "url": "http://noticiacla.com/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "nl"
+  },
+  {
+    "id": "aw-bondia24-com",
+    "title": "bondia24.com",
+    "url": "https://bondia24.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "nl"
+  },
+  {
+    "id": "aw-coolaruba-com",
+    "title": "coolaruba.com",
+    "url": "https://coolaruba.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "nl"
+  }
+]

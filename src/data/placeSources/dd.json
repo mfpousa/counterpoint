@@ -1,0 +1,24 @@
+[
+  {
+    "id": "dd-nd",
+    "title": "nd",
+    "url": "https://www.nd-aktuell.de/rss/neues-deutschland.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "de"
+  },
+  {
+    "id": "dd-junge-welt",
+    "title": "Junge Welt",
+    "url": "https://www.jungewelt.de/feeds/newsticker.rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "de"
+  }
+]

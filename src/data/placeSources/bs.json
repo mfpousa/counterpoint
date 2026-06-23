@@ -1,0 +1,37 @@
+[
+  {
+    "id": "bs-zns-1",
+    "title": "ZNS-1",
+    "url": "https://znsbahamas.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "bs-the-tribune",
+    "title": "The Tribune",
+    "url": "https://www.tribune242.com/rss/headlines/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en",
+    "region": "BS-NP",
+    "regionLabel": "New Providence"
+  },
+  {
+    "id": "bs-eleutheranews-com",
+    "title": "eleutheranews.com",
+    "url": "http://eleutheranews.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  }
+]

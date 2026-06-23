@@ -1,0 +1,112 @@
+[
+  {
+    "id": "mv-sun-mv",
+    "title": "sun.mv",
+    "url": "http://sun.mv/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "dv"
+  },
+  {
+    "id": "mv-psmnews-mv",
+    "title": "psmnews.mv",
+    "url": "http://psmnews.mv/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "dv"
+  },
+  {
+    "id": "mv-thepress-mv",
+    "title": "thepress.mv",
+    "url": "https://byline.mv/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "dv"
+  },
+  {
+    "id": "mv-haftha-mv",
+    "title": "haftha.mv",
+    "url": "https://haftha.mv/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "dv"
+  },
+  {
+    "id": "mv-aonews-mv",
+    "title": "aonews.mv",
+    "url": "https://aonews.mv/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "dv"
+  },
+  {
+    "id": "mv-maldivesindependent-com",
+    "title": "maldivesindependent.com",
+    "url": "https://maldivesindependent.com/api/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "dv"
+  },
+  {
+    "id": "mv-mbsnews-mv",
+    "title": "mbsnews.mv",
+    "url": "https://mbsnews.mv/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "dv"
+  },
+  {
+    "id": "mv-mikalnews-com",
+    "title": "mikalnews.com",
+    "url": "http://mikalnews.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "dv"
+  },
+  {
+    "id": "mv-maldivestimes-com",
+    "title": "maldivestimes.com",
+    "url": "https://maldivestimes.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "dv"
+  },
+  {
+    "id": "mv-dhiislam-com",
+    "title": "dhiislam.com",
+    "url": "https://dhiislam.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "dv"
+  }
+]

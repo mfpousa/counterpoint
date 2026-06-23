@@ -1,0 +1,123 @@
+[
+  {
+    "id": "tm-tmb-tv",
+    "title": "TMB TV",
+    "url": "http://www.tmb.tv/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "tk"
+  },
+  {
+    "id": "tm-turkmenistan-state-news-agency",
+    "title": "Turkmenistan State News Agency",
+    "url": "http://tdh.gov.tm/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "tk"
+  },
+  {
+    "id": "tm-turkmenistan-gov-tm",
+    "title": "turkmenistan.gov.tm",
+    "url": "http://www.turkmenistan.gov.tm/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "tk"
+  },
+  {
+    "id": "tm-newscentralasia-net",
+    "title": "newscentralasia.net",
+    "url": "http://feeds.feedburner.com/NewsCentralAsia",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "tk"
+  },
+  {
+    "id": "tm-turkmenistanlive-com",
+    "title": "turkmenistanlive.com",
+    "url": "http://turkmenistanlive.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "tk"
+  },
+  {
+    "id": "tm-azathabar-com",
+    "title": "azathabar.com",
+    "url": "http://www.azathabar.com/api/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "tk"
+  },
+  {
+    "id": "tm-turkmenistan-ru",
+    "title": "turkmenistan.ru",
+    "url": "http://turkmenistan.ru/ru/taxonomy/term/3/all/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "tk"
+  },
+  {
+    "id": "tm-turkmeninform-com",
+    "title": "turkmeninform.com",
+    "url": "https://www.turkmeninform.com/en/rss.php",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "tk"
+  },
+  {
+    "id": "tm-habartm-org",
+    "title": "habartm.org",
+    "url": "https://habartm.org/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "tk"
+  },
+  {
+    "id": "tm-asgabat-net",
+    "title": "asgabat.net",
+    "url": "http://asgabat.net/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "tk"
+  },
+  {
+    "id": "tm-minjust-gov-tm",
+    "title": "minjust.gov.tm",
+    "url": "http://minjust.gov.tm/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "tk"
+  }
+]

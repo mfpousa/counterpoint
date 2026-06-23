@@ -1,0 +1,15 @@
+[
+  {
+    "id": "li-1-fl-tv",
+    "title": "1 FL TV",
+    "url": "https://1fl.li/wp/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "de",
+    "region": "LI-07",
+    "regionLabel": "Schaan"
+  }
+]

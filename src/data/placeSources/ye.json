@@ -1,0 +1,145 @@
+[
+  {
+    "id": "ye-src",
+    "title": "الفضائية اليمنية",
+    "url": "https://yementv.tv/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "ye-src-2",
+    "title": "وكالة خبر للأنباء",
+    "url": "https://www.khbr.me/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "ye-althawrah-ye",
+    "title": "althawrah.ye",
+    "url": "https://althawrah.ye/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "ye-alayam24-com",
+    "title": "alayam24.com",
+    "url": "https://www.alayam24.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "ye-yemenat-net",
+    "title": "yemenat.net",
+    "url": "https://yemenat.net/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "ye-yemenonline-info",
+    "title": "yemenonline.info",
+    "url": "http://www.yemenonline.info/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "ye-al-tagheer-com",
+    "title": "al-tagheer.com",
+    "url": "https://al-tagheer.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "ye-sahafah24-net",
+    "title": "sahafah24.net",
+    "url": "http://www.sahafah24.net/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "ye-alwasat-ye-net",
+    "title": "alwasat-ye.net",
+    "url": "http://www.alwasat-ye.net/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "ye-alsahwa-yemen-net",
+    "title": "alsahwa-yemen.net",
+    "url": "http://www.alsahwa-yemen.net/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "ye-yementimes-com",
+    "title": "yementimes.com",
+    "url": "https://yementimes.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "ye-adenalghad-net",
+    "title": "adenalghad.net",
+    "url": "https://www.adngad.net/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "ye-tadamon-ye-org",
+    "title": "tadamon-ye.org",
+    "url": "https://tadamon-ye.org/?feed=rss2",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  }
+]

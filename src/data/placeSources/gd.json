@@ -1,0 +1,79 @@
+[
+  {
+    "id": "gd-grenadachronicle-com",
+    "title": "grenadachronicle.com",
+    "url": "http://grenadachronicle.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "gd-nowgrenada-com",
+    "title": "nowgrenada.com",
+    "url": "https://nowgrenada.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "gd-weefmgrenada-com",
+    "title": "weefmgrenada.com",
+    "url": "https://www.weefmgrenada.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "gd-drealfmgrenada-com",
+    "title": "drealfmgrenada.com",
+    "url": "https://drealfmgrenada.com/index.php/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "gd-spicegrenada-com",
+    "title": "spicegrenada.com",
+    "url": "https://spicegrenada.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "gd-spiceislander-com",
+    "title": "spiceislander.com",
+    "url": "https://spiceislander.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "gd-thenewtoday-gd",
+    "title": "thenewtoday.gd",
+    "url": "https://thenewtoday.gd/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  }
+]

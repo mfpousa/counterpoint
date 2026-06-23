@@ -1,0 +1,35 @@
+[
+  {
+    "id": "ai-the-anguillian",
+    "title": "The Anguillian",
+    "url": "https://theanguillian.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "ai-news-ai",
+    "title": "news.ai",
+    "url": "https://news.ai/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "ai-anguillanews-com",
+    "title": "anguillanews.com",
+    "url": "https://axanewz.com/e-news/?feed=rss2",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  }
+]

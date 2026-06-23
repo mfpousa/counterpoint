@@ -1,0 +1,87 @@
+[
+  {
+    "id": "sy-src",
+    "title": "الوَطن",
+    "url": "https://alwatan.sy/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar",
+    "region": "SY-DI",
+    "regionLabel": "محافظة دمشق"
+  },
+  {
+    "id": "sy-src-2",
+    "title": "فضائية روناهي",
+    "url": "https://ronahi.tv/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "sy-src-3",
+    "title": "إذاعة دمشق",
+    "url": "https://damasradio.fm/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar",
+    "region": "SY-DI",
+    "regionLabel": "محافظة دمشق"
+  },
+  {
+    "id": "sy-src-4",
+    "title": "عنب بلدي",
+    "url": "https://english.enabbaladi.net/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar",
+    "region": "SY-DI",
+    "regionLabel": "محافظة دمشق"
+  },
+  {
+    "id": "sy-src-5",
+    "title": "تلفزيون سوريا",
+    "url": "https://www.syria.tv/rss2",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "sy-src-6",
+    "title": "تلفزيون برايم",
+    "url": "https://prime1tv.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar",
+    "region": "SY-DI",
+    "regionLabel": "محافظة دمشق"
+  },
+  {
+    "id": "sy-sana-sy",
+    "title": "sana.sy",
+    "url": "https://sana.sy/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  }
+]

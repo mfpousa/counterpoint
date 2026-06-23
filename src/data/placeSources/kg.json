@@ -1,0 +1,101 @@
+[
+  {
+    "id": "kg-azattyk",
+    "title": "Azattyk",
+    "url": "http://rus.azattyk.org/api/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ky"
+  },
+  {
+    "id": "kg-tmb-tv",
+    "title": "TMB TV",
+    "url": "http://www.tmb.tv/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ky"
+  },
+  {
+    "id": "kg-gazeta-kg",
+    "title": "gazeta.kg",
+    "url": "https://gazeta.kg/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ky"
+  },
+  {
+    "id": "kg-24-kg",
+    "title": "24.kg",
+    "url": "http://24.kg/vybory/rss/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ky"
+  },
+  {
+    "id": "kg-for-kg",
+    "title": "for.kg",
+    "url": "http://www.for.kg/action/rss/rss_for_kg_news_last.php",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ky"
+  },
+  {
+    "id": "kg-azattyk-org",
+    "title": "azattyk.org",
+    "url": "http://azattyk.org/api/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ky"
+  },
+  {
+    "id": "kg-kyrgyztuusu-kg",
+    "title": "kyrgyztuusu.kg",
+    "url": "https://kyrgyztuusu.kg/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ky"
+  },
+  {
+    "id": "kg-timesca-com",
+    "title": "timesca.com",
+    "url": "https://timesca.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ky"
+  },
+  {
+    "id": "kg-msn-kg",
+    "title": "msn.kg",
+    "url": "http://www.msn.kg/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ky"
+  }
+]

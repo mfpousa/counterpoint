@@ -1,0 +1,140 @@
+[
+  {
+    "id": "lu-woxx",
+    "title": "Woxx",
+    "url": "https://www.woxx.lu/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "lb"
+  },
+  {
+    "id": "lu-luxe-tv",
+    "title": "Luxe.TV",
+    "url": "https://luxe.tv/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "lb",
+    "region": "LU-CA",
+    "regionLabel": "Kanton Capellen"
+  },
+  {
+    "id": "lu-luxemburger-wort",
+    "title": "Luxemburger Wort",
+    "url": "http://wort.lu/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "lb",
+    "region": "LU-LU",
+    "regionLabel": "Kanton Lëtzebuerg"
+  },
+  {
+    "id": "lu-le-quotidien",
+    "title": "Le Quotidien",
+    "url": "https://lequotidien.lu/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "lb",
+    "region": "LU-ES",
+    "regionLabel": "Kanton Esch-Uelzecht"
+  },
+  {
+    "id": "lu-contacto",
+    "title": "Contacto",
+    "url": "https://www.contacto.lu/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "lb"
+  },
+  {
+    "id": "lu-radio-ara",
+    "title": "Radio Ara",
+    "url": "https://www.radioara.org/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "lb"
+  },
+  {
+    "id": "lu-virgule",
+    "title": "Virgule",
+    "url": "https://www.virgule.lu/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "lb"
+  },
+  {
+    "id": "lu-gemengen-lu",
+    "title": "gemengen.lu",
+    "url": "http://www.gemengen.lu/?feed=rss2",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "lb"
+  },
+  {
+    "id": "lu-guykaiser-lu",
+    "title": "guykaiser.lu",
+    "url": "https://guykaiser.lu/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "lb"
+  },
+  {
+    "id": "lu-tout-luxembourg-com",
+    "title": "tout-luxembourg.com",
+    "url": "https://www.tout-luxembourg.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "lb"
+  },
+  {
+    "id": "lu-revue-lu",
+    "title": "revue.lu",
+    "url": "https://revue.lu/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "lb"
+  },
+  {
+    "id": "lu-luxtimes-lu",
+    "title": "luxtimes.lu",
+    "url": "http://luxtimes.lu/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "lb"
+  }
+]

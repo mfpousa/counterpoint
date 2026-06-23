@@ -1,0 +1,13 @@
+[
+  {
+    "id": "ms-themontserratreporter-com",
+    "title": "themontserratreporter.com",
+    "url": "https://www.themontserratreporter.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  }
+]

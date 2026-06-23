@@ -1,0 +1,96 @@
+[
+  {
+    "id": "tj-src",
+    "title": "Азия-Плюс",
+    "url": "https://asiaplus.news/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "tg",
+    "region": "TJ-DU",
+    "regionLabel": "Душанбе"
+  },
+  {
+    "id": "tj-src-2",
+    "title": "АМИТ Ховар",
+    "url": "https://khovar.tj/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "tg",
+    "region": "TJ-DU",
+    "regionLabel": "Душанбе"
+  },
+  {
+    "id": "tj-src-3",
+    "title": "Телевизиони Тоҷикистон",
+    "url": "https://www.tvt.tj/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "tg",
+    "region": "TJ-DU",
+    "regionLabel": "Душанбе"
+  },
+  {
+    "id": "tj-avesta-tj",
+    "title": "avesta.tj",
+    "url": "https://avesta.tj/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "tg"
+  },
+  {
+    "id": "tj-ozodi-org",
+    "title": "ozodi.org",
+    "url": "http://www.ozodi.org/api/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "tg"
+  },
+  {
+    "id": "tj-sadoimardum-tj",
+    "title": "sadoimardum.tj",
+    "url": "https://sadoimardum.tj/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "tg"
+  },
+  {
+    "id": "tj-pressa-tj",
+    "title": "pressa.tj",
+    "url": "http://www.pressa.tj/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "tg"
+  },
+  {
+    "id": "tj-jumhuriyat-tj",
+    "title": "jumhuriyat.tj",
+    "url": "https://jumhuriyat.tj/rssturbo.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "tg"
+  }
+]

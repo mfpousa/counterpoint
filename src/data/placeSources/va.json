@@ -1,0 +1,57 @@
+[
+  {
+    "id": "va-radio-vaticana",
+    "title": "Radio Vaticana",
+    "url": "https://www.vaticannews.va/it.rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "it"
+  },
+  {
+    "id": "va-agenzia-fides",
+    "title": "Agenzia Fides",
+    "url": "http://www.fides.org/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "it"
+  },
+  {
+    "id": "va-asianews",
+    "title": "AsiaNews",
+    "url": "https://www.asianews.it/it.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "it"
+  },
+  {
+    "id": "va-zenit-org",
+    "title": "zenit.org",
+    "url": "https://es.zenit.org/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "it"
+  },
+  {
+    "id": "va-insidethevatican-com",
+    "title": "insidethevatican.com",
+    "url": "https://insidethevatican.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "it"
+  }
+]

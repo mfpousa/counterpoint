@@ -1,0 +1,90 @@
+[
+  {
+    "id": "mc-radio-monaco",
+    "title": "Radio Monaco",
+    "url": "http://www.radio-monaco.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fr"
+  },
+  {
+    "id": "mc-riviera-radio",
+    "title": "Riviera Radio",
+    "url": "https://rivieraradio.mc/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fr"
+  },
+  {
+    "id": "mc-superyacht-tv",
+    "title": "Superyacht TV",
+    "url": "https://superyacht.tv/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fr"
+  },
+  {
+    "id": "mc-montecarlonews-it",
+    "title": "montecarlonews.it",
+    "url": "https://www.montecarlonews.it/links/rss/argomenti/montecarlonewsit/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fr"
+  },
+  {
+    "id": "mc-news-mc",
+    "title": "news.mc",
+    "url": "https://news.mc/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fr"
+  },
+  {
+    "id": "mc-monacolife-net",
+    "title": "monacolife.net",
+    "url": "https://monacolife.net/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fr"
+  },
+  {
+    "id": "mc-riviera-press-fr",
+    "title": "riviera-press.fr",
+    "url": "https://www.riviera-press.fr/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fr"
+  },
+  {
+    "id": "mc-monacomatin-mc",
+    "title": "monacomatin.mc",
+    "url": "https://www.nicematin.com/monaco/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fr"
+  }
+]

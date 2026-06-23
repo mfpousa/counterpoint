@@ -1,0 +1,94 @@
+[
+  {
+    "id": "mm-duwun",
+    "title": "Duwun",
+    "url": "https://www.duwun.com.mm/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "my",
+    "region": "MM-06",
+    "regionLabel": "ရန်ကုန်တိုင်းဒေသကြီး"
+  },
+  {
+    "id": "mm-src",
+    "title": "မြန်မာနောင်း",
+    "url": "https://www.myanmar-now.org/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "my",
+    "region": "MM-06",
+    "regionLabel": "ရန်ကုန်တိုင်းဒေသကြီး"
+  },
+  {
+    "id": "mm-voanews-com",
+    "title": "voanews.com",
+    "url": "http://www.voanews.com/api/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "my"
+  },
+  {
+    "id": "mm-moi-gov-mm",
+    "title": "moi.gov.mm",
+    "url": "http://moi.gov.mm/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "my"
+  },
+  {
+    "id": "mm-elevenmyanmar-com",
+    "title": "elevenmyanmar.com",
+    "url": "http://elevenmyanmar.com/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "my"
+  },
+  {
+    "id": "mm-bnionline-net",
+    "title": "bnionline.net",
+    "url": "http://www.bnionline.net/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "my"
+  },
+  {
+    "id": "mm-mizzima-com",
+    "title": "mizzima.com",
+    "url": "https://eng.mizzima.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "my"
+  },
+  {
+    "id": "mm-mizzimaburmese-com",
+    "title": "mizzimaburmese.com",
+    "url": "https://bur.mizzima.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "my"
+  }
+]

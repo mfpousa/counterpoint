@@ -1,0 +1,123 @@
+[
+  {
+    "id": "lk-src",
+    "title": "දි අයිලන්ඩ්",
+    "url": "http://island.lk/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "si"
+  },
+  {
+    "id": "lk-lankanewspapers-com",
+    "title": "lankanewspapers.com",
+    "url": "http://lankanewspapers.com/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "si"
+  },
+  {
+    "id": "lk-adaderana-lk",
+    "title": "adaderana.lk",
+    "url": "http://adaderana.lk/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "si"
+  },
+  {
+    "id": "lk-itn-lk",
+    "title": "itn.lk",
+    "url": "http://www.itn.lk/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "si"
+  },
+  {
+    "id": "lk-onlanka-com",
+    "title": "onlanka.com",
+    "url": "https://www.onlanka.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "si"
+  },
+  {
+    "id": "lk-vikalpa-org",
+    "title": "vikalpa.org",
+    "url": "https://www.vikalpa.org/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "si"
+  },
+  {
+    "id": "lk-maatram-org",
+    "title": "maatram.org",
+    "url": "https://maatram.org/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "si"
+  },
+  {
+    "id": "lk-tamilnet-com",
+    "title": "tamilnet.com",
+    "url": "http://www.tamilnet.com/newsfeed/rss20.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "si"
+  },
+  {
+    "id": "lk-lankatruth-com",
+    "title": "lankatruth.com",
+    "url": "https://lankatruth.com/si/?feed=rss2",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "si"
+  },
+  {
+    "id": "lk-divaina-com",
+    "title": "divaina.com",
+    "url": "https://www.divaina.lk/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "si"
+  },
+  {
+    "id": "lk-theacademic-org",
+    "title": "theacademic.org",
+    "url": "http://www.theacademic.org/index.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "si"
+  }
+]

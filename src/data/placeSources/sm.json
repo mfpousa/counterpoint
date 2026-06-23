@@ -1,0 +1,50 @@
+[
+  {
+    "id": "sm-san-marino-rtv",
+    "title": "San Marino RTV",
+    "url": "http://www.sanmarinortv.sm/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "it",
+    "region": "SM-07",
+    "regionLabel": "Città di San Marino"
+  },
+  {
+    "id": "sm-libertas-quotidiano",
+    "title": "Libertas (quotidiano)",
+    "url": "https://www.libertas.sm/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "it",
+    "region": "SM-06",
+    "regionLabel": "Borgo Maggiore"
+  },
+  {
+    "id": "sm-sanmarinofixing-com",
+    "title": "sanmarinofixing.com",
+    "url": "http://www.sanmarinofixing.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "it"
+  },
+  {
+    "id": "sm-italica-sm",
+    "title": "italica.sm",
+    "url": "http://www.italica.sm/rssfeed.php",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "it"
+  }
+]

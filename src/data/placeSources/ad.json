@@ -1,0 +1,116 @@
+[
+  {
+    "id": "ad-europa-fm",
+    "title": "Europa FM",
+    "url": "https://www.europafm.com/rss/234881.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ca"
+  },
+  {
+    "id": "ad-cadena-dial",
+    "title": "Cadena Dial",
+    "url": "https://www.cadenadial.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ca"
+  },
+  {
+    "id": "ad-diari-d-andorra",
+    "title": "Diari d'Andorra",
+    "url": "https://www.diariandorra.ad/rss/home.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ca",
+    "region": "AD-07",
+    "regionLabel": "Andorra la Vella"
+  },
+  {
+    "id": "ad-forum",
+    "title": "Fòrum",
+    "url": "https://forum.ad/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ca"
+  },
+  {
+    "id": "ad-radio-valira",
+    "title": "Ràdio Valira",
+    "url": "https://radiovalira.ad/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ca",
+    "region": "AD-03",
+    "regionLabel": "Encamp"
+  },
+  {
+    "id": "ad-la-valira",
+    "title": "La Valira",
+    "url": "https://lavalira.eu/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ca"
+  },
+  {
+    "id": "ad-bondia-ad",
+    "title": "bondia.ad",
+    "url": "https://www.bondia.ad/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ca"
+  },
+  {
+    "id": "ad-elperiodic-ad",
+    "title": "elperiodic.ad",
+    "url": "https://elperiodic.ad/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ca"
+  },
+  {
+    "id": "ad-cronicaeconomica-com",
+    "title": "cronicaeconomica.com",
+    "url": "https://www.cronicaeconomica.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ca"
+  },
+  {
+    "id": "ad-ara-ad",
+    "title": "ara.ad",
+    "url": "https://andorraara.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ca"
+  }
+]

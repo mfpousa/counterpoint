@@ -1,0 +1,68 @@
+[
+  {
+    "id": "hk-south-china-morning-post",
+    "title": "South China Morning Post",
+    "url": "https://www.scmp.com/rss/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "und"
+  },
+  {
+    "id": "hk-china-economic-review",
+    "title": "China Economic Review",
+    "url": "https://chinaeconomicreview.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "und"
+  },
+  {
+    "id": "hk-asian-private-banker",
+    "title": "Asian Private Banker",
+    "url": "http://www.asianprivatebanker.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "und"
+  },
+  {
+    "id": "hk-hong-kong-free-press",
+    "title": "Hong Kong Free Press",
+    "url": "https://hongkongfp.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "und"
+  },
+  {
+    "id": "hk-china-times",
+    "title": "China Times",
+    "url": "https://cthks.com/comments/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "und"
+  },
+  {
+    "id": "hk-stheadline-com",
+    "title": "stheadline.com",
+    "url": "https://www.stheadline.com/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "und"
+  }
+]

@@ -1,0 +1,24 @@
+[
+  {
+    "id": "fo-nordlysid-fo",
+    "title": "nordlysid.fo",
+    "url": "http://www.nordlysid.fo/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fo"
+  },
+  {
+    "id": "fo-oyggjatidindi-com",
+    "title": "oyggjatidindi.com",
+    "url": "http://www.oyggjatidindi.com/rss/rss_feeder.php?lang=1",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fo"
+  }
+]

@@ -1,0 +1,727 @@
+{
+  "ad": {
+    "label": "Andorra",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "al": {
+    "label": "Albania",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "ag": {
+    "label": "Antigua and Barbuda",
+    "continent": "north-america",
+    "continentLabel": "North America"
+  },
+  "ai": {
+    "label": "Anguilla",
+    "continent": "north-america",
+    "continentLabel": "North America"
+  },
+  "an": {
+    "label": "Netherlands Antilles",
+    "continent": "north-america",
+    "continentLabel": "North America"
+  },
+  "ae": {
+    "label": "United Arab Emirates",
+    "continent": "asia",
+    "continentLabel": "Asia"
+  },
+  "aw": {
+    "label": "Aruba",
+    "continent": "north-america",
+    "continentLabel": "North America"
+  },
+  "at": {
+    "label": "Austria",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "af": {
+    "label": "Afghanistan",
+    "continent": "asia",
+    "continentLabel": "Asia"
+  },
+  "bb": {
+    "label": "Barbados",
+    "continent": "north-america",
+    "continentLabel": "North America"
+  },
+  "bl": {
+    "label": "Saint Barthélemy",
+    "continent": "north-america",
+    "continentLabel": "North America"
+  },
+  "ba": {
+    "label": "Bosnia and Herzegovina",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "bm": {
+    "label": "Bermuda",
+    "continent": "north-america",
+    "continentLabel": "North America"
+  },
+  "bq": {
+    "label": "Caribbean Netherlands",
+    "continent": "north-america",
+    "continentLabel": "North America"
+  },
+  "bs": {
+    "label": "The Bahamas",
+    "continent": "north-america",
+    "continentLabel": "North America"
+  },
+  "bz": {
+    "label": "Belize",
+    "continent": "north-america",
+    "continentLabel": "North America"
+  },
+  "am": {
+    "label": "Armenia",
+    "continent": "asia",
+    "continentLabel": "Asia"
+  },
+  "be": {
+    "label": "Belgium",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "az": {
+    "label": "Azerbaijan",
+    "continent": "asia",
+    "continentLabel": "Asia"
+  },
+  "bg": {
+    "label": "Bulgaria",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "bd": {
+    "label": "Bangladesh",
+    "continent": "asia",
+    "continentLabel": "Asia"
+  },
+  "ca": {
+    "label": "Canada",
+    "continent": "north-america",
+    "continentLabel": "North America"
+  },
+  "cp": {
+    "label": "Clipperton Island",
+    "continent": "north-america",
+    "continentLabel": "North America"
+  },
+  "by": {
+    "label": "Belarus",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "bh": {
+    "label": "Bahrain",
+    "continent": "asia",
+    "continentLabel": "Asia"
+  },
+  "bn": {
+    "label": "Brunei",
+    "continent": "asia",
+    "continentLabel": "Asia"
+  },
+  "cr": {
+    "label": "Costa Rica",
+    "continent": "north-america",
+    "continentLabel": "North America"
+  },
+  "bt": {
+    "label": "Bhutan",
+    "continent": "asia",
+    "continentLabel": "Asia"
+  },
+  "ch": {
+    "label": "Switzerland",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "cu": {
+    "label": "Cuba",
+    "continent": "north-america",
+    "continentLabel": "North America"
+  },
+  "cw": {
+    "label": "Curaçao",
+    "continent": "north-america",
+    "continentLabel": "North America"
+  },
+  "dm": {
+    "label": "Dominica",
+    "continent": "north-america",
+    "continentLabel": "North America"
+  },
+  "cy": {
+    "label": "Cyprus",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "do": {
+    "label": "Dominican Republic",
+    "continent": "north-america",
+    "continentLabel": "North America"
+  },
+  "gd": {
+    "label": "Grenada",
+    "continent": "north-america",
+    "continentLabel": "North America"
+  },
+  "gl": {
+    "label": "Greenland",
+    "continent": "north-america",
+    "continentLabel": "North America"
+  },
+  "gp": {
+    "label": "Guadeloupe",
+    "continent": "north-america",
+    "continentLabel": "North America"
+  },
+  "cz": {
+    "label": "Czech Republic",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "gt": {
+    "label": "Guatemala",
+    "continent": "north-america",
+    "continentLabel": "North America"
+  },
+  "dd": {
+    "label": "German Democratic Republic",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "hn": {
+    "label": "Honduras",
+    "continent": "north-america",
+    "continentLabel": "North America"
+  },
+  "cn": {
+    "label": "People's Republic of China",
+    "continent": "asia",
+    "continentLabel": "Asia"
+  },
+  "cx": {
+    "label": "Christmas Island",
+    "continent": "asia",
+    "continentLabel": "Asia"
+  },
+  "ht": {
+    "label": "Haiti",
+    "continent": "north-america",
+    "continentLabel": "North America"
+  },
+  "jm": {
+    "label": "Jamaica",
+    "continent": "north-america",
+    "continentLabel": "North America"
+  },
+  "kn": {
+    "label": "Saint Kitts and Nevis",
+    "continent": "north-america",
+    "continentLabel": "North America"
+  },
+  "ky": {
+    "label": "Cayman Islands",
+    "continent": "north-america",
+    "continentLabel": "North America"
+  },
+  "lc": {
+    "label": "Saint Lucia",
+    "continent": "north-america",
+    "continentLabel": "North America"
+  },
+  "mf": {
+    "label": "Saint-Martin",
+    "continent": "north-america",
+    "continentLabel": "North America"
+  },
+  "mq": {
+    "label": "Martinique",
+    "continent": "north-america",
+    "continentLabel": "North America"
+  },
+  "ms": {
+    "label": "Montserrat",
+    "continent": "north-america",
+    "continentLabel": "North America"
+  },
+  "hk": {
+    "label": "Hong Kong",
+    "continent": "asia",
+    "continentLabel": "Asia"
+  },
+  "de": {
+    "label": "Germany",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "id": {
+    "label": "Indonesia",
+    "continent": "asia",
+    "continentLabel": "Asia"
+  },
+  "dk": {
+    "label": "Denmark",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "ee": {
+    "label": "Estonia",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "il": {
+    "label": "Israel",
+    "continent": "asia",
+    "continentLabel": "Asia"
+  },
+  "es": {
+    "label": "Spain",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "mx": {
+    "label": "Mexico",
+    "continent": "north-america",
+    "continentLabel": "North America"
+  },
+  "ni": {
+    "label": "Nicaragua",
+    "continent": "north-america",
+    "continentLabel": "North America"
+  },
+  "in": {
+    "label": "India",
+    "continent": "asia",
+    "continentLabel": "Asia"
+  },
+  "fi": {
+    "label": "Finland",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "fo": {
+    "label": "Faroe Islands",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "pa": {
+    "label": "Panama",
+    "continent": "north-america",
+    "continentLabel": "North America"
+  },
+  "iq": {
+    "label": "Iraq",
+    "continent": "asia",
+    "continentLabel": "Asia"
+  },
+  "pm": {
+    "label": "Saint Pierre and Miquelon",
+    "continent": "north-america",
+    "continentLabel": "North America"
+  },
+  "pr": {
+    "label": "Puerto Rico",
+    "continent": "north-america",
+    "continentLabel": "North America"
+  },
+  "sv": {
+    "label": "El Salvador",
+    "continent": "north-america",
+    "continentLabel": "North America"
+  },
+  "sx": {
+    "label": "Sint Maarten",
+    "continent": "north-america",
+    "continentLabel": "North America"
+  },
+  "tc": {
+    "label": "Turks and Caicos Islands",
+    "continent": "north-america",
+    "continentLabel": "North America"
+  },
+  "tt": {
+    "label": "Trinidad and Tobago",
+    "continent": "north-america",
+    "continentLabel": "North America"
+  },
+  "um": {
+    "label": "United States Minor Outlying Islands",
+    "continent": "north-america",
+    "continentLabel": "North America"
+  },
+  "vi": {
+    "label": "United States Virgin Islands",
+    "continent": "north-america",
+    "continentLabel": "North America"
+  },
+  "fr": {
+    "label": "France",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "ir": {
+    "label": "Iran",
+    "continent": "asia",
+    "continentLabel": "Asia"
+  },
+  "jo": {
+    "label": "Jordan",
+    "continent": "asia",
+    "continentLabel": "Asia"
+  },
+  "ge": {
+    "label": "Georgia",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "gg": {
+    "label": "Guernsey",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "gi": {
+    "label": "Gibraltar",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "gr": {
+    "label": "Greece",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "hr": {
+    "label": "Croatia",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "hu": {
+    "label": "Hungary",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "ie": {
+    "label": "Ireland",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "im": {
+    "label": "Isle of Man",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "is": {
+    "label": "Iceland",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "jp": {
+    "label": "Japan",
+    "continent": "asia",
+    "continentLabel": "Asia"
+  },
+  "kg": {
+    "label": "Kyrgyzstan",
+    "continent": "asia",
+    "continentLabel": "Asia"
+  },
+  "kh": {
+    "label": "Cambodia",
+    "continent": "asia",
+    "continentLabel": "Asia"
+  },
+  "it": {
+    "label": "Italy",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "kp": {
+    "label": "North Korea",
+    "continent": "asia",
+    "continentLabel": "Asia"
+  },
+  "je": {
+    "label": "Jersey",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "kz": {
+    "label": "Kazakhstan",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "kr": {
+    "label": "South Korea",
+    "continent": "asia",
+    "continentLabel": "Asia"
+  },
+  "li": {
+    "label": "Liechtenstein",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "kw": {
+    "label": "Kuwait",
+    "continent": "asia",
+    "continentLabel": "Asia"
+  },
+  "lt": {
+    "label": "Lithuania",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "la": {
+    "label": "Laos",
+    "continent": "asia",
+    "continentLabel": "Asia"
+  },
+  "lu": {
+    "label": "Luxembourg",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "lb": {
+    "label": "Lebanon",
+    "continent": "asia",
+    "continentLabel": "Asia"
+  },
+  "lv": {
+    "label": "Latvia",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "mc": {
+    "label": "Monaco",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "md": {
+    "label": "Moldova",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "me": {
+    "label": "Montenegro",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "mk": {
+    "label": "North Macedonia",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "mt": {
+    "label": "Malta",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "lk": {
+    "label": "Sri Lanka",
+    "continent": "asia",
+    "continentLabel": "Asia"
+  },
+  "mm": {
+    "label": "Myanmar",
+    "continent": "asia",
+    "continentLabel": "Asia"
+  },
+  "nl": {
+    "label": "Kingdom of the Netherlands",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "mn": {
+    "label": "Mongolia",
+    "continent": "asia",
+    "continentLabel": "Asia"
+  },
+  "mo": {
+    "label": "Macau",
+    "continent": "asia",
+    "continentLabel": "Asia"
+  },
+  "mv": {
+    "label": "Maldives",
+    "continent": "asia",
+    "continentLabel": "Asia"
+  },
+  "no": {
+    "label": "Norway",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "my": {
+    "label": "Malaysia",
+    "continent": "asia",
+    "continentLabel": "Asia"
+  },
+  "pl": {
+    "label": "Poland",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "np": {
+    "label": "Nepal",
+    "continent": "asia",
+    "continentLabel": "Asia"
+  },
+  "om": {
+    "label": "Oman",
+    "continent": "asia",
+    "continentLabel": "Asia"
+  },
+  "pt": {
+    "label": "Portugal",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "ph": {
+    "label": "Philippines",
+    "continent": "asia",
+    "continentLabel": "Asia"
+  },
+  "ro": {
+    "label": "Romania",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "rs": {
+    "label": "Serbia",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "pk": {
+    "label": "Pakistan",
+    "continent": "asia",
+    "continentLabel": "Asia"
+  },
+  "ps": {
+    "label": "Palestine",
+    "continent": "asia",
+    "continentLabel": "Asia"
+  },
+  "qa": {
+    "label": "Qatar",
+    "continent": "asia",
+    "continentLabel": "Asia"
+  },
+  "sa": {
+    "label": "Saudi Arabia",
+    "continent": "asia",
+    "continentLabel": "Asia"
+  },
+  "sg": {
+    "label": "Singapore",
+    "continent": "asia",
+    "continentLabel": "Asia"
+  },
+  "ru": {
+    "label": "Russia",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "sy": {
+    "label": "Syria",
+    "continent": "asia",
+    "continentLabel": "Asia"
+  },
+  "se": {
+    "label": "Sweden",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "si": {
+    "label": "Slovenia",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "sj": {
+    "label": "Svalbard and Jan Mayen",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "th": {
+    "label": "Thailand",
+    "continent": "asia",
+    "continentLabel": "Asia"
+  },
+  "tj": {
+    "label": "Tajikistan",
+    "continent": "asia",
+    "continentLabel": "Asia"
+  },
+  "tl": {
+    "label": "Timor-Leste",
+    "continent": "asia",
+    "continentLabel": "Asia"
+  },
+  "sk": {
+    "label": "Slovakia",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "sm": {
+    "label": "San Marino",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "tm": {
+    "label": "Turkmenistan",
+    "continent": "asia",
+    "continentLabel": "Asia"
+  },
+  "tr": {
+    "label": "Turkey",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "tw": {
+    "label": "Taiwan",
+    "continent": "asia",
+    "continentLabel": "Asia"
+  },
+  "uz": {
+    "label": "Uzbekistan",
+    "continent": "asia",
+    "continentLabel": "Asia"
+  },
+  "ua": {
+    "label": "Ukraine",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "va": {
+    "label": "Vatican City",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "vn": {
+    "label": "Vietnam",
+    "continent": "asia",
+    "continentLabel": "Asia"
+  },
+  "xk": {
+    "label": "Kosovo",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "yu": {
+    "label": "Yugoslavia",
+    "continent": "europe",
+    "continentLabel": "Europe"
+  },
+  "ye": {
+    "label": "Yemen",
+    "continent": "asia",
+    "continentLabel": "Asia"
+  }
+}

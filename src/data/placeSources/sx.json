@@ -1,0 +1,79 @@
+[
+  {
+    "id": "sx-dutchcaribbeannews-com",
+    "title": "dutchcaribbeannews.com",
+    "url": "http://dutchcaribbeannews.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "nl"
+  },
+  {
+    "id": "sx-kikotapasando-com",
+    "title": "kikotapasando.com",
+    "url": "https://kikotapasando.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "nl"
+  },
+  {
+    "id": "sx-sxm-talks-com",
+    "title": "sxm-talks.com",
+    "url": "https://www.sxm-talks.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "nl"
+  },
+  {
+    "id": "sx-721news-com",
+    "title": "721news.com",
+    "url": "https://www.721news.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "nl"
+  },
+  {
+    "id": "sx-sxmislandtime-com",
+    "title": "sxmislandtime.com",
+    "url": "https://sxmislandtime.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "nl"
+  },
+  {
+    "id": "sx-smn-news-com",
+    "title": "smn-news.com",
+    "url": "http://smn-news.com/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "nl"
+  },
+  {
+    "id": "sx-pearlfmradio-sx",
+    "title": "pearlfmradio.sx",
+    "url": "http://pearlfmradio.sx/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "nl"
+  }
+]

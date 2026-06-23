@@ -1,0 +1,173 @@
+[
+  {
+    "id": "me-pobjeda",
+    "title": "Pobjeda",
+    "url": "https://rss.pobjeda.me/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "und",
+    "region": "ME-16",
+    "regionLabel": "Podgorica Capital City"
+  },
+  {
+    "id": "me-vijesti",
+    "title": "Vijesti",
+    "url": "https://www.vijesti.me/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "und",
+    "region": "ME-16",
+    "regionLabel": "Podgorica Capital City"
+  },
+  {
+    "id": "me-dan",
+    "title": "Dan",
+    "url": "http://www.dan.co.me/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "und",
+    "region": "ME-16",
+    "regionLabel": "Podgorica Capital City"
+  },
+  {
+    "id": "me-montenegrin-news-agency",
+    "title": "Montenegrin News Agency",
+    "url": "https://mina.news/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "und"
+  },
+  {
+    "id": "me-pink-m",
+    "title": "Pink M",
+    "url": "https://pink.rs/rss-feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "und"
+  },
+  {
+    "id": "me-cdm-me",
+    "title": "cdm.me",
+    "url": "https://www.cdm.me/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "und"
+  },
+  {
+    "id": "me-monitor-co-me",
+    "title": "monitor.co.me",
+    "url": "https://www.monitor.co.me/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "und"
+  },
+  {
+    "id": "me-okf-cetinje-org",
+    "title": "okf-cetinje.org",
+    "url": "https://okf-cetinje.org/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "und"
+  },
+  {
+    "id": "me-pcnen-com",
+    "title": "pcnen.com",
+    "url": "https://www.pcnen.com/portal/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "und"
+  },
+  {
+    "id": "me-maticacrnogorska-me",
+    "title": "maticacrnogorska.me",
+    "url": "https://maticacrnogorska.me/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "und"
+  },
+  {
+    "id": "me-co-me",
+    "title": "co.me",
+    "url": "https://press.co.me/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "und"
+  },
+  {
+    "id": "me-portalkombinat-co-me",
+    "title": "portalkombinat.co.me",
+    "url": "https://portalkombinat.co.me/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "und"
+  },
+  {
+    "id": "me-lupa-co-me",
+    "title": "lupa.co.me",
+    "url": "https://lupa.co.me/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "und"
+  },
+  {
+    "id": "me-mladiberana-me",
+    "title": "mladiberana.me",
+    "url": "https://mladiberana.me/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "und"
+  },
+  {
+    "id": "me-pvportal-me",
+    "title": "pvportal.me",
+    "url": "https://pvportal.me/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "und"
+  }
+]

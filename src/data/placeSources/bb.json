@@ -1,0 +1,68 @@
+[
+  {
+    "id": "bb-cbc-tv-8",
+    "title": "CBC TV 8",
+    "url": "https://www.cbc.bb/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "bb-caribbean-news-agency",
+    "title": "Caribbean News Agency",
+    "url": "https://cananewsonline.com/main/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "bb-barbadosgazette-com",
+    "title": "barbadosgazette.com",
+    "url": "http://www.barbadosgazette.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "bb-nationnews-com",
+    "title": "nationnews.com",
+    "url": "https://nationnews.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "bb-barbadostoday-bb",
+    "title": "barbadostoday.bb",
+    "url": "https://barbadostoday.bb/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "bb-bajanreporter-com",
+    "title": "bajanreporter.com",
+    "url": "https://www.bajanreporter.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  }
+]

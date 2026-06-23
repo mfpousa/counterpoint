@@ -1,0 +1,46 @@
+[
+  {
+    "id": "dm-dominicagazette-com",
+    "title": "dominicagazette.com",
+    "url": "http://www.dominicagazette.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "dm-dbcradio-net",
+    "title": "dbcradio.net",
+    "url": "http://www.dbcradio.net/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "dm-dominicanewsonline-com",
+    "title": "dominicanewsonline.com",
+    "url": "https://feeds.feedburner.com/DominicaNewsOnline/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "dm-thedominican-net",
+    "title": "thedominican.net",
+    "url": "http://thedominican.net/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  }
+]

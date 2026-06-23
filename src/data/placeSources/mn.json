@@ -1,0 +1,15 @@
+[
+  {
+    "id": "mn-src",
+    "title": "Стар Телевиз",
+    "url": "https://startv.mn/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "mn",
+    "region": "MN-1",
+    "regionLabel": "Улаанбаатар"
+  }
+]

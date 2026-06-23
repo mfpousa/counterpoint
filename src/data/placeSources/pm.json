@@ -1,0 +1,13 @@
+[
+  {
+    "id": "pm-grandcolombier-com",
+    "title": "grandcolombier.com",
+    "url": "https://grandcolombier.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fr"
+  }
+]

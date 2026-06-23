@@ -1,0 +1,57 @@
+[
+  {
+    "id": "cw-curacao-nu",
+    "title": "Curaçao.nu",
+    "url": "https://curacao.nu/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "nl"
+  },
+  {
+    "id": "cw-radio-hoyer",
+    "title": "Radio Hoyer",
+    "url": "https://radiohoyer.com/?feed=rss2",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "nl"
+  },
+  {
+    "id": "cw-extra-cw",
+    "title": "extra.cw",
+    "url": "https://extra.cw/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "nl"
+  },
+  {
+    "id": "cw-curacaonieuws-nu",
+    "title": "curacaonieuws.nu",
+    "url": "http://curacaonieuws.nu/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "nl"
+  },
+  {
+    "id": "cw-vigilantekorsou-news",
+    "title": "vigilantekorsou.news",
+    "url": "http://www.vigilantekorsou.news/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "nl"
+  }
+]

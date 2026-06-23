@@ -1,0 +1,35 @@
+[
+  {
+    "id": "tc-timespub-tc",
+    "title": "timespub.tc",
+    "url": "https://www.timespub.tc/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "tc-ptv8tci-com",
+    "title": "ptv8tci.com",
+    "url": "https://www.youtube.com/feeds/videos.xml?channel_id=UCGcADFz5i-OPbNz9BM5imgQ",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "tc-tcimagazine-com",
+    "title": "tcimagazine.com",
+    "url": "http://tcimagazine.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  }
+]

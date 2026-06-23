@@ -1,0 +1,46 @@
+[
+  {
+    "id": "gi-gibraltar-chronicle",
+    "title": "Gibraltar Chronicle",
+    "url": "https://www.chronicle.gi/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "und"
+  },
+  {
+    "id": "gi-theolivepress-es",
+    "title": "theolivepress.es",
+    "url": "https://www.theolivepress.es/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "und"
+  },
+  {
+    "id": "gi-gibraltarfinance-com",
+    "title": "gibraltarfinance.com",
+    "url": "https://www.gibraltarfinance.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "und"
+  },
+  {
+    "id": "gi-vox-gi",
+    "title": "vox.gi",
+    "url": "http://www.vox.gi/cms/?format=feed&amp;type=rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "und"
+  }
+]

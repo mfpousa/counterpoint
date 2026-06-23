@@ -1,0 +1,92 @@
+[
+  {
+    "id": "qa-src",
+    "title": "تلفزيون ج",
+    "url": "http://www.jeemtv.net/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "qa-src-2",
+    "title": "الجزيرة.نت",
+    "url": "https://www.aljazeera.net/aljazeerarss/a7c186be-1baa-4bd4-9d80-a84db769f779/73d0e1b4-532f-45ef-b135-bfdff8b8cab9",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "qa-src-3",
+    "title": "شبكة التلفزيون العربي",
+    "url": "https://www.alaraby.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar",
+    "region": "QA-ZA",
+    "regionLabel": "بلدية الضعاين"
+  },
+  {
+    "id": "qa-src-4",
+    "title": "قناة الجزيرة",
+    "url": "https://www.aljazeera.com/xml/rss/all.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "qa-madhyamam-com",
+    "title": "madhyamam.com",
+    "url": "https://www.madhyamam.com/feeds.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "qa-chandrikadaily-com",
+    "title": "chandrikadaily.com",
+    "url": "http://www.chandrikadaily.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "qa-doha-news-com",
+    "title": "doha-news.com",
+    "url": "https://doha-news.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "qa-nricafe-com",
+    "title": "nricafe.com",
+    "url": "https://nricafe.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  }
+]

@@ -1,0 +1,68 @@
+[
+  {
+    "id": "nl-de-telegraaf",
+    "title": "De Telegraaf",
+    "url": "http://telegraaf.nl/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "nl"
+  },
+  {
+    "id": "nl-nrc",
+    "title": "NRC",
+    "url": "https://www.nrc.nl/rss/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "nl"
+  },
+  {
+    "id": "nl-trouw",
+    "title": "Trouw",
+    "url": "http://www.trouw.nl/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "nl"
+  },
+  {
+    "id": "nl-eilanden-nieuws",
+    "title": "Eilanden Nieuws",
+    "url": "https://www.eilandennieuws.nl/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "nl"
+  },
+  {
+    "id": "nl-radio-maria-nederland",
+    "title": "Radio Maria Nederland",
+    "url": "https://www.radiomaria.nl/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "nl"
+  },
+  {
+    "id": "nl-waterkant",
+    "title": "Waterkant",
+    "url": "https://www.waterkant.net/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "nl"
+  }
+]

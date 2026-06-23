@@ -1,0 +1,145 @@
+[
+  {
+    "id": "sg-eco-business",
+    "title": "Eco-Business",
+    "url": "https://www.eco-business.com/feeds/all/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ms"
+  },
+  {
+    "id": "sg-the-new-paper",
+    "title": "The New Paper",
+    "url": "https://www.tnp.sg/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ms"
+  },
+  {
+    "id": "sg-business-times-singapura",
+    "title": "Business Times (Singapura)",
+    "url": "http://businesstimes.com.sg/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ms"
+  },
+  {
+    "id": "sg-tamil-murasu",
+    "title": "Tamil Murasu",
+    "url": "https://www.tamilmurasu.com.sg/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ms"
+  },
+  {
+    "id": "sg-one-fm-91-3",
+    "title": "ONE FM 91.3",
+    "url": "https://www.onefm.sg/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ms"
+  },
+  {
+    "id": "sg-kiss-92fm",
+    "title": "Kiss 92FM",
+    "url": "https://www.kiss92.sg/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ms"
+  },
+  {
+    "id": "sg-tabla",
+    "title": "Tabla!",
+    "url": "https://www.tabla.com.sg/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ms"
+  },
+  {
+    "id": "sg-ufm100-3",
+    "title": "UFM100.3",
+    "url": "https://www.ufm1003.sg/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ms"
+  },
+  {
+    "id": "sg-berita-harian",
+    "title": "Berita Harian",
+    "url": "https://www.beritaharian.sg/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ms"
+  },
+  {
+    "id": "sg-money-fm-89-3",
+    "title": "Money FM 89.3",
+    "url": "https://www.moneyfm893.sg/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ms"
+  },
+  {
+    "id": "sg-96-3-hao-fm",
+    "title": "96.3 Hao FM",
+    "url": "https://www.963haofm.sg/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ms"
+  },
+  {
+    "id": "sg-pravasiexpress-com",
+    "title": "pravasiexpress.com",
+    "url": "https://pravasiexpress.com/rss/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ms"
+  },
+  {
+    "id": "sg-weekender-com-sg",
+    "title": "weekender.com.sg",
+    "url": "https://weekender.com.sg/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ms"
+  }
+]

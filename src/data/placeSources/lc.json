@@ -1,0 +1,81 @@
+[
+  {
+    "id": "lc-the-star",
+    "title": "The Star",
+    "url": "https://stluciastar.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en",
+    "region": "LC-02",
+    "regionLabel": "Castries Quarter"
+  },
+  {
+    "id": "lc-stluciachronicle-com",
+    "title": "stluciachronicle.com",
+    "url": "http://www.stluciachronicle.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "lc-dbstvstlucia-com",
+    "title": "dbstvstlucia.com",
+    "url": "https://dbstvstlucia.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "lc-thevoiceslu-com",
+    "title": "thevoiceslu.com",
+    "url": "http://www.thevoiceslu.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "lc-stluciatimes-com",
+    "title": "stluciatimes.com",
+    "url": "https://stluciatimes.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "lc-stlucianewsonline-com",
+    "title": "stlucianewsonline.com",
+    "url": "https://www.stlucianewsonline.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "lc-caribbeanhotfm-com",
+    "title": "caribbeanhotfm.com",
+    "url": "https://caribbeanhotfm.com/?feed=rss2",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  }
+]

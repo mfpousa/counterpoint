@@ -1,0 +1,90 @@
+[
+  {
+    "id": "mt-times-of-malta",
+    "title": "Times of Malta",
+    "url": "http://www.timesofmalta.com/?feed=rss2",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "mt"
+  },
+  {
+    "id": "mt-lovinmalta-com",
+    "title": "lovinmalta.com",
+    "url": "https://lovinmalta.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "mt"
+  },
+  {
+    "id": "mt-corrieredimalta-com",
+    "title": "corrieredimalta.com",
+    "url": "https://www.corrieredimalta.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "mt"
+  },
+  {
+    "id": "mt-church-mt",
+    "title": "church.mt",
+    "url": "https://church.mt/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "mt"
+  },
+  {
+    "id": "mt-theshiftnews-com",
+    "title": "theshiftnews.com",
+    "url": "http://theshiftnews.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "mt"
+  },
+  {
+    "id": "mt-newsbook-com-mt",
+    "title": "newsbook.com.mt",
+    "url": "http://www.newsbook.com.mt/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "mt"
+  },
+  {
+    "id": "mt-gozonews-com",
+    "title": "gozonews.com",
+    "url": "http://gozonews.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "mt"
+  },
+  {
+    "id": "mt-daphne-foundation",
+    "title": "daphne.foundation",
+    "url": "https://www.daphne.foundation/feed.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "mt"
+  }
+]

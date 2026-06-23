@@ -1,0 +1,37 @@
+[
+  {
+    "id": "tl-radio-televisao-timor-leste",
+    "title": "Rádio-Televisão Timor Leste",
+    "url": "http://www.rttlep.tl/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "pt",
+    "region": "TL-DI",
+    "regionLabel": "Município de Díli"
+  },
+  {
+    "id": "tl-thediliweekly-com",
+    "title": "thediliweekly.com",
+    "url": "https://thediliweekly.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "pt"
+  },
+  {
+    "id": "tl-temposemanal-com",
+    "title": "temposemanal.com",
+    "url": "https://temposemanal.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "pt"
+  }
+]

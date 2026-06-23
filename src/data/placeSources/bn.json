@@ -1,0 +1,13 @@
+[
+  {
+    "id": "bn-rtb-sukmaindera",
+    "title": "RTB Sukmaindera",
+    "url": "https://www.rtb.gov.bn/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ms"
+  }
+]

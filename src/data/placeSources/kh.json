@@ -1,0 +1,118 @@
+[
+  {
+    "id": "kh-the-phnom-penh-post",
+    "title": "The Phnom Penh Post",
+    "url": "https://www.phnompenhpost.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "km",
+    "region": "KH-12",
+    "regionLabel": "ភ្នំពេញ"
+  },
+  {
+    "id": "kh-src",
+    "title": "បណ្ដាញទូរទស្សន៍កម្ពុជា",
+    "url": "https://ctn.com.kh/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "km",
+    "region": "KH-12",
+    "regionLabel": "ភ្នំពេញ"
+  },
+  {
+    "id": "kh-src-2",
+    "title": "វិទ្យុសំលេងប្រជាធិបតេយ្យ",
+    "url": "https://vodenglish.news/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "km"
+  },
+  {
+    "id": "kh-khmer-times",
+    "title": "Khmer Times",
+    "url": "https://www.khmertimeskh.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "km",
+    "region": "KH-12",
+    "regionLabel": "ភ្នំពេញ"
+  },
+  {
+    "id": "kh-watphnom-news-com",
+    "title": "watphnom-news.com",
+    "url": "https://watphnom-news.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "km"
+  },
+  {
+    "id": "kh-kampucheathmey-com",
+    "title": "kampucheathmey.com",
+    "url": "https://www.kampucheathmey.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "km"
+  },
+  {
+    "id": "kh-kohsantepheapdaily-com-kh",
+    "title": "kohsantepheapdaily.com.kh",
+    "url": "https://kohsantepheapdaily.com.kh/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "km"
+  },
+  {
+    "id": "kh-tvk-gov-kh",
+    "title": "tvk.gov.kh",
+    "url": "https://www.tvk.gov.kh/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "km"
+  },
+  {
+    "id": "kh-cambodgemag-com",
+    "title": "cambodgemag.com",
+    "url": "https://www.cambodgemag.com/blog-feed.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "km"
+  },
+  {
+    "id": "kh-nationalpost-com",
+    "title": "nationalpost.com",
+    "url": "https://nationalpost.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "km"
+  }
+]

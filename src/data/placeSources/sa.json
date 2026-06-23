@@ -1,0 +1,142 @@
+[
+  {
+    "id": "sa-src",
+    "title": "اتحاد وكالات أنباء دول منظمة التعاون الإسلامي",
+    "url": "https://una-oic.org/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar",
+    "region": "SA-02",
+    "regionLabel": "منطقة مكة المكرمة"
+  },
+  {
+    "id": "sa-src-2",
+    "title": "جريدة الحدث",
+    "url": "http://www.al-hadath.com/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "sa-src-3",
+    "title": "زي أفلام",
+    "url": "https://www.zeeaflam.com/?feed=rss2",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "sa-src-4",
+    "title": "عاجل",
+    "url": "https://ajel.sa/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar",
+    "region": "SA-01",
+    "regionLabel": "منطقة الرياض"
+  },
+  {
+    "id": "sa-src-5",
+    "title": "الشرق للأخبار",
+    "url": "https://asharq.com/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "sa-src-6",
+    "title": "قناة زاد الفضائية",
+    "url": "https://www.zad.tv/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "sa-src-7",
+    "title": "ترو جيمنج",
+    "url": "https://www.true-gaming.net/home/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar",
+    "region": "SA-01",
+    "regionLabel": "منطقة الرياض"
+  },
+  {
+    "id": "sa-src-8",
+    "title": "إنت عربي",
+    "url": "https://entarabi.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar",
+    "region": "SA-01",
+    "regionLabel": "منطقة الرياض"
+  },
+  {
+    "id": "sa-aawsat-com",
+    "title": "aawsat.com",
+    "url": "http://www.aawsat.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "sa-albiladpress-com",
+    "title": "albiladpress.com",
+    "url": "http://www.albiladpress.com/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "sa-alwatan-com-sa",
+    "title": "alwatan.com.sa",
+    "url": "http://alwatan.com.sa/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "sa-urdunews-com",
+    "title": "urdunews.com",
+    "url": "https://www.urdunews.com/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  }
+]

@@ -1,0 +1,81 @@
+[
+  {
+    "id": "bt-src",
+    "title": "བྷུ་ཊན་ཊཡེམསི།",
+    "url": "https://bhutantimes.bt/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "dz",
+    "region": "BT-15",
+    "regionLabel": "ཐིམ་ཕུ་རྫོང་ཁག"
+  },
+  {
+    "id": "bt-src-2",
+    "title": "ད་བུཊ་ནིསི།",
+    "url": "https://thebhutanese.bt/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "dz"
+  },
+  {
+    "id": "bt-bbs-bt",
+    "title": "bbs.bt",
+    "url": "https://www.bbs.bt/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "dz"
+  },
+  {
+    "id": "bt-businessbhutan-bt",
+    "title": "businessbhutan.bt",
+    "url": "https://businessbhutan.bt/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "dz"
+  },
+  {
+    "id": "bt-dailybhutan-com",
+    "title": "dailybhutan.com",
+    "url": "https://dailybhutan.com/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "dz"
+  },
+  {
+    "id": "bt-apfanews-com",
+    "title": "apfanews.com",
+    "url": "https://apfanews.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "dz"
+  },
+  {
+    "id": "bt-bhutannewsnetwork-com",
+    "title": "bhutannewsnetwork.com",
+    "url": "https://bhutannewsnetwork.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "dz"
+  }
+]

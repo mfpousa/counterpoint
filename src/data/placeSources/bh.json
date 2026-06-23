@@ -1,0 +1,90 @@
+[
+  {
+    "id": "bh-src",
+    "title": "جريدة البلاد",
+    "url": "https://www.albiladpress.com/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "bh-madhyamam-com",
+    "title": "madhyamam.com",
+    "url": "https://www.madhyamam.com/feeds.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "bh-bizbahrain-com",
+    "title": "bizbahrain.com",
+    "url": "https://www.bizbahrain.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "bh-twentyfoursevennews-com",
+    "title": "twentyfoursevennews.com",
+    "url": "https://twentyfoursevennews.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "bh-chandrikadaily-com",
+    "title": "chandrikadaily.com",
+    "url": "https://www.chandrikadaily.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "bh-bahrainmirror-com",
+    "title": "bahrainmirror.com",
+    "url": "http://bahrainmirror.com/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "bh-vob-org",
+    "title": "vob.org",
+    "url": "https://www.vob.org/?feed=rss2",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "bh-khaleejmag-com",
+    "title": "khaleejmag.com",
+    "url": "https://khaleejmag.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  }
+]
