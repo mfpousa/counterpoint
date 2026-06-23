@@ -1745,6 +1745,23 @@ function storiesBuildVersion(worldId: string): number {
   return v;
 }
 
+/** The persisted (last-session) synthesized stories for a store key, served as a STALE
+ *  set immediately on a cold in-memory cache (e.g. right after a server restart) while a
+ *  fresh build runs in the background — so /api/stories returns the last-built set instead
+ *  of an empty array. Developing-first then most-recent, capped to a live result's size. */
+function persistedStories(storeKey: string): Story[] {
+  return getStoryStore(storeKey)
+    .all()
+    .map((e) => e.story)
+    .sort((a, b) => {
+      const da = a.developing ? 1 : 0;
+      const db = b.developing ? 1 : 0;
+      if (db !== da) return db - da;
+      return b.updatedAt - a.updatedAt;
+    })
+    .slice(0, config.stories.maxStories);
+}
+
 /**
  * Build (and cache) the synthesized cross-source stories for a world. Clusters
  * the recent analyzed pool by same-event similarity, keeps clusters spanning
@@ -1774,16 +1791,20 @@ export async function getStories(
   ) {
     return { stories: cachedForLang.stories, busyWith, synthesizing: false };
   }
-  // A (re)build for this language is already running: return what we have RIGHT NOW
-  // (stale or empty) and let it finish in the background. We must NOT await it — synthesis
-  // is dozens of slow LLM calls, and blocking the response on it is what made /api/stories
-  // hang for minutes while the feed/status endpoints stayed responsive.
-  if (state.storiesInFlight.get(lang)) {
-    return { stories: cachedForLang?.stories ?? [], busyWith, synthesizing: true };
-  }
-
   // Per-language persistent store so EN and ES syntheses don't cross-pollinate.
   const storeKey = lang === "en" ? worldId : `${worldId}__${lang}`;
+  // Stale set to serve IMMEDIATELY while a (re)build runs: the in-memory result if we have
+  // one, else the PERSISTED stories from disk — so right after a server restart we return
+  // the last-built set instead of an empty array until synthesis finishes.
+  const stale = cachedForLang?.stories ?? persistedStories(storeKey);
+
+  // A (re)build for this language is already running: return the stale set now and let it
+  // finish in the background. We must NOT await it — synthesis is dozens of slow LLM calls,
+  // and blocking the response on it is what made /api/stories hang for minutes while the
+  // feed/status endpoints stayed responsive.
+  if (state.storiesInFlight.get(lang)) {
+    return { stories: stale, busyWith, synthesizing: true };
+  }
   const builtAtSnapshot = buildVersion;
   const p = (async (): Promise<Story[]> => {
     const eligible = storyEligible(worldId);
@@ -1980,7 +2001,7 @@ export async function getStories(
   // true and swaps in the fresh set once the background build populates the cache.
   p.catch((e) => console.error(`[stories:${worldId}] synthesis failed:`, e));
   state.storiesInFlight.set(lang, p);
-  return { stories: cachedForLang?.stories ?? [], busyWith, synthesizing: true };
+  return { stories: stale, busyWith, synthesizing: true };
 }
 
 /** A single synthesized story by id (builds the set if needed). Null if gone. */
