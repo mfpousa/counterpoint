@@ -20,6 +20,7 @@ import { StoryCard } from "../../src/components/StoryCard";
 import { FadeInView } from "../../src/components/anim";
 import { BriefingCard } from "../../src/components/BriefingCard";
 import { AnalysisProgress } from "../../src/components/AnalysisProgress";
+import { WorldSwitcher } from "../../src/components/WorldSwitcher";
 import { GeoNavigator } from "../../src/components/GeoNavigator";
 import { GEO_ROOT_ID, poolIdForNode } from "../../src/data/geo";
 import { fetchStories } from "../../src/lib/api";
@@ -62,9 +63,11 @@ export default function FeedScreen() {
     status,
     summaries,
     storyViews,
+    worldId,
     feedWorldId,
     busyWorld,
     refreshFeed,
+    setWorld,
     updatePrefs,
   } = useApp();
   const t = useT();
@@ -319,9 +322,11 @@ export default function FeedScreen() {
       }
     >
       <View style={{ width: contentW, gap: spacing.md }}>
-        {/* Geography is the only navigator: drill World → continent → country → …
-            and a node's outlets become the feed pool. Selecting the World root means
-            "no geographic override" — i.e. the broad Front Page. */}
+        {/* World switcher: pick which news universe to browse (front page = World). */}
+        <WorldSwitcher worldId={worldId} busyWorld={busyWorld} onSelect={setWorld} />
+
+        {/* Coverage drill-down: browse by source geography (World → … → council).
+            The World root means "no geographic override" — i.e. the chosen world. */}
         <GeoNavigator
           activePoolId={prefs.geoPool}
           home={prefs.geoHome}

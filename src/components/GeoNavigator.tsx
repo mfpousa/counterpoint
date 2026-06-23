@@ -74,6 +74,13 @@ export function GeoNavigator({
   const stateLabel = (s: CoverageState): string =>
     s === "ready" ? t("geo.covered") : s === "none" ? t("geo.none") : t("geo.unknown");
 
+  // Hide options with no coverage: keep nodes that have their own outlets
+  // ("ready") or that can be drilled into (continents / covered descendants).
+  // This trims the long data-driven country list down to places we can serve.
+  const visibleChildren: CoverageNode[] = (view?.children ?? []).filter(
+    (n) => n.state === "ready" || n.hasChildren,
+  );
+
   const chip = (node: CoverageNode, active: boolean, key: string) => (
     <Pressable
       key={key}
@@ -148,9 +155,9 @@ export function GeoNavigator({
         </View>
       )}
       {error && !loading && <Text style={styles.statusText}>{t("geo.error")}</Text>}
-      {!loading && !error && view && view.children.length > 0 && (
+      {!loading && !error && view && visibleChildren.length > 0 && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
-          {view.children.map((n) => chip(n, n.nodeId === currentNode, `c-${n.nodeId}`))}
+          {visibleChildren.map((n) => chip(n, n.nodeId === currentNode, `c-${n.nodeId}`))}
         </ScrollView>
       )}
     </View>

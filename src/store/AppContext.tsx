@@ -392,7 +392,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setBriefing(null);
       setFeedError(null);
       setBusyWorld(null);
-      const next = { ...prefs, worldId };
+      // Picking a topical world EXITS geo mode (clears the geographic override),
+      // so the chosen world is what actually shows — the two axes never fight.
+      const next = { ...prefs, worldId, geoPool: undefined };
       setPrefs(next);
       await savePreferences(next);
     },

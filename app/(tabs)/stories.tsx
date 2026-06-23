@@ -15,10 +15,12 @@ import { useApp } from "../../src/store/AppContext";
 import { fetchStories } from "../../src/lib/api";
 import { StoryCard } from "../../src/components/StoryCard";
 import { lastMinuteStories } from "../../src/lib/storyUpdates";
+import { WorldSwitcher } from "../../src/components/WorldSwitcher";
 import { GeoNavigator } from "../../src/components/GeoNavigator";
 import { GEO_ROOT_ID, geoLabel, geoNodeIdOf, poolIdForNode } from "../../src/data/geo";
 import { openStory } from "../../src/lib/nav";
 import { AnalysisProgress } from "../../src/components/AnalysisProgress";
+import { worldById } from "../../src/data/worlds";
 import { colors, font, radius, spacing } from "../../src/theme";
 import type { Story } from "../../src/types";
 
@@ -34,7 +36,8 @@ function columnsFor(contentWidth: number): number {
 export default function StoriesScreen() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const { prefs, feedWorldId, updatePrefs, status, storyViews } = useApp();
+  const { prefs, worldId, feedWorldId, busyWorld, setWorld, updatePrefs, status, storyViews } =
+    useApp();
 
   const [stories, setStories] = useState<Story[]>([]);
   const [loading, setLoading] = useState(false);
@@ -104,6 +107,8 @@ export default function StoriesScreen() {
         }
       >
         <View style={{ width: contentW, gap: spacing.md }}>
+          <WorldSwitcher worldId={worldId} busyWorld={busyWorld} onSelect={setWorld} />
+
           <GeoNavigator
             activePoolId={prefs.geoPool}
             home={prefs.geoHome}
@@ -138,8 +143,8 @@ export default function StoriesScreen() {
             <View style={styles.busyBanner}>
               <ActivityIndicator size="small" color={colors.warn} />
               <Text style={styles.busyText}>
-                “{geoLabel(geoNodeIdOf(busy)) || "Another area"}” is still refreshing. Only one
-                refreshes at a time — stories here will build once it’s free.
+                “{geoNodeIdOf(busy) ? geoLabel(geoNodeIdOf(busy)) : worldById(busy).title}” is still
+                refreshing. Only one refreshes at a time — stories here will build once it’s free.
               </Text>
             </View>
           )}
