@@ -72,10 +72,13 @@ export const config = {
     // Larger batches for the cheap title-only clickbait triage pass.
     triageBatchSize: num("AI_TRIAGE_BATCH_SIZE", 40),
     concurrency: num("AI_CONCURRENCY", 2),
-    // Items deeply analyzed per CHUNK. The first chunk makes the feed usable
-    // fast; the rest of the backlog is drained in the background. 0 = no chunk
-    // cap (one big, blocking pass). Results are persisted either way.
-    maxItems: numOrZero("AI_MAX_ITEMS", 200),
+    // Items deeply analyzed per CHUNK — deliberately SMALL so the first
+    // synthesized feed/stories land in SECONDS, not after one long pass. The
+    // background catch-up loop (scheduleCatchUp) then drains the rest in more
+    // small chunks while the pool is in use, up to each pool's total budget
+    // (geo.deepAnalyzeKeep / place.deepAnalyzeKeep). Keep this well under those
+    // totals. 0 = no chunk cap (one big, blocking pass). Persisted either way.
+    maxItems: numOrZero("AI_MAX_ITEMS", 24),
     // INACTIVITY timeout for an LLM call: resets on every streamed chunk, so a
     // model that's actively generating is never cut off. Must comfortably exceed
     // worst-case prompt-ingestion / time-to-first-token on your hardware.
