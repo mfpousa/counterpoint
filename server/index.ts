@@ -178,12 +178,12 @@ app.get("/api/briefing/stream", async (req, res) => {
 app.get("/api/stories", async (req, res) => {
   try {
     const force = req.query.force === "1" || req.query.force === "true";
-    const { stories, busyWith } = await getStories(
+    const { stories, busyWith, synthesizing } = await getStories(
       readWorld(req.query.world),
       force,
       readLang(req.query.lang),
     );
-    res.json({ stories, busyWith });
+    res.json({ stories, busyWith, synthesizing });
   } catch (e) {
     console.error("[api] /api/stories failed:", e);
     res.status(500).json({ stories: [], error: e instanceof Error ? e.message : "failed" });

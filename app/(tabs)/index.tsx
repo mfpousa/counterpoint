@@ -38,6 +38,8 @@ const MAX_CONTENT_WIDTH = 1180;
 const H_PAD = spacing.lg;
 // Cap on the standalone "Developing" band (ongoing storylines not in "Last minute").
 const DEVELOPING_MAX = 12;
+// Poll interval while the backend is synthesizing stories in the background.
+const STORIES_POLL_MS = 4000;
 
 // Per world+language story cache at MODULE scope so it SURVIVES a remount of the
 // Today screen. Backing out of a /news/[id] or /story/[id] route remounts this
@@ -97,9 +99,18 @@ export default function FeedScreen() {
   const currentKey = storyKeyFor(feedWorldId, prefs.language);
   const currentKeyRef = useRef(currentKey);
   currentKeyRef.current = currentKey;
+  // Synthesis runs in the BACKGROUND on the server, so a fetch can return [] together
+  // with a `synthesizing` flag; we poll back via this timer until the set arrives. A ref
+  // to the latest loadStories lets the timer call it without capturing a stale closure.
+  const retryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loadStoriesRef = useRef<(force?: boolean) => void>(() => {});
   const loadStories = useCallback(
     async (force = false) => {
       const key = storyKeyFor(feedWorldId, prefs.language);
+      if (retryRef.current) {
+        clearTimeout(retryRef.current);
+        retryRef.current = null;
+      }
       setLoadingStories(true);
       try {
         const res = await fetchStories({ world: feedWorldId, force, lang: prefs.language });
@@ -117,6 +128,11 @@ export default function FeedScreen() {
           cacheStories(res.stories);
         }
         storiesLoadedOnce.current = true;
+        // The server synthesizes in the BACKGROUND (so /api/stories never blocks for
+        // minutes). While it's still building, poll back shortly to pick up the set.
+        if (res.synthesizing && currentKeyRef.current === key) {
+          retryRef.current = setTimeout(() => loadStoriesRef.current(), STORIES_POLL_MS);
+        }
       } finally {
         // Only clear the spinner if we're still on the same world/language (the new
         // world's own load owns its spinner once we've switched).
@@ -125,6 +141,7 @@ export default function FeedScreen() {
     },
     [feedWorldId, prefs.language],
   );
+  loadStoriesRef.current = loadStories;
   useEffect(() => {
     // Show this world+language's cached stories immediately (no skeleton flash)
     // when we've built them before. Otherwise CLEAR to empty: a remount keeps the
@@ -140,6 +157,12 @@ export default function FeedScreen() {
       storiesLoadedOnce.current = false;
     }
     void loadStories();
+    return () => {
+      if (retryRef.current) {
+        clearTimeout(retryRef.current);
+        retryRef.current = null;
+      }
+    };
   }, [loadStories, feedWorldId, prefs.language]);
 
   // Live: when the backend finishes analyzing a chunk (analyzed count grows),

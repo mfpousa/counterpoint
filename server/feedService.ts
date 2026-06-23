@@ -1756,9 +1756,9 @@ export async function getStories(
   worldId: string = DEFAULT_WORLD_ID,
   force = false,
   lang: Lang = "en",
-): Promise<{ stories: Story[]; busyWith: string | null }> {
+): Promise<{ stories: Story[]; busyWith: string | null; synthesizing: boolean }> {
   const { busyWith } = await ensurePool(worldId, force);
-  if (!config.stories.enabled) return { stories: [], busyWith };
+  if (!config.stories.enabled) return { stories: [], busyWith, synthesizing: false };
 
   const state = ws(worldId);
   // For the world this advances when ANY contributing pool rebuilds (see helper).
@@ -1772,10 +1772,15 @@ export async function getStories(
     (cachedForLang.builtAt === buildVersion ||
       (!force && Date.now() - cachedForLang.builtWallAt < config.stories.minRebuildMs))
   ) {
-    return { stories: cachedForLang.stories, busyWith };
+    return { stories: cachedForLang.stories, busyWith, synthesizing: false };
   }
-  const inFlight = state.storiesInFlight.get(lang);
-  if (inFlight) return { stories: await inFlight, busyWith };
+  // A (re)build for this language is already running: return what we have RIGHT NOW
+  // (stale or empty) and let it finish in the background. We must NOT await it — synthesis
+  // is dozens of slow LLM calls, and blocking the response on it is what made /api/stories
+  // hang for minutes while the feed/status endpoints stayed responsive.
+  if (state.storiesInFlight.get(lang)) {
+    return { stories: cachedForLang?.stories ?? [], busyWith, synthesizing: true };
+  }
 
   // Per-language persistent store so EN and ES syntheses don't cross-pollinate.
   const storeKey = lang === "en" ? worldId : `${worldId}__${lang}`;
@@ -1969,8 +1974,13 @@ export async function getStories(
     state.storiesInFlight.delete(lang);
   });
 
+  // Run in the BACKGROUND: we deliberately don't await the synthesis here (see above).
+  // Swallow rejections so the un-awaited promise can't surface as an unhandled rejection,
+  // and serve whatever we have cached now; the client polls back while `synthesizing` is
+  // true and swaps in the fresh set once the background build populates the cache.
+  p.catch((e) => console.error(`[stories:${worldId}] synthesis failed:`, e));
   state.storiesInFlight.set(lang, p);
-  return { stories: await p, busyWith };
+  return { stories: cachedForLang?.stories ?? [], busyWith, synthesizing: true };
 }
 
 /** A single synthesized story by id (builds the set if needed). Null if gone. */

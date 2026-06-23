@@ -395,6 +395,8 @@ export async function fetchKnowledgeInsight(
 export interface StoriesResponse {
   stories: Story[];
   busyWith?: string | null;
+  /** The backend is synthesizing in the BACKGROUND; poll again shortly for the result. */
+  synthesizing?: boolean;
 }
 
 /**
@@ -414,11 +416,15 @@ export async function fetchStories(
   const qs = params.toString();
   try {
     const res = await fetch(`${apiBaseUrl()}/api/stories${qs ? `?${qs}` : ""}`, { method: "GET" });
-    if (!res.ok) return { stories: [], busyWith: null };
+    if (!res.ok) return { stories: [], busyWith: null, synthesizing: false };
     const data = (await res.json()) as StoriesResponse;
-    return { stories: Array.isArray(data.stories) ? data.stories : [], busyWith: data.busyWith ?? null };
+    return {
+      stories: Array.isArray(data.stories) ? data.stories : [],
+      busyWith: data.busyWith ?? null,
+      synthesizing: !!data.synthesizing,
+    };
   } catch {
-    return { stories: [], busyWith: null };
+    return { stories: [], busyWith: null, synthesizing: false };
   }
 }
 
