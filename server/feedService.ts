@@ -1609,7 +1609,15 @@ export async function getBriefingStream(
 }
 
 /** The recent, analyzed pool eligible to be clustered into stories. Uses the
- *  WIDER of the event/issue windows so multi-day developing issues are covered. */
+ *  WIDER of the event/issue windows so multi-day developing issues are covered.
+ *
+ *  NB: near-clones (`cloneOf`) are KEPT here, unlike the feed/provisional sets. GEO
+ *  pools dedup near-identical wire copy down to ONE representative for the feed + for
+ *  analysis — but story synthesis NEEDS those copies: a story requires several DISTINCT
+ *  sources, and that multi-source signal lives ENTIRELY in the clones. Excluding them
+ *  collapsed every geo event to a single-source rep, so multi-source events and
+ *  developing issues never formed for geo pools (and the globe's alert markers stayed
+ *  empty). Clones inherit the rep's analysis, so they re-cluster onto the same event. */
 function storyEligible(worldId: string, now = Date.now()): StoredItem[] {
   const window = Math.min(
     config.feed.retentionMs,
@@ -1617,9 +1625,7 @@ function storyEligible(worldId: string, now = Date.now()): StoredItem[] {
   );
   return getStore(worldId)
     .all()
-    .filter(
-      (s) => !s.clickbait && s.analyzed && !s.cloneOf && now - s.item.publishedAt <= window,
-    );
+    .filter((s) => !s.clickbait && s.analyzed && now - s.item.publishedAt <= window);
 }
 
 /** Token set for a synthesized story (from its title + source headlines), used

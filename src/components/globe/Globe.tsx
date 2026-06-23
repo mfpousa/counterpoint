@@ -545,7 +545,16 @@ export function Globe({
   const goUp = () => {
     const path = view?.path ?? [];
     const parent = path.length >= 2 ? path[path.length - 2] : null;
-    navTo(parent ? parent.nodeId : GEO_ROOT_ID);
+    const nodeId = parent ? parent.nodeId : GEO_ROOT_ID;
+    navTo(nodeId);
+    // Going up changes the SELECTION too, so the feed follows the new level (e.g.
+    // Galicia → Spain shows Spain's feed) instead of staying on the child.
+    if (nodeId === GEO_ROOT_ID) {
+      onSelectWorld?.();
+    } else if (parent) {
+      onSelect(parent.poolId);
+      onPlace?.(parent.label);
+    }
   };
 
   const zoomBy = (factor: number) => {
