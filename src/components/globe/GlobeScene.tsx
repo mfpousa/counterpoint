@@ -14,7 +14,7 @@ import React, { memo, useRef } from "react";
 import type { MutableRefObject } from "react";
 import { useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import { AdditiveBlending, BackSide, DoubleSide } from "three";
-import type { Group, Mesh, MeshBasicMaterial } from "three";
+import type { Group, Mesh, MeshBasicMaterial, PerspectiveCamera } from "three";
 import { colors } from "../../theme";
 import { hashId, type Vec3 } from "../../lib/globeLayout";
 import { EVENT_CATEGORIES, type GeoAlert } from "../../lib/geoAlerts";
@@ -378,8 +378,14 @@ export function GlobeScene({
    *  half this so the focused content stays centred in the visible area. 0 = no shift. */
   rightInset?: number;
 }) {
-  const viewport = useThree((s) => s.viewport);
+  const camera = useThree((s) => s.camera);
+  const size = useThree((s) => s.size);
   const group = useRef<Group>(null);
+  // Eased horizontal CAMERA view-offset (px) so the globe slides smoothly when the side
+  // panel opens/closes. A projection offset (not a world translation) shifts EVERY depth
+  // by the same pixels, so the focused country on the near surface lands exactly on the
+  // visible centre instead of overshooting.
+  const offsetPx = useRef(0);
   useFrame((_, delta) => {
     const g = group.current;
     if (!g) return;
@@ -402,13 +408,18 @@ export function GlobeScene({
     g.rotation.x = Math.max(-1.2, Math.min(1.2, refs.rot.current.pitch));
     const s = g.scale.x + (refs.zoom.current - g.scale.x) * 0.2;
     g.scale.setScalar(s);
-    // Desktop: when the side panel covers the right, ease the globe LEFT so the focused
-    // content centres in the VISIBLE area instead of hiding behind the panel.
-    const targetX =
-      rightInset > 0 && viewport.factor > 0
-        ? -(rightInset / 2) / viewport.factor
-        : 0;
-    g.position.x += (targetX - g.position.x) * 0.06;
+    // Desktop: when the side panel covers the right, shift the RENDER left so the focused
+    // content centres in the VISIBLE area. We use a camera view-offset (a projection
+    // shift) rather than translating the globe in world space: a world shift moves the
+    // near surface (where the focused country sits) MORE pixels than the globe centre and
+    // overshoots, whereas a projection offset shifts all depths by the same pixels.
+    const cam = camera as PerspectiveCamera;
+    offsetPx.current += (rightInset / 2 - offsetPx.current) * 0.12;
+    if (offsetPx.current > 0.5) {
+      cam.setViewOffset(size.width, size.height, offsetPx.current, 0, size.width, size.height);
+    } else if (cam.view?.enabled) {
+      cam.clearViewOffset();
+    }
   });
 
   // Scroll-wheel zoom that pulls the point under the cursor toward the view centre as it
