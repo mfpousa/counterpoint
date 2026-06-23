@@ -124,6 +124,7 @@ export function Globe({
   onNavigate,
   status,
   onAlertPress,
+  rightInset = 0,
   topInset = 0,
   height = 320,
 }: {
@@ -149,6 +150,9 @@ export function Globe({
   status?: AnalysisStatus | null;
   /** Tap a worldview marker → open its story (the host routes to the reader). */
   onAlertPress?: (id: string) => void;
+  /** Width (px) an overlaying panel covers on the RIGHT (desktop) — the globe recenters
+   *  into the remaining visible area when it opens/closes. */
+  rightInset?: number;
   /** Safe-area top inset (px) so the hero search clears the status bar/notch. */
   topInset?: number;
   /** Canvas height in px (it sits inside a scroll view). */
@@ -472,6 +476,7 @@ export function Globe({
           (nameKey ? byName.get(nameKey) : undefined);
         return {
           key: `r-${s.regionId || i}`,
+          isRegion: true,
           positions: s.positions,
           normals: s.normals,
           entityId: child ? child.nodeId : null,
@@ -655,6 +660,7 @@ export function Globe({
             gizmos={gizmos}
             alerts={alerts}
             onAlertPress={onAlertPress}
+            rightInset={rightInset}
             autoSpin={browse === GEO_ROOT_ID && !activePoolId}
             focusedId={focusedId}
             onFocus={setFocusedId}

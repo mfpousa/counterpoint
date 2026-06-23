@@ -12,7 +12,7 @@
 
 import React, { memo, useRef } from "react";
 import type { MutableRefObject } from "react";
-import { useFrame, type ThreeEvent } from "@react-three/fiber";
+import { useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import { AdditiveBlending, BackSide, DoubleSide } from "three";
 import type { Group, Mesh, MeshBasicMaterial } from "three";
 import { colors } from "../../theme";
@@ -156,7 +156,7 @@ const CountryMesh = memo(function CountryMesh({
     if (!m) return;
     m.scale.setScalar(m.scale.x + (targetScale - m.scale.x) * 0.18);
   });
-  let color = LAND_INERT;
+  let color = c.isRegion ? LAND_REGION : LAND_INERT;
   if (interactive) color = c.selectable ? LAND_READY : LAND_DRILL;
   if (c.current) color = LAND_HERE; // the place we're inside — stands out from neighbours
   if (c.active) color = LAND_ACTIVE; // the committed feed — brightest
@@ -311,6 +311,7 @@ export function GlobeScene({
   onFocus,
   onActivate,
   refs,
+  rightInset = 0,
 }: {
   countries: GlobeCountry[];
   regions: GlobeCountry[];
@@ -326,7 +327,11 @@ export function GlobeScene({
   onFocus: (id: string | null) => void;
   onActivate: (id: string) => void;
   refs: GlobeViewRefs;
+  /** Width (px) the side panel covers on the RIGHT (desktop). The globe eases LEFT by
+   *  half this so the focused content stays centred in the visible area. 0 = no shift. */
+  rightInset?: number;
 }) {
+  const viewport = useThree((s) => s.viewport);
   const group = useRef<Group>(null);
   useFrame((_, delta) => {
     const g = group.current;
@@ -364,6 +369,10 @@ export function GlobeScene({
     g.rotation.x = Math.max(-1.2, Math.min(1.2, refs.rot.current.pitch));
     const s = g.scale.x + (refs.zoom.current - g.scale.x) * 0.2;
     g.scale.setScalar(s);
+    // Desktop: when the side panel covers the right, ease the globe LEFT so the focused
+    // content centres in the VISIBLE area instead of hiding behind the panel.
+    const targetX = rightInset > 0 && viewport.factor > 0 ? -(rightInset / 2) / viewport.factor : 0;
+    g.position.x += (targetX - g.position.x) * 0.12;
   });
 
   return (

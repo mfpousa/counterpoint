@@ -347,6 +347,9 @@ export default function FeedScreen() {
         stories={stories}
         worldActive={worldId === DEFAULT_WORLD_ID && !prefs.geoPool}
         topInset={insets.top}
+        // Desktop: while the side panel is open it covers the right; tell the globe so it
+        // recenters into the visible area (and recenters back when the panel closes).
+        rightInset={isWide && panelState === "open" ? panelW : 0}
         status={status}
         onAlertPress={(id) => openStory(id)}
         onPlace={setPlaceTitle}
