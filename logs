@@ -1,13 +1,66 @@
-[feed:place-es] refresh — fetching 0 sources…
-[feed:place-es] fetched 0; 0 new & recent to triage; 0 in store
-[feed:place-es] refresh done in 2ms
-[stories:place-es] 0 eligible -> 0 clusters, 0 issues; 0 developing + 0 event spec(s)
-[feed:place-es] refresh — fetching 0 sources…
-[feed:place-es] fetched 0; 0 new & recent to triage; 0 in store
-[feed:place-es] refresh done in 2ms
-[feed:place-es] view "|@es/es-galicia/" (general) -> 0 items from 0 eligible, place-boosted 0 in 0ms
-[feed:place-es] refresh — fetching 0 sources…
-[feed:place-es] fetched 0; 0 new & recent to triage; 0 in store
-[feed:place-es] refresh done in 3ms
-[feed:place-es] view "" (general) -> 0 items from 0 eligible in 0ms
-[feed:place-es] briefing(en): streaming "general" from 0 item(s)…
+tsx scripts/buildPlaceSources.ts --country gb
+
+[place:gb] resolving country metadata from Wikidata (ISO GB)…
+[place:gb] resolved Q145 (United Kingdom, lang=en, continent=europe).
+[place:gb] resolving Wikidata outlets (Q145, lang=en)…
+Wikidata returned 1000 row(s); 8 skipped (unlabeled); 844 unique outlet(s).
+Media Cloud: 101 collection(s) match "United Kingdom".
+[place:gb] selected 62 collection(s): 38381111:United Kingdom - State & Local, 34412476:United Kingdom - National, 38381181:Lancashire, United Kingdom - State & Local, 38381120:Warwickshire, United Kingdom - State & Local, 38381267:Devon, United Kingdom - State & Local, 38381122:Lincolnshire, United Kingdom - State & Local, 38381191:Aberdeenshire, United Kingdom - State & Local, 38381309:North Yorkshire, United Kingdom - State & Local, 38381261:West Sussex, United Kingdom - State & Local, 38381245:Hampshire, United Kingdom - State & Local, 38381299:Worcestershire, United Kingdom - State & Local, 38381144:Hertfordshire, United Kingdom - State & Local, 38381114:Derbyshire, United Kingdom - State & Local, 38381213:Highland, United Kingdom - State & Local, 38381253:Oxfordshire, United Kingdom - State & Local, 38381195:Argyll and Bute, United Kingdom - State & Local, 38381176:Cumbria, United Kingdom - State & Local, 38381185:Belfast, United Kingdom - State & Local, 38381189:Scotland, United Kingdom - State & Local, 38381136:Cambridgeshire, United Kingdom - State & Local, 38381142:Essex, United Kingdom - State & Local, 38381132:Nottinghamshire, United Kingdom - State & Local, 38381259:Surrey, United Kingdom - State & Local, 38381193:Angus, United Kingdom - State & Local, 38381163:Northumberland, United Kingdom - State & Local, 38381249:Kent, United Kingdom - State & Local, 38381199:Dumfries and Galloway, United Kingdom - State & Local, 38381221:North Ayrshire, United Kingdom - State & Local, 38381243:East Sussex, United Kingdom - State & Local, 38381149:Norfolk, United Kingdom - State & Local, 38381277:Somerset, United Kingdom - State & Local, 38381128:Northamptonshire, United Kingdom - State & Local, 38381171:Cheshire West and Chester, United Kingdom - State & Local, 38381127:Buckinghamshire, United Kingdom - State & Local, 38381265:Cornwall, United Kingdom - State & Local, 38381271:Gloucestershire, United Kingdom - State & Local, 38381269:Dorset, United Kingdom - State & Local, 38381140:Central Bedfordshire, United Kingdom - State & Local, 38381211:Fife, United Kingdom - State & Local, 38381301:East Riding of Yorkshire, United Kingdom - State & Local, 38381169:Cheshire East, United Kingdom - State & Local, 38381291:Herefordshire, United Kingdom - State & Local, 38381151:Suffolk, United Kingdom - State & Local, 38381295:Staffordshire, United Kingdom - State & Local, 38381241:Brighton and Hove, United Kingdom - State & Local, 38381187:South Ayrshire, United Kingdom - State & Local, 38381205:East Lothian, United Kingdom - State & Local, 38381161:Newcastle upon Tyne, United Kingdom - State & Local, 38381251:Milton Keynes, United Kingdom - State & Local, 38381167:Blackpool, United Kingdom - State & Local, 38381283:Wiltshire, United Kingdom - State & Local, 38381237:West Dunbartonshire, United Kingdom - State & Local, 38381118:Leicestershire, United Kingdom - State & Local, 38381178:Halton, United Kingdom - State & Local, 38381219:Moray, United Kingdom - State & Local, 38381275:Plymouth, United Kingdom - State & Local, 38381124:Rutland, United Kingdom - State & Local, 38381293:Shropshire, United Kingdom - State & Local, 38381289:Powys, United Kingdom - State & Local, 38381155:Darlington, United Kingdom - State & Local, 38381203:East Dunbartonshire, United Kingdom - State & Local, 38381231:Shetland Islands, United Kingdom - State & Local
+Media Cloud returned 2 unique outlet(s).
+Media Cloud returned 2 unique outlet(s).
+Media Cloud returned 3 unique outlet(s).
+Media Cloud returned 3 unique outlet(s).
+Media Cloud returned 2 unique outlet(s).
+Media Cloud returned 4 unique outlet(s).
+Media Cloud returned 3 unique outlet(s).
+Media Cloud returned 7 unique outlet(s).
+Media Cloud returned 5 unique outlet(s).
+Media Cloud returned 2 unique outlet(s).
+Media Cloud returned 4 unique outlet(s).
+Media Cloud returned 5 unique outlet(s).
+Media Cloud returned 2 unique outlet(s).
+Media Cloud returned 2 unique outlet(s).
+Media Cloud returned 2 unique outlet(s).
+Media Cloud returned 5 unique outlet(s).
+Media Cloud returned 7 unique outlet(s).
+Media Cloud returned 8 unique outlet(s).
+Media Cloud returned 3 unique outlet(s).
+Media Cloud returned 7 unique outlet(s).
+Media Cloud returned 11 unique outlet(s).
+buildPlaceSources failed: Media Cloud 500 Internal Server Error for https://search.mediacloud.org/api/sources/sources/?collection_id=38381171&limit=100
+Media Cloud returned 2 unique outlet(s).
+Media Cloud returned 4 unique outlet(s).
+Media Cloud returned 2 unique outlet(s).
+Media Cloud returned 2 unique outlet(s).
+Media Cloud returned 2 unique outlet(s).
+Media Cloud returned 3 unique outlet(s).
+Media Cloud returned 4 unique outlet(s).
+Media Cloud returned 2 unique outlet(s).
+Media Cloud returned 5 unique outlet(s).
+Media Cloud returned 2 unique outlet(s).
+Media Cloud returned 2 unique outlet(s).
+Media Cloud returned 3 unique outlet(s).
+Media Cloud returned 5 unique outlet(s).
+Media Cloud returned 3 unique outlet(s).
+Media Cloud returned 8 unique outlet(s).
+Media Cloud returned 5 unique outlet(s).
+Media Cloud returned 2 unique outlet(s).
+Media Cloud returned 2 unique outlet(s).
+Media Cloud returned 6 unique outlet(s).
+Media Cloud returned 6 unique outlet(s).
+Media Cloud returned 7 unique outlet(s).
+Media Cloud returned 6 unique outlet(s).
+Media Cloud returned 5 unique outlet(s).
+Media Cloud returned 7 unique outlet(s).
+Media Cloud returned 9 unique outlet(s).
+Media Cloud returned 10 unique outlet(s).
+Media Cloud returned 6 unique outlet(s).
+Media Cloud returned 8 unique outlet(s).
+Media Cloud returned 10 unique outlet(s).
+Media Cloud returned 12 unique outlet(s).
+Media Cloud returned 10 unique outlet(s).
+Media Cloud returned 14 unique outlet(s).
+Media Cloud returned 17 unique outlet(s).
+Media Cloud returned 18 unique outlet(s).
+Media Cloud returned 89 unique outlet(s).
+Media Cloud returned 337 unique outlet(s).
