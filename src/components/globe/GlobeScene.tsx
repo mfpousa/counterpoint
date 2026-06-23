@@ -177,6 +177,8 @@ export function GlobeScene({
           <icosahedronGeometry args={[PLANET_RADIUS, 5]} />
           <meshStandardMaterial color="#173049" metalness={0.55} roughness={0.32} />
         </mesh>
+        {/* The real landmasses on top of the ocean (radius 1.0 > ocean 0.94). */}
+        {land && <Land data={land} />}
         {entities.map((d) => (
           <GlobeEntity
             key={d.id}
