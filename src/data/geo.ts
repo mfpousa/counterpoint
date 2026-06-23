@@ -1,13 +1,13 @@
-// GEOGRAPHIC POOL TREE — the source-geography hierarchy the reader drills through:
+// GEOGRAPHIC POOL MODEL — the source-geography hierarchy the reader drills through:
 //
 //   world → continent → country → region → province → locality/council
 //
 // A POOL is a set of outlets at one geographic granularity. Drilling down swaps
-// the SOURCE SET (handled server-side by the source registry), not a content
-// filter: a locality pool shows everything its outlets report — local, national
-// or international. This module is the SHARED model (client + server): the tree
-// itself plus the pool-id <-> node-id mapping. Coverage (which nodes actually
-// have discovered sources) is resolved separately, on demand, by the server.
+// the SOURCE SET, not a content filter: a region pool shows everything its outlets
+// report. This SHARED module holds only the type model + the pool-id <-> node-id
+// mapping. The TREE ITSELF is DATA-DRIVEN and built server-side from the discovered
+// placeSources (see server/geoTree.ts) — there are no hardcoded places here, and
+// the client gets the tree (and coverage) from the /api/coverage endpoint.
 
 /** The levels of the geographic hierarchy, broad → narrow. */
 export type GeoLevel =
@@ -28,10 +28,10 @@ export const GEO_LEVEL_ORDER: GeoLevel[] = [
   "locality",
 ];
 
-/** One node in the geographic tree. */
+/** One node in the geographic tree (built server-side from discovered data). */
 export interface GeoNode {
-  /** Hierarchical id, hyphen-joined: "world", "eu", "es", "es-galicia",
-   *  "es-galicia-pontevedra", "es-galicia-pontevedra-vigo". */
+  /** Stable id: continent slug ("europe"), ISO 3166-1 alpha-2 ("es"), or a
+   *  slugified ISO 3166-2 region ("es-ga"). "world" is the root. */
   id: string;
   /** Parent node id; absent only for the root ("world"). */
   parent?: string;
@@ -40,191 +40,35 @@ export interface GeoNode {
   label: string;
   /** ISO 3166-1 alpha-2 this node sits under (absent for world/continent). */
   country?: string;
-}
-
-// --- Country dataset --------------------------------------------------------
-// The country level is DATA-DRIVEN, not hand-listed in the tree: continents map
-// to a list of [ISO 3166-1 alpha-2, display name] pairs, and the country nodes
-// are generated from it below. This keeps the navigator's options from being a
-// hardcoded handful — adding a country (or a whole continent) is a one-line data
-// edit, and coverage stays resolved on demand by the server.
-
-/** Sovereign states of Europe (ISO 3166-1 alpha-2 → English name). */
-const EUROPE_COUNTRIES: ReadonlyArray<readonly [string, string]> = [
-  ["al", "Albania"],
-  ["ad", "Andorra"],
-  ["at", "Austria"],
-  ["by", "Belarus"],
-  ["be", "Belgium"],
-  ["ba", "Bosnia & Herzegovina"],
-  ["bg", "Bulgaria"],
-  ["hr", "Croatia"],
-  ["cy", "Cyprus"],
-  ["cz", "Czechia"],
-  ["dk", "Denmark"],
-  ["ee", "Estonia"],
-  ["fi", "Finland"],
-  ["fr", "France"],
-  ["de", "Germany"],
-  ["gr", "Greece"],
-  ["hu", "Hungary"],
-  ["is", "Iceland"],
-  ["ie", "Ireland"],
-  ["it", "Italy"],
-  ["xk", "Kosovo"],
-  ["lv", "Latvia"],
-  ["li", "Liechtenstein"],
-  ["lt", "Lithuania"],
-  ["lu", "Luxembourg"],
-  ["mt", "Malta"],
-  ["md", "Moldova"],
-  ["mc", "Monaco"],
-  ["me", "Montenegro"],
-  ["nl", "Netherlands"],
-  ["mk", "North Macedonia"],
-  ["no", "Norway"],
-  ["pl", "Poland"],
-  ["pt", "Portugal"],
-  ["ro", "Romania"],
-  ["ru", "Russia"],
-  ["sm", "San Marino"],
-  ["rs", "Serbia"],
-  ["sk", "Slovakia"],
-  ["si", "Slovenia"],
-  ["es", "Spain"],
-  ["se", "Sweden"],
-  ["ch", "Switzerland"],
-  ["ua", "Ukraine"],
-  ["gb", "United Kingdom"],
-  ["va", "Vatican City"],
-];
-
-/** Generate the country-level nodes for a continent from its ISO dataset. */
-function countriesUnder(continent: string, list: ReadonlyArray<readonly [string, string]>): GeoNode[] {
-  return list.map(([code, label]) => ({
-    id: code,
-    parent: continent,
-    level: "country" as const,
-    label,
-    country: code,
-  }));
-}
-
-// --- Seed tree --------------------------------------------------------------
-// The continents plus a REAL deeper vertical slice (Spain → Galicia → Pontevedra
-// → Vigo) so sub-country navigation works end to end. Country nodes are merged in
-// from the dataset above; deeper branches are added here (or, later, from
-// on-demand discovery) without touching the plumbing.
-
-const NODES: GeoNode[] = [
-  { id: "world", level: "world", label: "World" },
-
-  // Continents (children of world).
-  { id: "eu", parent: "world", level: "continent", label: "Europe" },
-  { id: "am", parent: "world", level: "continent", label: "Americas" },
-  { id: "af", parent: "world", level: "continent", label: "Africa" },
-  { id: "as", parent: "world", level: "continent", label: "Asia" },
-  { id: "oc", parent: "world", level: "continent", label: "Oceania" },
-
-  // Countries (data-driven). Europe is populated; other continents follow the
-  // same one-line pattern once their datasets land.
-  ...countriesUnder("eu", EUROPE_COUNTRIES),
-
-  // Spain vertical slice (deeper than country — "es" itself comes from the
-  // dataset above).
-  { id: "es-galicia", parent: "es", level: "region", label: "Galicia", country: "es" },
-  {
-    id: "es-galicia-pontevedra",
-    parent: "es-galicia",
-    level: "province",
-    label: "Pontevedra",
-    country: "es",
-  },
-  {
-    id: "es-galicia-pontevedra-vigo",
-    parent: "es-galicia-pontevedra",
-    level: "locality",
-    label: "Vigo",
-    country: "es",
-  },
-];
-
-const BY_ID = new Map<string, GeoNode>(NODES.map((n) => [n.id, n]));
-
-const CHILDREN = ((): Map<string, GeoNode[]> => {
-  const m = new Map<string, GeoNode[]>();
-  for (const n of NODES) {
-    if (!n.parent) continue;
-    const arr = m.get(n.parent) ?? [];
-    arr.push(n);
-    m.set(n.parent, arr);
-  }
-  return m;
-})();
-
-/** The root node id of the tree. */
-export const GEO_ROOT_ID = "world";
-
-/** Resolve a node by id (undefined if unknown). */
-export function geoNode(id: string | undefined | null): GeoNode | undefined {
-  return id ? BY_ID.get(id) : undefined;
-}
-
-/** True if `id` is a known geographic node. */
-export function isGeoNode(id: string | undefined | null): boolean {
-  return !!id && BY_ID.has(id);
-}
-
-/** Direct children of a node, in declaration order (empty if leaf/unknown). */
-export function childrenOf(id: string | undefined | null): GeoNode[] {
-  return (id && CHILDREN.get(id)) || [];
-}
-
-/** Ancestor chain from the ROOT down to `id` (inclusive). Empty if unknown. */
-export function pathOf(id: string | undefined | null): GeoNode[] {
-  const out: GeoNode[] = [];
-  let cur = geoNode(id);
-  const guard = new Set<string>(); // defend against accidental cycles
-  while (cur && !guard.has(cur.id)) {
-    out.push(cur);
-    guard.add(cur.id);
-    cur = cur.parent ? geoNode(cur.parent) : undefined;
-  }
-  return out.reverse();
-}
-
-/** Display label for a node id (falls back to the id itself). */
-export function geoLabel(id: string | undefined | null): string {
-  return geoNode(id)?.label ?? (id ?? "");
-}
-
-/** All known nodes (declaration order). */
-export function allGeoNodes(): GeoNode[] {
-  return NODES.slice();
+  /** ISO 3166-2 region code (e.g. "ES-GA") for region nodes — used to filter the
+   *  country's outlets down to this region. Absent for non-region nodes. */
+  regionCode?: string;
 }
 
 // --- Pool id <-> node id ----------------------------------------------------
 // A geographic pool id is `geo-<nodeId>`. Encoding the node in the worldId lets
-// ALL the existing per-world plumbing (store, build lock, view cache, status)
-// work unchanged — exactly how `place-<cc>` was bolted on, but generalized to
-// any level of the tree.
+// ALL the per-world plumbing (store, build lock, view cache, status) work
+// unchanged. These helpers are purely FORMAT-based (no membership check): the
+// tree is data-driven and lives server-side (server/geoTree.ts), so the shared
+// client never bundles it. The server validates node existence when it builds a
+// pool's sources (an unknown node simply yields no outlets).
+
+/** The root node id of the tree. */
+export const GEO_ROOT_ID = "world";
 
 export const GEO_POOL_PREFIX = "geo-";
 
-/** True if a pool/world id names a geographic pool (`geo-<nodeId>`). */
+/** True if a pool/world id is shaped like a geographic pool (`geo-<nodeId>`). */
 export function isGeoPoolId(id: string | undefined | null): boolean {
-  if (!id || !id.startsWith(GEO_POOL_PREFIX)) return false;
-  return isGeoNode(id.slice(GEO_POOL_PREFIX.length));
+  return !!id && id.startsWith(GEO_POOL_PREFIX) && id.length > GEO_POOL_PREFIX.length;
 }
 
-/** The node id of a geographic pool id ("geo-es-galicia" -> "es-galicia"), else null. */
+/** The node id of a geographic pool id ("geo-es-ga" -> "es-ga"), else null. */
 export function geoNodeIdOf(poolId: string | undefined | null): string | null {
-  if (!poolId || !poolId.startsWith(GEO_POOL_PREFIX)) return null;
-  const nodeId = poolId.slice(GEO_POOL_PREFIX.length);
-  return isGeoNode(nodeId) ? nodeId : null;
+  return isGeoPoolId(poolId) ? (poolId as string).slice(GEO_POOL_PREFIX.length) : null;
 }
 
-/** The pool id for a node id ("es-galicia" -> "geo-es-galicia"). */
+/** The pool id for a node id ("es-ga" -> "geo-es-ga"). */
 export function poolIdForNode(nodeId: string): string {
   return `${GEO_POOL_PREFIX}${nodeId}`;
 }

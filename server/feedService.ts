@@ -15,21 +15,25 @@ import { fetchAll } from "../src/lib/rss";
 import type { AnalysisStatus, Briefing, FeedItem, Lang, Story } from "../src/types";
 import { DEFAULT_WORLD_ID, isPlaceWorldId, placeCountryOf, worldSources } from "../src/data/worlds";
 import {
-  childrenOf,
-  geoLabel,
-  geoNode,
   geoNodeIdOf,
   GEO_ROOT_ID,
   isGeoPoolId,
-  pathOf,
   poolIdForNode,
   type GeoNode,
 } from "../src/data/geo";
+import {
+  childrenOf,
+  coverageStateOf,
+  geoLabel,
+  geoNode,
+  pathOf,
+  sourcesForGeoNode,
+  type CoverageState,
+} from "./geoTree";
 import { ZONES, ZONES_BY_ID } from "../src/data/zones";
 import { detectZones } from "../src/lib/zones";
 import { gazetteerFor } from "./places";
 import { placeSourcesFor } from "./placeSources";
-import { coverageStateOf, sourcesForNode, type CoverageState } from "./sourceRegistry";
 import { dedupeNearClones } from "./dedupe";
 import { interleaveByRecencyBuckets } from "./fairness";
 import type { Source } from "../src/types";
@@ -298,13 +302,13 @@ export function topLocalBacklog(survivors: StoredItem[], keep: number): StoredIt
 
 /**
  * The source set for a pool:
- *  - a GEOGRAPHIC pool (`geo-<nodeId>`) draws from that node's registry (world →
- *    continent → country → region → province → locality) — the drill-down model;
+ *  - a GEOGRAPHIC pool (`geo-<nodeId>`) draws from the node's discovered outlets —
+ *    its country's set, narrowed to the region for region nodes (see geoTree);
  *  - a legacy REGIONAL pool (`place-<cc>`) uses the country's discovered outlets;
  *  - a topical world uses its curated sources.
  */
 function sourcesForWorld(worldId: string): Source[] {
-  if (isGeoPoolId(worldId)) return sourcesForNode(geoNodeIdOf(worldId));
+  if (isGeoPoolId(worldId)) return sourcesForGeoNode(geoNodeIdOf(worldId));
   const cc = placeCountryOf(worldId);
   return cc ? placeSourcesFor(cc) : worldSources(worldId);
 }

@@ -17,14 +17,21 @@
 //   MEDIACLOUD_API_KEY=xxx npm run sources:place -- --country es   # + AI-picked MC collections
 //   MEDIACLOUD_API_KEY=xxx npm run sources:place -- --country es --mc-collection 1234,5678
 //
-// Flags: --country <cc> [--qid Qnnn] [--lang xx] [--mc-collection ids] [--mc-query text]
-//        [--limit N] [--concurrency N] [--timeout ms] [--out path]
+// Flags: (--country <cc> | --continent <name> | --all) [--qid Qnnn] [--lang xx]
+//        [--mc-collection ids] [--mc-query text] [--limit N] [--concurrency N]
+//        [--timeout ms] [--out path]
+//
+// Bulk, no hand-maintained country list:
+//   npm run sources:place -- --continent Europe        # every European country
+//   npm run sources:place -- --all                     # refresh existing registries
 
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { Source } from "../src/types";
 import {
   discoverFeeds,
+  resolveCountriesInContinent,
+  resolveCountry,
   resolveMediaCloudOutlets,
   resolveWikidataOutlets,
   searchMediaCloudCollections,
@@ -34,25 +41,11 @@ import {
 } from "./lib/discovery";
 import { aiReachable, chatJsonArray } from "../server/ai";
 
-/** Country code -> Wikidata QID (extend as new markets are added; --qid overrides). */
-const COUNTRY_QID: Record<string, string> = {
-  es: "Q29", us: "Q30", gb: "Q145", fr: "Q142", de: "Q183", it: "Q38",
-  pt: "Q45", nl: "Q55", be: "Q31", ie: "Q27", mx: "Q96", ar: "Q414",
-  br: "Q155", ca: "Q16", au: "Q408",
-};
-/** Reasonable default content language per country (--lang overrides). */
-const COUNTRY_LANG: Record<string, string> = {
-  es: "es", us: "en", gb: "en", fr: "fr", de: "de", it: "it", pt: "pt",
-  nl: "nl", be: "nl", ie: "en", mx: "es", ar: "es", br: "pt", ca: "en", au: "en",
-};
-/** Display name per country, used as the Media Cloud collection search query. */
-const COUNTRY_NAME: Record<string, string> = {
-  es: "Spain", us: "United States", gb: "United Kingdom", fr: "France",
-  de: "Germany", it: "Italy", pt: "Portugal", nl: "Netherlands", be: "Belgium",
-  ie: "Ireland", mx: "Mexico", ar: "Argentina", br: "Brazil", ca: "Canada", au: "Australia",
-};
-
 interface Args {
+  /** Refresh every country that already has a placeSources file. */
+  all: boolean;
+  /** Build every country on a continent (by name, e.g. "Europe") via Wikidata. */
+  continent: string | null;
   country: string;
   qid: string | null;
   lang: string | null;
@@ -73,6 +66,8 @@ function parseArgs(argv: string[]): Args {
   };
   const has = (flag: string) => argv.indexOf(flag) >= 0;
   return {
+    all: has("--all"),
+    continent: has("--continent") ? get("--continent", "") || null : null,
     country: get("--country", "").toLowerCase(),
     qid: has("--qid") ? get("--qid", "") || null : null,
     lang: has("--lang") ? get("--lang", "") || null : null,
@@ -160,6 +155,7 @@ async function resolveMediaCloudFor(
   cc: string,
   args: Args,
   key: string,
+  queryName: string,
 ): Promise<Candidate[]> {
   // Explicit ids bypass search + AI selection entirely.
   if (args.mcCollection) {
@@ -171,7 +167,7 @@ async function resolveMediaCloudFor(
     return lists.flat();
   }
   // Otherwise: search the directory and let the model pick.
-  const query = args.mcQuery ?? COUNTRY_NAME[cc] ?? cc;
+  const query = args.mcQuery ?? queryName ?? cc;
   const cols = await searchMediaCloudCollections(query, key);
   const picked = await pickCollections(query, cols);
   if (picked.length === 0) {
@@ -186,12 +182,46 @@ async function resolveMediaCloudFor(
   return lists.flat();
 }
 
-async function run(args: Args): Promise<void> {
-  if (!args.country) throw new Error("Pass --country <cc> (ISO 3166-1 alpha-2, e.g. es).");
-  const cc = args.country;
-  const qid = args.qid ?? COUNTRY_QID[cc];
-  if (!qid) throw new Error(`No Wikidata QID known for "${cc}". Pass --qid Qnnn.`);
-  const lang = args.lang ?? COUNTRY_LANG[cc] ?? "und";
+/** Country metadata for the generated placeSources/index.json (powers the tree). */
+interface CountryMeta {
+  label: string;
+  continent: string;
+  continentLabel: string;
+}
+
+/** Merge one country into the generated placeSources index (cc -> metadata). */
+function updateIndex(cc: string, meta: CountryMeta): void {
+  const indexPath = resolve(process.cwd(), "src/data/placeSources", "index.json");
+  let index: Record<string, CountryMeta> = {};
+  if (existsSync(indexPath)) {
+    try {
+      const parsed = JSON.parse(readFileSync(indexPath, "utf8"));
+      if (parsed && typeof parsed === "object") index = parsed as Record<string, CountryMeta>;
+    } catch {
+      /* rewrite a corrupt index from scratch */
+    }
+  }
+  index[cc] = meta;
+  writeFileSync(indexPath, JSON.stringify(index, null, 2) + "\n", "utf8");
+}
+
+/** Build the generated registry for one country, auto-resolving its Wikidata
+ *  identity (QID/lang/name/continent) from the ISO code — flags still override. */
+async function buildCountry(cc: string, args: Args): Promise<void> {
+  console.error(`[place:${cc}] resolving country metadata from Wikidata (ISO ${cc.toUpperCase()})…`);
+  const info = await resolveCountry(cc);
+  if (info) {
+    console.error(
+      `[place:${cc}] resolved ${info.qid} (${info.label}, lang=${info.lang}, continent=${info.continent || "?"}).`,
+    );
+  }
+  const qid = args.qid ?? info?.qid ?? null;
+  const lang = args.lang ?? info?.lang ?? "und";
+  const name = args.mcQuery ?? info?.label ?? cc;
+  const continent = info?.continent ?? "";
+  const continentLabel = info?.continentLabel ?? "";
+  if (!qid) throw new Error(`Could not resolve a Wikidata QID for "${cc}". Pass --qid Qnnn.`);
+  const queryName = name;
 
   // 1) Resolve candidates from the datasets.
   console.error(`[place:${cc}] resolving Wikidata outlets (${qid}, lang=${lang})…`);
@@ -203,7 +233,7 @@ async function run(args: Args): Promise<void> {
   let mc: Candidate[] = [];
   const key = process.env.MEDIACLOUD_API_KEY || "";
   if (key) {
-    mc = await resolveMediaCloudFor(cc, args, key);
+    mc = await resolveMediaCloudFor(cc, args, key, queryName);
   } else if (args.mcCollection || args.mcQuery) {
     console.error(`[place:${cc}] Media Cloud requested but MEDIACLOUD_API_KEY missing — skipping.`);
   }
@@ -239,17 +269,64 @@ async function run(args: Args): Promise<void> {
       confidence: 0.4,
       leanRationale: d.leanRationale,
       lang,
+      // Region discovery: tag the outlet's top-level subdivision (ISO 3166-2) so
+      // the geo drill-down can serve region-specific outlets.
+      ...(d.region ? { region: d.region, regionLabel: d.regionLabel ?? undefined } : {}),
     });
   }
 
-  // 4) Write the generated registry.
+  // 4) Write the generated registry + fold the country into the tree index.
   const outPath = args.out ?? resolve(process.cwd(), "src/data/placeSources", `${cc}.json`);
   mkdirSync(resolve(outPath, ".."), { recursive: true });
   writeFileSync(outPath, JSON.stringify(sources, null, 2) + "\n", "utf8");
+  if (!args.out) updateIndex(cc, { label: name, continent, continentLabel });
+  const tagged = sources.filter((s) => s.region).length;
   console.error(
-    `[place:${cc}] wrote ${sources.length} working local source(s) -> ${outPath} ` +
-    `(from ${discovered.length} candidate(s)).`,
+    `[place:${cc}] wrote ${sources.length} working local source(s) (${tagged} region-tagged) ` +
+    `-> ${outPath} (from ${discovered.length} candidate(s)).`,
   );
+}
+
+/** Build a batch of countries, isolating per-country failures. */
+async function buildAll(codes: string[], args: Args): Promise<void> {
+  console.error(`[place] building ${codes.length} countr(ies): ${codes.join(", ")}`);
+  for (const cc of codes) {
+    try {
+      await buildCountry(cc, { ...args, country: cc });
+    } catch (e) {
+      console.error(`[place:${cc}] failed:`, e instanceof Error ? e.message : e);
+    }
+  }
+}
+
+/** Country codes that already have a generated placeSources/<cc>.json. */
+function existingCountryCodes(): string[] {
+  const dir = resolve(process.cwd(), "src/data/placeSources");
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir)
+    .filter((f: string) => /^[a-z]{2}\.json$/.test(f))
+    .map((f: string) => f.slice(0, 2));
+}
+
+async function run(args: Args): Promise<void> {
+  // --continent <name>: discover the country list from Wikidata, then build each.
+  if (args.continent) {
+    const codes = await resolveCountriesInContinent(args.continent);
+    if (codes.length === 0) throw new Error(`No countries resolved for continent "${args.continent}".`);
+    await buildAll(codes, args);
+    return;
+  }
+  // --all: refresh every country that already has a generated registry.
+  if (args.all) {
+    await buildAll(existingCountryCodes(), args);
+    return;
+  }
+  if (!args.country) {
+    throw new Error(
+      "Pass --country <cc> (e.g. es), --continent <name> (e.g. Europe), or --all to refresh existing.",
+    );
+  }
+  await buildCountry(args.country, args);
 }
 
 run(parseArgs(process.argv.slice(2))).catch((e: unknown) => {

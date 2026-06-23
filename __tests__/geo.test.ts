@@ -1,64 +1,39 @@
 import {
-  childrenOf,
-  geoLabel,
-  geoNode,
-  geoNodeIdOf,
   GEO_ROOT_ID,
-  isGeoNode,
+  geoNodeIdOf,
   isGeoPoolId,
-  pathOf,
   poolIdForNode,
 } from "../src/data/geo";
 
-describe("geo tree", () => {
-  it("resolves nodes and labels", () => {
-    expect(geoNode("es")?.label).toBe("Spain");
-    expect(geoNode("es-galicia-pontevedra-vigo")?.level).toBe("locality");
-    expect(geoLabel("es-galicia")).toBe("Galicia");
-    expect(geoLabel("unknown")).toBe("unknown");
-    expect(isGeoNode("es")).toBe(true);
-    expect(isGeoNode("nope")).toBe(false);
+// The shared geo module is now purely the type model + pool-id helpers. The TREE
+// itself is data-driven and lives server-side (see __tests__/geoTree.test.ts), so
+// these helpers are FORMAT-based (no membership against a hardcoded node list).
+describe("geo pool ids", () => {
+  it("exposes the world root", () => {
+    expect(GEO_ROOT_ID).toBe("world");
   });
 
-  it("walks children", () => {
-    const continents = childrenOf(GEO_ROOT_ID).map((n) => n.id);
-    expect(continents).toContain("eu");
-    expect(childrenOf("es").map((n) => n.id)).toEqual(["es-galicia"]);
-    expect(childrenOf("es-galicia-pontevedra-vigo")).toEqual([]); // leaf
+  it("maps node ids <-> pool ids round-trip", () => {
+    expect(poolIdForNode("es")).toBe("geo-es");
+    expect(poolIdForNode("es-ga")).toBe("geo-es-ga");
+    expect(geoNodeIdOf("geo-es-ga")).toBe("es-ga");
+    expect(geoNodeIdOf(poolIdForNode("europe"))).toBe("europe");
   });
 
-  it("populates Europe's countries from the dataset (not a hardcoded handful)", () => {
-    const euCountries = childrenOf("eu");
-    // A broad, data-driven set — well beyond the original Spain-only seed.
-    expect(euCountries.length).toBeGreaterThan(30);
-    expect(euCountries.every((n) => n.level === "country" && n.parent === "eu")).toBe(true);
-    const ids = euCountries.map((n) => n.id);
-    expect(ids).toEqual(expect.arrayContaining(["es", "fr", "de", "it", "gb", "ua"]));
-    expect(isGeoNode("fr")).toBe(true);
-    expect(geoNode("de")?.label).toBe("Germany");
-    expect(pathOf("fr").map((n) => n.id)).toEqual(["world", "eu", "fr"]);
-  });
-
-  it("builds the root→node path inclusive and ordered", () => {
-    const path = pathOf("es-galicia-pontevedra-vigo").map((n) => n.id);
-    expect(path).toEqual([
-      "world",
-      "eu",
-      "es",
-      "es-galicia",
-      "es-galicia-pontevedra",
-      "es-galicia-pontevedra-vigo",
-    ]);
-    expect(pathOf("unknown")).toEqual([]);
-  });
-
-  it("maps pool ids <-> node ids", () => {
-    expect(poolIdForNode("es-galicia")).toBe("geo-es-galicia");
-    expect(geoNodeIdOf("geo-es-galicia")).toBe("es-galicia");
+  it("recognizes geo pool ids by SHAPE, not membership", () => {
     expect(isGeoPoolId("geo-es")).toBe(true);
-    expect(isGeoPoolId("geo-nope")).toBe(false); // unknown node
+    expect(isGeoPoolId("geo-anything")).toBe(true); // server validates existence
+    expect(isGeoPoolId("geo-")).toBe(false); // empty node id
     expect(isGeoPoolId("place-es")).toBe(false); // legacy regional id
     expect(isGeoPoolId("frontpage")).toBe(false);
+    expect(isGeoPoolId(null)).toBe(false);
+    expect(isGeoPoolId(undefined)).toBe(false);
+  });
+
+  it("returns null for non-geo pool ids", () => {
     expect(geoNodeIdOf("place-es")).toBeNull();
+    expect(geoNodeIdOf("frontpage")).toBeNull();
+    expect(geoNodeIdOf("geo-")).toBeNull();
+    expect(geoNodeIdOf(null)).toBeNull();
   });
 });

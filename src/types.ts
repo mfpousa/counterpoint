@@ -67,6 +67,14 @@ export interface Source {
    * Absent for the default front-page sources (treated as "international").
    */
   zone?: string;
+  /**
+   * Top-level subnational REGION this outlet is based in, as an ISO 3166-2 code
+   * (e.g. "ES-GA" for Galicia). Set by the discovery pipeline (Wikidata) so the
+   * geographic drill-down can serve region-specific outlets. Absent when unknown.
+   */
+  region?: string;
+  /** Human-readable label for `region` (e.g. "Galicia"). */
+  regionLabel?: string;
 }
 
 /**

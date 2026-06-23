@@ -176,8 +176,8 @@ export const config = {
   },
   geo: {
     // GEOGRAPHIC POOLS (geo-<nodeId>): world → continent → country → region →
-    // province → locality. Each pool is fed by its node's own outlets (see
-    // server/sourceRegistry.ts) and shows EVERYTHING they report.
+    // province → locality. Each pool is fed by its country's discovered local
+    // outlets (src/data/placeSources/<cc>.json) and shows EVERYTHING they report.
     //
     // Throughput lever: a cheap title-only prescreen scores coarse importance,
     // we near-clone DEDUP the survivors (so identical wire copy is analyzed once),

@@ -16,7 +16,10 @@ const UA_DISCOVERY = "CounterpointFeedDiscovery/0.1 (+https://example.com; conta
 export interface Candidate {
   title: string;
   homepage: string | null;
+  /** Top-level subnational region as ISO 3166-2 (e.g. "ES-GA"), when known. */
   region?: string | null;
+  /** Human-readable label for `region` (e.g. "Galicia"). */
+  regionLabel?: string | null;
 }
 
 /** A Source-shaped result after RSS autodiscovery (matches src/types.ts Source). */
@@ -25,6 +28,7 @@ export interface DiscoveredSource {
   url: string | null; // the validated FEED url (null when none found)
   homepage: string;
   region: string | null;
+  regionLabel: string | null;
   lang: string;
   lean: null;
   confidence: number;
@@ -46,16 +50,26 @@ const WDQS = "https://query.wikidata.org/sparql";
  */
 function wikidataQuery(qid: string, lang: string): string {
   return `
-    SELECT ?outlet ?outletLabel ?website WHERE {
+    SELECT ?outlet ?outletLabel ?website ?regionCode ?regionLabel WHERE {
       VALUES ?type {
         wd:Q11032 wd:Q1110794 wd:Q1153191 wd:Q192283 wd:Q1616075 wd:Q14350
       }
       ?outlet wdt:P31 ?type .
       { ?outlet wdt:P17 wd:${qid} . } UNION { ?outlet wdt:P495 wd:${qid} . }
       OPTIONAL { ?outlet wdt:P856 ?website. }
+      # Top-level subnational region: walk the outlet's location up the admin tree
+      # to the subdivision whose DIRECT parent is the country and which carries an
+      # ISO 3166-2 code (the autonomous community / state / region level).
+      OPTIONAL {
+        ?outlet (wdt:P159|wdt:P131) ?loc .
+        ?loc wdt:P131* ?region .
+        ?region wdt:P131 wd:${qid} .
+        ?region wdt:P300 ?regionCode .
+      }
       SERVICE wikibase:label {
         bd:serviceParam wikibase:language "${lang},en".
         ?outlet rdfs:label ?outletLabel.
+        ?region rdfs:label ?regionLabel.
       }
     }
     LIMIT 1000`;
@@ -64,6 +78,8 @@ function wikidataQuery(qid: string, lang: string): string {
 interface WdBinding {
   outletLabel?: { value: string };
   website?: { value: string };
+  regionCode?: { value: string };
+  regionLabel?: { value: string };
 }
 
 /** WDQS 5xx (esp. 504) are frequently transient — retry with backoff. */
@@ -99,8 +115,15 @@ export async function resolveWikidataOutlets(qid: string, lang: string): Promise
       skippedUnlabeled++;
       continue;
     }
-    if (!byTitle.has(title)) {
-      byTitle.set(title, { title, homepage: b.website?.value ?? null, region: null });
+    const region = b.regionCode?.value?.trim() || null;
+    const regionLabel = b.regionLabel?.value?.trim() || null;
+    const existing = byTitle.get(title);
+    if (!existing) {
+      byTitle.set(title, { title, homepage: b.website?.value ?? null, region, regionLabel });
+    } else if (!existing.region && region) {
+      // Fill in a region from a later binding for the same outlet.
+      existing.region = region;
+      existing.regionLabel = regionLabel;
     }
   }
   console.error(
@@ -111,6 +134,105 @@ export async function resolveWikidataOutlets(qid: string, lang: string): Promise
     console.error("First raw binding:", JSON.stringify(bindings[0], null, 2));
   }
   return [...byTitle.values()];
+}
+
+/** A country's Wikidata identity, resolved from its ISO code (no hand table). */
+export interface CountryInfo {
+  /** Wikidata QID, e.g. "Q29" for Spain. */
+  qid: string;
+  /** English display name, used as the Media Cloud collection search query. */
+  label: string;
+  /** Primary official language as ISO 639-1 (e.g. "es"); "und" if unknown. */
+  lang: string;
+  /** Continent slug for grouping (e.g. "europe"); "" if unknown. */
+  continent: string;
+  /** Human-readable continent label (e.g. "Europe"); "" if unknown. */
+  continentLabel: string;
+}
+
+/** SPARQL: a country by ISO 3166-1 alpha-2 (P297), with its English label, its
+ *  primary official-language code (P37 → P218) and its continent (P30). */
+function countryQuery(cc: string): string {
+  return `
+    SELECT ?country ?countryLabel ?code ?continent ?continentLabel WHERE {
+      ?country wdt:P297 "${cc.toUpperCase()}".
+      OPTIONAL { ?country wdt:P37 ?lang. ?lang wdt:P218 ?code. }
+      OPTIONAL { ?country wdt:P30 ?continent. }
+      SERVICE wikibase:label {
+        bd:serviceParam wikibase:language "en".
+        ?country rdfs:label ?countryLabel.
+        ?continent rdfs:label ?continentLabel.
+      }
+    }
+    LIMIT 1`;
+}
+
+interface WdCountryBinding {
+  country?: { value: string };
+  countryLabel?: { value: string };
+  code?: { value: string };
+  continent?: { value: string };
+  continentLabel?: { value: string };
+}
+
+/** Accent/space-insensitive slug for stable continent ids ("North America" → "north-america"). */
+function slugify(s: string): string {
+  return s
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+}
+
+/**
+ * Resolve a country's Wikidata QID, English name and primary language from its
+ * ISO 3166-1 alpha-2 code — so callers never hand-maintain a QID/lang/name table.
+ * Returns null when the code can't be resolved.
+ */
+export async function resolveCountry(cc: string): Promise<CountryInfo | null> {
+  const code = cc.trim().toLowerCase();
+  if (!/^[a-z]{2}$/.test(code)) return null;
+  const url = `${WDQS}?query=${encodeURIComponent(countryQuery(code))}&format=json`;
+  const res = await fetchWdqs(url);
+  const json = (await res.json()) as { results: { bindings: WdCountryBinding[] } };
+  const b = json.results.bindings[0];
+  const qid = b?.country?.value?.split("/").pop() ?? "";
+  if (!/^Q\d+$/.test(qid)) return null;
+  const continentLabel = b?.continentLabel?.value?.trim() || "";
+  return {
+    qid,
+    label: b?.countryLabel?.value?.trim() || code.toUpperCase(),
+    lang: b?.code?.value?.trim().toLowerCase() || "und",
+    continent: continentLabel ? slugify(continentLabel) : "",
+    continentLabel,
+  };
+}
+
+/** Title-case a continent name so it matches Wikidata's English label exactly. */
+function titleCase(s: string): string {
+  return s.trim().toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/**
+ * All ISO 3166-1 alpha-2 country codes on a continent (matched by English label,
+ * e.g. "Europe"), via Wikidata — so bulk builds need no hand-maintained list.
+ */
+export async function resolveCountriesInContinent(continent: string): Promise<string[]> {
+  const name = titleCase(continent);
+  if (!name) return [];
+  const query = `
+    SELECT DISTINCT ?code WHERE {
+      ?continent rdfs:label "${name.replace(/"/g, '\\"')}"@en .
+      ?country wdt:P30 ?continent ; wdt:P297 ?code .
+    }`;
+  const url = `${WDQS}?query=${encodeURIComponent(query)}&format=json`;
+  const res = await fetchWdqs(url);
+  const json = (await res.json()) as { results: { bindings: Array<{ code?: { value: string } }> } };
+  const codes = new Set<string>();
+  for (const b of json.results.bindings) {
+    const c = b.code?.value?.trim().toLowerCase();
+    if (c && /^[a-z]{2}$/.test(c)) codes.add(c);
+  }
+  console.error(`Wikidata: ${codes.size} countr(ies) on "${name}".`);
+  return [...codes].sort();
 }
 
 // ---------------------------------------------------------------------------
@@ -310,6 +432,7 @@ export async function discoverFeeds(candidates: Candidate[], opts: DiscoverOpts)
       url: feed,
       homepage,
       region: c.region ?? null,
+      regionLabel: c.regionLabel ?? null,
       lang: opts.lang,
       lean: null,
       confidence: 0.5,

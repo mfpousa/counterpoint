@@ -63,8 +63,8 @@ function readWorld(raw: unknown): string {
 }
 
 // NOTE: the `place` lens (gazetteer relevance boost) was removed — regional news
-// now comes from the geographic drill-down pools (`geo-<nodeId>`); see
-// server/sourceRegistry.ts and the client GeoNavigator.
+// now comes from the geographic drill-down pools (`geo-<nodeId>`), fed by each
+// country's discovered placeSources; see server/placeSources.ts + GeoNavigator.
 
 /** The catalogue of worlds (metadata only) the client renders in its switcher. */
 app.get("/api/worlds", (_req, res) => {

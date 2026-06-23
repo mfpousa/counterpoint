@@ -17,7 +17,7 @@ import { StoryCard } from "../../src/components/StoryCard";
 import { lastMinuteStories } from "../../src/lib/storyUpdates";
 import { WorldSwitcher } from "../../src/components/WorldSwitcher";
 import { GeoNavigator } from "../../src/components/GeoNavigator";
-import { GEO_ROOT_ID, geoLabel, geoNodeIdOf, poolIdForNode } from "../../src/data/geo";
+import { GEO_ROOT_ID, isGeoPoolId, poolIdForNode } from "../../src/data/geo";
 import { openStory } from "../../src/lib/nav";
 import { AnalysisProgress } from "../../src/components/AnalysisProgress";
 import { worldById } from "../../src/data/worlds";
@@ -143,8 +143,8 @@ export default function StoriesScreen() {
             <View style={styles.busyBanner}>
               <ActivityIndicator size="small" color={colors.warn} />
               <Text style={styles.busyText}>
-                “{geoNodeIdOf(busy) ? geoLabel(geoNodeIdOf(busy)) : worldById(busy).title}” is still
-                refreshing. Only one refreshes at a time — stories here will build once it’s free.
+                “{isGeoPoolId(busy) ? "Another area" : worldById(busy).title}” is still refreshing.
+                Only one refreshes at a time — stories here will build once it’s free.
               </Text>
             </View>
           )}

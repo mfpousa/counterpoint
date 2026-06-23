@@ -12,7 +12,7 @@ import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { fetchCoverage, type CoverageNode, type CoverageState, type CoverageView } from "../lib/api";
-import { geoNodeIdOf, isGeoNode, GEO_ROOT_ID } from "../data/geo";
+import { geoNodeIdOf, GEO_ROOT_ID } from "../data/geo";
 import { useT } from "../store/AppContext";
 import { colors, font, radius, spacing } from "../theme";
 
@@ -41,11 +41,11 @@ export function GeoNavigator({
 }) {
   const t = useT();
   // "Where you are": an explicitly-selected pool wins; otherwise open at the saved
-  // home node (if still valid), else the world root.
+  // home node, else the world root. The server validates the node (the coverage
+  // endpoint falls back to the root for unknown ids), so no client-side membership
+  // check is needed against the data-driven tree.
   const currentNode =
-    (activePoolId && geoNodeIdOf(activePoolId)) ||
-    (home && isGeoNode(home) ? home : null) ||
-    GEO_ROOT_ID;
+    (activePoolId && geoNodeIdOf(activePoolId)) || home || GEO_ROOT_ID;
   // We browse from (and show the children of) the current node.
   const browseNode = currentNode;
   const [view, setView] = useState<CoverageView | null>(null);

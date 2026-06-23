@@ -1,0 +1,52 @@
+[
+  {
+    "id": "es-faro",
+    "title": "Faro de Vigo",
+    "url": "https://www.farodevigo.es/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis.",
+    "lang": "es",
+    "region": "ES-GA",
+    "regionLabel": "Galicia"
+  },
+  {
+    "id": "es-lavoz",
+    "title": "La Voz de Galicia",
+    "url": "https://www.lavozdegalicia.es/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis.",
+    "lang": "es",
+    "region": "ES-GA",
+    "regionLabel": "Galicia"
+  },
+  {
+    "id": "es-elpais",
+    "title": "El País",
+    "url": "https://www.elpais.com/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis.",
+    "lang": "es",
+    "region": "ES-MD",
+    "regionLabel": "Comunidad de Madrid"
+  },
+  {
+    "id": "es-rtve",
+    "title": "RTVE",
+    "url": "https://www.rtve.es/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis.",
+    "lang": "es"
+  }
+]
