@@ -117,10 +117,15 @@ export default function FeedScreen() {
         // Drop a response the reader has since navigated away from (world/language
         // changed mid-flight) so it can't bleed another world's stories into view.
         if (currentKeyRef.current !== key) return;
-        // Never WIPE a populated set while the backend is mid-rebuild: /api/stories
-        // can transiently return [] during synthesis. Keep showing the stale set
-        // until real stories arrive, then swap them in (they eventually update).
-        if (res.stories.length > 0) {
+        // Apply a response only when it's the AUTHORITATIVE (finished) set, or we have
+        // nothing to show yet. While rebuilding, /api/stories serves STALE data with
+        // `synthesizing: true`, and that stale set can omit the ongoing/developing issues —
+        // letting it replace a populated set briefly WIPED them from the bands until the
+        // fresh build returned. So a synthesizing response only ever FILLS an empty list;
+        // it never overwrites one we already have. The next non-synthesizing response swaps
+        // in the full set (developing included).
+        const havePrev = (storiesByKey.get(key)?.length ?? 0) > 0;
+        if (res.stories.length > 0 && (!res.synthesizing || !havePrev)) {
           setStories(res.stories);
           storiesByKey.set(key, res.stories);
           // Share with the routed story panel so opening a listed story is instant

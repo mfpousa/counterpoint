@@ -12,7 +12,7 @@
 
 import React, { memo, useRef } from "react";
 import type { MutableRefObject } from "react";
-import { useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
+import { useFrame, type ThreeEvent } from "@react-three/fiber";
 import { AdditiveBlending, BackSide, DoubleSide } from "three";
 import type { Group, Mesh, MeshBasicMaterial } from "three";
 import { colors } from "../../theme";
@@ -325,7 +325,6 @@ export function GlobeScene({
   onActivate,
   onHoverMove,
   refs,
-  rightInset = 0,
 }: {
   countries: GlobeCountry[];
   regions: GlobeCountry[];
@@ -343,11 +342,7 @@ export function GlobeScene({
   /** Cursor position (NDC, -1..1) while a place is hovered — drives the floating pin. */
   onHoverMove?: (x: number, y: number) => void;
   refs: GlobeViewRefs;
-  /** Width (px) the side panel covers on the RIGHT (desktop). The globe eases LEFT by
-   *  half this so the focused content stays centred in the visible area. 0 = no shift. */
-  rightInset?: number;
 }) {
-  const viewport = useThree((s) => s.viewport);
   const group = useRef<Group>(null);
   useFrame((_, delta) => {
     const g = group.current;
@@ -371,10 +366,6 @@ export function GlobeScene({
     g.rotation.x = Math.max(-1.2, Math.min(1.2, refs.rot.current.pitch));
     const s = g.scale.x + (refs.zoom.current - g.scale.x) * 0.2;
     g.scale.setScalar(s);
-    // Desktop: when the side panel covers the right, ease the globe LEFT so the focused
-    // content centres in the VISIBLE area instead of hiding behind the panel.
-    const targetX = rightInset > 0 && viewport.factor > 0 ? -(rightInset / 2) / viewport.factor : 0;
-    g.position.x += (targetX - g.position.x) * 0.12;
   });
 
   // Scroll-wheel zoom that pulls the point under the cursor toward the view centre as it

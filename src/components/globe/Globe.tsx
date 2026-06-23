@@ -706,7 +706,6 @@ export function Globe({
             gizmos={gizmos}
             alerts={alerts}
             onAlertPress={onAlertPress}
-            rightInset={rightInset}
             autoSpin={browse === GEO_ROOT_ID && !activePoolId}
             focusedId={focusedId}
             onFocus={setFocusedId}
