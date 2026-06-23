@@ -48,9 +48,9 @@ import {
   type CountryShape,
   type GeoCentroids,
 } from "../../lib/geoShapes";
-import { buildAlerts, type GeoAlert } from "../../lib/geoAlerts";
+import { EVENT_CATEGORIES, buildAlerts, type EventCategory, type GeoAlert } from "../../lib/geoAlerts";
 import { searchPlaces, type PlaceHit } from "../../lib/placeSearch";
-import type { Story } from "../../types";
+import type { AnalysisStatus, Story } from "../../types";
 import countries110m from "../../data/world/countries-110m.json";
 import { useT } from "../../store/AppContext";
 import { colors, font, radius, spacing } from "../../theme";
@@ -122,6 +122,8 @@ export function Globe({
   onPlace,
   browseNode,
   onNavigate,
+  status,
+  onAlertPress,
   topInset = 0,
   height = 320,
 }: {
@@ -143,6 +145,10 @@ export function Globe({
   browseNode?: string;
   /** Fired on every USER map navigation so the host can push a page-history entry. */
   onNavigate?: (nodeId: string) => void;
+  /** Live backend analysis status — drives a compact "Updating <place>" pill. */
+  status?: AnalysisStatus | null;
+  /** Tap a worldview marker → open its story (the host routes to the reader). */
+  onAlertPress?: (id: string) => void;
   /** Safe-area top inset (px) so the hero search clears the status bar/notch. */
   topInset?: number;
   /** Canvas height in px (it sits inside a scroll view). */
@@ -228,8 +234,9 @@ export function Globe({
     }
   }, []);
 
-  // Ongoing-story alerts: locate developing stories on the globe by detected zone or
-  // a country name in the headline, sized/coloured by gravity (Story.severity).
+  // Worldview: locate MAJOR events on the globe (by detected zone or a country name in
+  // the headline), classified by category and sized by gravity. Only fairly newsworthy
+  // events (severity >= 0.4) so the map reads as the day's big picture, not noise.
   const alerts = useMemo<GeoAlert[]>(() => {
     if (!worldGeo || stories.length === 0) return [];
     const centroidByName = new Map(
@@ -238,9 +245,15 @@ export function Globe({
     return buildAlerts(
       stories,
       { centroidByIso2: worldGeo.centroids.byIso2, centroidByName, zoneToIso2: ZONE_ISO2 },
-      { max: 40 },
+      { minSeverity: 0.4, max: 40 },
     );
   }, [worldGeo, stories]);
+
+  // The categories actually present, for the on-globe legend (in a stable order).
+  const legendCats = useMemo<EventCategory[]>(() => {
+    const present = new Set(alerts.map((a) => a.category));
+    return (Object.keys(EVENT_CATEGORIES) as EventCategory[]).filter((c) => present.has(c));
+  }, [alerts]);
 
   // Unified place search (continents + countries) over the bundled centroids. Picking
   // a result flies the globe there, commits it as the feed pool, and opens articles.
@@ -557,6 +570,20 @@ export function Globe({
     }
   };
 
+  // Jump straight back to the top of the world (the front page), from any depth.
+  const goWorld = () => {
+    navTo(GEO_ROOT_ID);
+    onSelectWorld?.();
+  };
+
+  // Fly to the saved HOME node and make it the feed (the counterpart to “set home”).
+  const goHome = () => {
+    if (!home) return;
+    navTo(home);
+    onSelect(poolIdForNode(home));
+    onOpenArticles?.();
+  };
+
   const zoomBy = (factor: number) => {
     refs.zoom.current = clamp(refs.zoom.current * factor, ZOOM_MIN, ZOOM_MAX);
   };
@@ -627,6 +654,7 @@ export function Globe({
             outline={regionOutline}
             gizmos={gizmos}
             alerts={alerts}
+            onAlertPress={onAlertPress}
             autoSpin={browse === GEO_ROOT_ID && !activePoolId}
             focusedId={focusedId}
             onFocus={setFocusedId}
@@ -694,9 +722,14 @@ export function Globe({
           pointerEvents="box-none"
         >
           {!atRoot && (
-            <Pressable onPress={goUp} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel={t("geo.allRegions")}>
-              <Ionicons name="arrow-up" size={14} color={colors.text} />
-            </Pressable>
+            <>
+              <Pressable onPress={goUp} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel={t("geo.allRegions")}>
+                <Ionicons name="arrow-up" size={14} color={colors.text} />
+              </Pressable>
+              <Pressable onPress={goWorld} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel={t("geo.world")}>
+                <Ionicons name="earth" size={14} color={colors.text} />
+              </Pressable>
+            </>
           )}
           <View style={styles.levelPill}>
             <Ionicons name="location-outline" size={12} color={colors.textDim} />
@@ -704,9 +737,16 @@ export function Globe({
               {nodeLabel}
             </Text>
           </View>
+          {/* GO to the saved home (distinct from pinning it below). */}
+          {home && browse !== home && (
+            <Pressable onPress={goHome} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel={t("geo.home")}>
+              <Ionicons name="home" size={14} color={colors.accent} />
+            </Pressable>
+          )}
+          {/* PIN the current place as home (a bookmark, so it never looks like 'go home'). */}
           {onSetHome && !atRoot ? (
             <Pressable onPress={() => onSetHome(browse)} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel={t("geo.setHome")}>
-              <Ionicons name={home === browse ? "home" : "home-outline"} size={13} color={home === browse ? colors.accent : colors.textDim} />
+              <Ionicons name={home === browse ? "bookmark" : "bookmark-outline"} size={13} color={home === browse ? colors.accent : colors.textDim} />
             </Pressable>
           ) : null}
         </View>
@@ -749,6 +789,30 @@ export function Globe({
             </Pressable>
           </View>
         </View>
+
+        {/* Compact "what's updating" pill so backend work is visible over the globe too. */}
+        {hero && status?.active && (
+          <View style={styles.statusWrap} pointerEvents="none">
+            <View style={styles.statusPill}>
+              <ActivityIndicator size="small" color={colors.accent} />
+              <Text style={styles.statusText} numberOfLines={1}>
+                {t("analysis.updating", { place: status.label || t("geo.world") })}
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* Worldview legend: which event categories are coloured on the map right now. */}
+        {hero && legendCats.length > 0 && (
+          <View style={styles.legend} pointerEvents="none">
+            {legendCats.map((cat) => (
+              <View key={cat} style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: EVENT_CATEGORIES[cat].color }]} />
+                <Text style={styles.legendText}>{EVENT_CATEGORIES[cat].label}</Text>
+              </View>
+            ))}
+          </View>
+        )}
 
         {loading && (
           <View style={styles.center} pointerEvents="none">
@@ -818,6 +882,41 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   searchResultText: { flex: 1, color: colors.text, fontSize: font.small, fontWeight: "700" },
+  statusWrap: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 56,
+    alignItems: "center",
+    paddingHorizontal: spacing.lg,
+  },
+  statusPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    maxWidth: "100%",
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface + "F0",
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  statusText: { color: colors.text, fontSize: font.small, fontWeight: "700", flexShrink: 1 },
+  legend: {
+    position: "absolute",
+    left: spacing.lg,
+    right: spacing.lg,
+    bottom: 98,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    rowGap: spacing.xs,
+    columnGap: spacing.md,
+  },
+  legendItem: { flexDirection: "row", alignItems: "center", gap: 5 },
+  legendDot: { width: 9, height: 9, borderRadius: 5 },
+  legendText: { color: colors.textDim, fontSize: font.tiny, fontWeight: "700" },
   topBar: {
     position: "absolute",
     top: spacing.sm,

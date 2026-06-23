@@ -135,6 +135,13 @@ class WorldStoryStore {
     return pickBestMatch([...this.store.values()], kind, memberIds, used, threshold);
   }
 
+  /** A cached story by id (still held while within the retention window even if it
+   *  dropped out of the current result), so a deep/related link can resolve it. */
+  get(id: string): CachedStory | undefined {
+    this.load();
+    return this.store.get(id);
+  }
+
   /** Keep `keepIds` (in the current result) plus any entry still within the feed
    *  retention window (so a temporarily-quiet development survives to revive
    *  without re-synthesis); drop the rest. Returns the number removed. */

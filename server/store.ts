@@ -180,6 +180,21 @@ export function getStore(worldId: string): WorldStore {
 }
 
 /**
+ * Stored items across ALL instantiated pools whose id matches `include(worldId)`.
+ * Lets the WORLD view synthesize ongoing stories from ALL the news the process has
+ * fetched (front page + every geo/regional pool that's been loaded), instead of one
+ * pool in isolation. Only LOADED pools contribute — we can't synthesize from news we
+ * never fetched — so the world's stories get richer as more places are visited.
+ */
+export function storedAcrossPools(include: (worldId: string) => boolean): StoredItem[] {
+  const out: StoredItem[] = [];
+  for (const [worldId, store] of stores) {
+    if (include(worldId)) out.push(...store.all());
+  }
+  return out;
+}
+
+/**
  * Find an analyzed item by id across EVERY known world. Used by the rewrite /
  * grade endpoints, which receive only an item id. `preferWorld` (the caller's
  * active world) is checked first for speed; otherwise we scan all worlds.

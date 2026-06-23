@@ -1,4 +1,4 @@
-import { buildAlerts, locateStory, type AlertPlaceIndex } from "../src/lib/geoAlerts";
+import { buildAlerts, classifyEvent, locateStory, type AlertPlaceIndex } from "../src/lib/geoAlerts";
 import { latLonToVec3 } from "../src/lib/globeLayout";
 import type { Story } from "../src/types";
 
@@ -51,17 +51,19 @@ describe("geoAlerts (locate ongoing stories on the globe)", () => {
     expect(locateStory(story({ developing: true, title: "Markets wobble" }), IDX)).toBeNull();
   });
 
-  it("buildAlerts keeps only locatable DEVELOPING stories", () => {
+  it("buildAlerts keeps locatable MAJOR events (developing or not), strongest first", () => {
     const alerts = buildAlerts(
       [
         story({ id: "a", developing: true, severity: 0.6, sources: [{ zone: "ukraine" } as never] }),
-        story({ id: "b", developing: false, severity: 0.9, sources: [{ zone: "ukraine" } as never] }), // not developing
+        story({ id: "b", developing: false, severity: 0.9, sources: [{ zone: "ukraine" } as never] }),
         story({ id: "c", developing: true, severity: 0.7, title: "Nothing here" }), // unlocatable
       ],
       IDX,
     );
-    expect(alerts.map((a) => a.id)).toEqual(["a"]);
+    // b (0.9) outranks a (0.6); the single event b is included now, not just developing ones.
+    expect(alerts.map((a) => a.id)).toEqual(["b", "a"]);
     expect(alerts[0].dir).toBe(uaDir);
+    expect(alerts.find((x) => x.id === "b")?.developing).toBe(false);
   });
 
   it("sorts by severity and honours minSeverity + max", () => {
@@ -71,5 +73,23 @@ describe("geoAlerts (locate ongoing stories on the globe)", () => {
     ];
     expect(buildAlerts(stories, IDX, { minSeverity: 0.5 }).map((a) => a.id)).toEqual(["hi"]);
     expect(buildAlerts(stories, IDX, { max: 1 }).map((a) => a.id)).toEqual(["hi"]);
+  });
+});
+
+describe("classifyEvent (news → world-event category)", () => {
+  const ev = (title: string, topic = "world") => classifyEvent({ title, summary: "", topic });
+  it("detects conflict", () => expect(ev("Russia launches missile attack on troops")).toBe("conflict"));
+  it("detects diplomacy", () => expect(ev("Leaders hold peace talks at summit")).toBe("diplomacy"));
+  it("detects unrest", () => expect(ev("Mass protests and riots erupt after election")).toBe("unrest"));
+  it("detects health", () => expect(ev("New virus outbreak spreads, vaccine sought")).toBe("health"));
+  it("detects disaster", () => expect(ev("Major earthquake and tsunami hit the coast")).toBe("disaster"));
+  it("detects tech", () => expect(ev("Semiconductor breakthrough in quantum computing")).toBe("tech"));
+  it("detects economy", () => expect(ev("Inflation spikes as the stock market tumbles")).toBe("economy"));
+  it("conflict outranks unrest on a tie via priority", () =>
+    expect(ev("Air strike amid protest")).toBe("conflict"));
+  it("falls back to topic when no keyword matches", () => {
+    expect(ev("A calm day", "technology")).toBe("tech");
+    expect(ev("A calm day", "health")).toBe("health");
+    expect(ev("A calm day", "culture")).toBe("other");
   });
 });

@@ -17,7 +17,7 @@ import { AdditiveBlending, BackSide, DoubleSide } from "three";
 import type { Group, Mesh, MeshBasicMaterial } from "three";
 import { colors } from "../../theme";
 import { hashId, type Vec3 } from "../../lib/globeLayout";
-import type { GeoAlert } from "../../lib/geoAlerts";
+import { EVENT_CATEGORIES, type GeoAlert } from "../../lib/geoAlerts";
 
 /** One geographic entity to render on the globe (a continent/country/region). */
 export interface GlobeEntityData {
@@ -241,47 +241,53 @@ function Countries({
   );
 }
 
-/** Severity → colour ramp (calm amber → urgent red). Bigger stories pull more eye. */
-function severityColor(sev: number): string {
-  if (sev >= 0.66) return "#E8654E";
-  if (sev >= 0.33) return "#E0A94B";
-  return "#E6B86B";
-}
-
-/** One ongoing-story alert: a solid core + an outward "sonar" ping that loops, sized
- *  and coloured by the story's gravity. The phase is desynced per id so they shimmer. */
-function AlertMarker({ alert }: { alert: GeoAlert }) {
+/** One world-event marker: a solid core + an outward "sonar" ping that loops, sized by
+ *  gravity and COLOURED BY EVENT CATEGORY (conflict/health/tech…). The phase is desynced
+ *  per id so they shimmer, and an invisible larger hit sphere makes the tiny dot tappable
+ *  (→ open the story), turning the globe into an explorable worldview. */
+function AlertMarker({ alert, onPress }: { alert: GeoAlert; onPress?: (id: string) => void }) {
   const ping = useRef<Mesh>(null);
   const mat = useRef<MeshBasicMaterial>(null);
-  const r = 0.01 + alert.severity * 0.018;
-  const color = severityColor(alert.severity);
+  const r = 0.012 + alert.severity * 0.02;
+  const color = EVENT_CATEGORIES[alert.category].color;
   const phase = (hashId(alert.id) % 1000) / 1000;
   useFrame((state) => {
     const tt = (state.clock.elapsedTime * 0.7 + phase) % 1;
     if (ping.current) ping.current.scale.setScalar(1 + tt * 3.5);
-    if (mat.current) mat.current.opacity = (1 - tt) * 0.45;
+    if (mat.current) mat.current.opacity = (1 - tt) * 0.5;
   });
   return (
     <group
       position={[alert.dir.x * ALERT_RADIUS, alert.dir.y * ALERT_RADIUS, alert.dir.z * ALERT_RADIUS]}
     >
       <mesh>
-        <sphereGeometry args={[r, 10, 10]} />
+        <sphereGeometry args={[r, 12, 12]} />
         <meshBasicMaterial color={color} />
       </mesh>
       <mesh ref={ping}>
-        <sphereGeometry args={[r, 10, 10]} />
-        <meshBasicMaterial ref={mat} color={color} transparent opacity={0.4} depthWrite={false} />
+        <sphereGeometry args={[r, 12, 12]} />
+        <meshBasicMaterial ref={mat} color={color} transparent opacity={0.45} depthWrite={false} />
       </mesh>
+      {onPress && (
+        <mesh
+          onClick={(e: ThreeEvent<MouseEvent>) => {
+            e.stopPropagation();
+            onPress(alert.id);
+          }}
+        >
+          <sphereGeometry args={[Math.max(r * 2.6, 0.05), 8, 8]} />
+          <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+        </mesh>
+      )}
     </group>
   );
 }
 
-function Alerts({ alerts }: { alerts: GeoAlert[] }) {
+function Alerts({ alerts, onPress }: { alerts: GeoAlert[]; onPress?: (id: string) => void }) {
   return (
     <>
       {alerts.map((a) => (
-        <AlertMarker key={a.id} alert={a} />
+        <AlertMarker key={a.id} alert={a} onPress={onPress} />
       ))}
     </>
   );
@@ -294,6 +300,7 @@ export function GlobeScene({
   outline,
   gizmos,
   alerts,
+  onAlertPress,
   autoSpin,
   focusedId,
   onFocus,
@@ -306,6 +313,8 @@ export function GlobeScene({
   outline: Float32Array | null;
   gizmos: GlobeEntityData[];
   alerts: GeoAlert[];
+  /** Tapping a worldview marker opens its story. */
+  onAlertPress?: (id: string) => void;
   /** Idle auto-rotate ONLY on the pristine world landing; stops once a place is chosen. */
   autoSpin: boolean;
   focusedId: string | null;
@@ -411,8 +420,8 @@ export function GlobeScene({
             onActivate={onActivate}
           />
         ))}
-        {/* Pulsing severity alerts where ongoing stories are happening. */}
-        <Alerts alerts={alerts} />
+        {/* Worldview: category-coloured, gravity-sized event markers (tap to open). */}
+        <Alerts alerts={alerts} onPress={onAlertPress} />
       </group>
     </>
   );

@@ -16,21 +16,27 @@ function pct(done: number, total: number): number {
 export function AnalysisProgress({ status }: { status: AnalysisStatus | null }) {
   const t = useT();
   if (!status) return null;
-  const { phase, active, done, total, pending, analyzed } = status;
+  const { phase, active, done, total, pending, analyzed, label } = status;
   // Nothing happening and no backlog — stay out of the way.
   if (!active && pending === 0) return null;
-  const phaseLabel = t(`analysis.${phase}`);
 
+  const place = label || t("geo.world");
+  const phaseLabel = t(`analysis.${phase}`);
   const overallTotal = analyzed + pending;
-  // Prefer the in-pass bar when we have one; otherwise fall back to overall.
-  const ratio = total > 0 ? pct(done, total) : pct(analyzed, overallTotal);
-  const showPassCount = total > 0 && (phase === "analyzing" || phase === "triage");
+  // The model passes that report a per-chunk count drive a per-pass bar; everything
+  // else (fetching, synthesizing, idle-with-backlog) falls back to overall progress.
+  const passBar =
+    total > 0 && (phase === "analyzing" || phase === "triage" || phase === "embedding");
+  const ratio = passBar ? pct(done, total) : pct(analyzed, overallTotal);
 
   return (
     <View style={styles.card}>
       <View style={styles.headerRow}>
         <ActivityIndicator size="small" color={colors.accent} />
-        <Text style={styles.label}>{phaseLabel}</Text>
+        {/* WHICH place is getting updates right now. */}
+        <Text style={styles.label} numberOfLines={1}>
+          {active ? t("analysis.updating", { place }) : t("analysis.upToDate", { place })}
+        </Text>
         <Text style={styles.count}>
           {overallTotal > 0
             ? t("analysis.analyzed", {
@@ -45,11 +51,15 @@ export function AnalysisProgress({ status }: { status: AnalysisStatus | null }) 
         <View style={[styles.fill, { width: `${Math.round(ratio * 100)}%` }]} />
       </View>
 
-      <Text style={styles.sub}>
-        {showPassCount
-          ? t("analysis.batch", { done: done.toLocaleString(), total: total.toLocaleString() })
-          : phaseLabel}
-        {pending > 0 ? ` · ${t("analysis.pending", { n: pending.toLocaleString() })}` : ` · ${t("analysis.done")}`}
+      {/* Exactly what stage it's on, the per-batch count, and what's left. */}
+      <Text style={styles.sub} numberOfLines={1}>
+        {phaseLabel}
+        {passBar
+          ? ` · ${t("analysis.batch", { done: done.toLocaleString(), total: total.toLocaleString() })}`
+          : ""}
+        {pending > 0
+          ? ` · ${t("analysis.pending", { n: pending.toLocaleString() })}`
+          : ` · ${t("analysis.done")}`}
       </Text>
     </View>
   );

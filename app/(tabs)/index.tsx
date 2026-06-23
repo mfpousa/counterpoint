@@ -319,10 +319,11 @@ export default function FeedScreen() {
   const [placeTitle, setPlaceTitle] = useState<string | null>(null);
   // Map navigation lives in the URL so the browser's back/forward arrows move the map.
   const navParams = useLocalSearchParams<{ place?: string }>();
+  // URL param first, then the committed pool, else the WORLD (the globe opens on the
+  // world landing; the saved home is reached via the globe's home button, not auto).
   const place =
     (typeof navParams.place === "string" && navParams.place) ||
     (prefs.geoPool && geoNodeIdOf(prefs.geoPool)) ||
-    prefs.geoHome ||
     GEO_ROOT_ID;
 
   // Responsive layout math — the feed now lives in the side/sheet panel, so card
@@ -346,6 +347,8 @@ export default function FeedScreen() {
         stories={stories}
         worldActive={worldId === DEFAULT_WORLD_ID && !prefs.geoPool}
         topInset={insets.top}
+        status={status}
+        onAlertPress={(id) => openStory(id)}
         onPlace={setPlaceTitle}
         browseNode={place}
         onNavigate={(nodeId) =>
@@ -390,8 +393,18 @@ export default function FeedScreen() {
         onExpand={() => setPanelState("open")}
         onClose={() => setPanelState(isWide ? "hidden" : "peek")}
       >
-        {/* World switcher: pick which news universe to browse (front page = World). */}
-        <WorldSwitcher worldId={worldId} busyWorld={busyWorld} onSelect={setWorld} />
+        {/* World switcher: pick which news universe to browse (front page = World).
+            Switching the topical world EXITS geo mode, so clear the globe's place too
+            (otherwise the map keeps showing the old place while the feed has moved). */}
+        <WorldSwitcher
+          worldId={worldId}
+          busyWorld={busyWorld}
+          onSelect={(id) => {
+            setWorld(id);
+            setPlaceTitle(null);
+            router.push("/");
+          }}
+        />
 
         {/* Only one world refreshes at a time. Surface this only when the
             selected world has nothing to show because another is hogging the lock. */}

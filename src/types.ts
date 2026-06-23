@@ -437,20 +437,24 @@ export interface StoryView {
 
 /** Live backend build/analysis progress, surfaced from GET /api/status. */
 export interface AnalysisStatus {
-  /** Current phase: idle | fetching | triage | transcripts | analyzing. */
-  phase: "idle" | "fetching" | "triage" | "transcripts" | "analyzing";
+  /** Current pipeline stage, in order: fetching sources → triage (scan headlines)
+   *  → analyzing (deep read) → embedding → synthesizing (stories) → idle. */
+  phase: "idle" | "fetching" | "triage" | "transcripts" | "analyzing" | "embedding" | "synthesizing";
   /** Whether a build/analysis is currently running. */
   active: boolean;
   /** Items completed in the current pass. */
   done: number;
   /** Items in the current pass. */
   total: number;
-  /** Items still awaiting deep analysis (within the recency window). */
+  /** Items still awaiting deep analysis (the REAL remaining work, capped/deduped). */
   pending: number;
   /** Items analyzed and eligible for the feed (within the recency window). */
   analyzed: number;
   /** The world this status is for. */
   world?: string;
+  /** Human-readable name of the PLACE/world currently getting updates (e.g. "Galicia",
+   *  "Spain", "Front page") — shown in the indicator as "Updating <label>". */
+  label?: string;
   /** If a DIFFERENT world is currently refreshing (only one runs at a time),
    *  its id; else null. The UI uses this to show a 'busy' banner. */
   busyWith?: string | null;

@@ -1,6 +1,7 @@
-// Pure: place ONGOING (developing) stories onto the globe as "alert" markers, sized
-// and coloured by their gravity (Story.severity 0..1). Stories carry no explicit
-// coordinates, so we locate one two ways, best-first:
+// Pure: turn the news into a "worldview" — place MAJOR world events onto the globe,
+// CLASSIFIED (conflict, diplomacy, unrest, health, tech, disaster, economy) and sized
+// by gravity (Story.severity 0..1). Stories carry no explicit coordinates, so we locate
+// one two ways, best-first:
 //
 //   1. ZONES — the affiliation zones the model attached to the story (sides[].zones
 //      and each source's `zone`, e.g. "ukraine"/"russia"). Mapped to a country ISO-2
@@ -14,11 +15,92 @@
 import type { Story } from "../types";
 import type { Vec3 } from "./globeLayout";
 
-/** A located ongoing story, ready to render as a pulsing globe marker. */
+/** A class of world EVENT we extract from the news to paint the globe's worldview. */
+export type EventCategory =
+  | "conflict"
+  | "diplomacy"
+  | "unrest"
+  | "health"
+  | "tech"
+  | "disaster"
+  | "economy"
+  | "other";
+
+/** Per-category visuals: marker COLOUR (globe) + a legend label & Ionicons glyph name
+ *  (RN legend). Kept here, pure, so the globe and the legend always agree. */
+export const EVENT_CATEGORIES: Record<
+  EventCategory,
+  { color: string; label: string; icon: string }
+> = {
+  conflict: { color: "#E8654E", label: "Conflict", icon: "flame" },
+  unrest: { color: "#E0A94B", label: "Unrest", icon: "megaphone" },
+  diplomacy: { color: "#6EA8FE", label: "Diplomacy", icon: "people-circle" },
+  health: { color: "#5BD6A6", label: "Health", icon: "medkit" },
+  tech: { color: "#9B8CFF", label: "Tech & science", icon: "hardware-chip" },
+  disaster: { color: "#E06C9F", label: "Disaster", icon: "warning" },
+  economy: { color: "#56C2D6", label: "Economy", icon: "trending-up" },
+  other: { color: "#9AA4B2", label: "Other", icon: "ellipse" },
+};
+
+/** Keyword signatures per category (lowercase substrings scanned in title + dek). */
+const CATEGORY_KEYWORDS: Record<Exclude<EventCategory, "other">, string[]> = {
+  conflict: ["war","airstrike","air strike","drone strike","missile","troops","invasion","offensive","military","bombing","shelling","frontline","combat","militant","insurgent","artillery","occupation","gunmen","clashes","killed in"],
+  disaster: ["earthquake","flood","wildfire","hurricane","tsunami","drought","eruption","volcano","landslide","typhoon","cyclone","heatwave","famine","mudslide","quake"],
+  health: ["virus","outbreak","disease","pandemic","vaccine","epidemic","covid","measles","cholera","ebola","mpox","infection","health crisis","contagion"],
+  unrest: ["protest","riot","coup","unrest","demonstration","rally","crackdown","uprising","walkout","election","referendum","impeach","ousted","dissident"],
+  diplomacy: ["talks","summit","treaty","sanction","diplomat","negotiat","accord","envoy","ambassador","peace deal","alliance","memorandum"],
+  tech: ["artificial intelligence","semiconductor","quantum","satellite","rocket","spacecraft","breakthrough","robot","startup","chipmaker","ai model"],
+  economy: ["inflation","recession","stock market","tariff","trade war","gdp","currency","interest rate","bankrupt","oil price","economic"],
+};
+
+// Tie-break order: a story matching both "war" and "election" reads as CONFLICT.
+const CATEGORY_PRIORITY: Exclude<EventCategory, "other">[] = [
+  "conflict",
+  "disaster",
+  "health",
+  "unrest",
+  "diplomacy",
+  "tech",
+  "economy",
+];
+
+/** Classify a story into a world-event category by keyword signal, falling back to its
+ *  topic. Heuristic + deterministic (no model call) so it's instant and unit-tested. */
+export function classifyEvent(story: { title: string; summary: string; topic: string }): EventCategory {
+  const hay = `${story.title} ${story.summary}`.toLowerCase();
+  let best: EventCategory = "other";
+  let bestScore = 0;
+  for (const cat of CATEGORY_PRIORITY) {
+    let score = 0;
+    for (const kw of CATEGORY_KEYWORDS[cat]) if (hay.includes(kw)) score += 1;
+    if (score > bestScore) {
+      bestScore = score;
+      best = cat;
+    }
+  }
+  if (bestScore > 0) return best;
+  switch (story.topic) {
+    case "technology":
+    case "science":
+      return "tech";
+    case "health":
+      return "health";
+    case "economics":
+      return "economy";
+    default:
+      return "other";
+  }
+}
+
+/** A located world event, ready to render on the globe's worldview map. */
 export interface GeoAlert {
   id: string;
   title: string;
   topic: string;
+  /** World-event category (drives the marker colour + the legend). */
+  category: EventCategory;
+  /** True for an ongoing/developing issue (vs a single settled event). */
+  developing: boolean;
   /** 0..1 gravity — drives marker size + colour intensity. */
   severity: number;
   /** Unit direction on the sphere for the marker. */
@@ -56,7 +138,9 @@ export function locateStory(story: Story, idx: AlertPlaceIndex): Vec3 | null {
   return best?.dir ?? null;
 }
 
-/** Locate every ongoing story we can, strongest gravity first (capped by `max`). */
+/** Locate every MAJOR locatable event (above `minSeverity`), classify it, strongest
+ *  gravity first (capped by `max`). Includes single events AND ongoing issues — the
+ *  worldview is everything happening now, not just developing storylines. */
 export function buildAlerts(
   stories: Story[],
   idx: AlertPlaceIndex,
@@ -65,12 +149,19 @@ export function buildAlerts(
   const minSeverity = opts.minSeverity ?? 0;
   const out: GeoAlert[] = [];
   for (const s of stories) {
-    if (!s.developing) continue; // alerts = ONGOING issues
     const severity = typeof s.severity === "number" ? s.severity : 0.5;
     if (severity < minSeverity) continue;
     const dir = locateStory(s, idx);
     if (!dir) continue;
-    out.push({ id: s.id, title: s.title, topic: s.topic, severity, dir });
+    out.push({
+      id: s.id,
+      title: s.title,
+      topic: s.topic,
+      category: classifyEvent(s),
+      developing: !!s.developing,
+      severity,
+      dir,
+    });
   }
   out.sort((a, b) => b.severity - a.severity);
   return typeof opts.max === "number" ? out.slice(0, opts.max) : out;

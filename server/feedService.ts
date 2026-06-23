@@ -13,7 +13,7 @@
 
 import { fetchAll } from "../src/lib/rss";
 import type { AnalysisStatus, Briefing, FeedItem, Lang, Story } from "../src/types";
-import { DEFAULT_WORLD_ID, isPlaceWorldId, placeCountryOf, worldSources } from "../src/data/worlds";
+import { DEFAULT_WORLD_ID, WORLDS, isPlaceWorldId, placeCountryOf, worldSources } from "../src/data/worlds";
 import {
   geoNodeIdOf,
   GEO_ROOT_ID,
@@ -62,7 +62,7 @@ import { cosineSim, embedQuery, embedTexts, itemEmbedText } from "./embeddings";
 import { interestTokens, partitionByExclusion, toFeedItem, tokenize } from "./personalize";
 import { interpretQuery, type ParsedQuery } from "./query";
 import { rankItems } from "./rank";
-import { getStore, type StoredItem } from "./store";
+import { getStore, storedAcrossPools, type StoredItem } from "./store";
 import { getStoryStore, type StoryKind } from "./storyStore";
 import { buildDevelopingStory, buildStory } from "./synthesize";
 import { fetchTranscripts } from "./transcripts";
@@ -91,7 +91,14 @@ export interface FeedResult {
 
 // Live build progress, surfaced to the UI via /api/status so users can watch
 // the (potentially long) analysis advance instead of staring at a spinner.
-type BuildPhase = "idle" | "fetching" | "triage" | "transcripts" | "analyzing";
+type BuildPhase =
+  | "idle"
+  | "fetching"
+  | "triage"
+  | "transcripts"
+  | "analyzing"
+  | "embedding"
+  | "synthesizing";
 
 /** All mutable build/cache state for ONE world. */
 interface WorldState {
@@ -194,6 +201,16 @@ function markWatched(worldId: string): void {
   }
 }
 
+/** Human-readable name of the place/world a status refers to (shown in the UI as
+ *  'Updating <place>'): the geo node's label for geo pools, the country for regional
+ *  pools, else the topical world's title. */
+function poolLabel(worldId: string): string {
+  if (isGeoPoolId(worldId)) return geoLabel(geoNodeIdOf(worldId)) || "World";
+  const cc = placeCountryOf(worldId);
+  if (cc) return placeLabelFor(cc);
+  return WORLDS.find((w) => w.id === worldId)?.title ?? worldId;
+}
+
 /** Snapshot of build/analysis progress for a world, for the UI. */
 export function getStatus(worldId: string = DEFAULT_WORLD_ID): AnalysisStatus {
   // Every status poll is a heartbeat that this pool is being watched — and the
@@ -202,15 +219,17 @@ export function getStatus(worldId: string = DEFAULT_WORLD_ID): AnalysisStatus {
   const state = ws(worldId);
   const st = getStore(worldId);
   const cutoff = analyzeCutoff();
-  // Queued-but-not-yet-prescreened items count as pending too, so the UI reflects
-  // the FULL remaining backlog (not just what's already in the store).
-  let pending = state.prescreenQueue.length;
   let analyzed = 0;
   for (const s of st.all()) {
     if (s.clickbait || s.item.publishedAt < cutoff) continue;
     if (s.analyzed) analyzed += 1;
-    else pending += 1;
   }
+  // Remaining = queued-but-not-yet-prescreened + what the analyzer WILL actually deep-
+  // analyze (the capped/deduped set), NOT every un-analyzed item. Counting the whole
+  // un-analyzed store is what made capped geo/place pools show a backlog that never
+  // drained — "N pending" stuck forever even though the server was done. Mirroring
+  // pendingForAnalysis makes the indicator reach completion when the analyzer does.
+  const pending = state.prescreenQueue.length + pendingForAnalysis(worldId).length;
   const active =
     state.status.phase !== "idle" ||
     state.buildInFlight !== null ||
@@ -227,6 +246,7 @@ export function getStatus(worldId: string = DEFAULT_WORLD_ID): AnalysisStatus {
     pending,
     analyzed,
     world: worldId,
+    label: poolLabel(worldId),
     busyWith: null,
   };
 }
@@ -827,6 +847,7 @@ function embedPending(worldId: string): Promise<{ remaining: number; progressed:
     // Reuse the analysis chunk size for the embedding chunk.
     const slice = config.ai.maxItems > 0 ? pending.slice(0, config.ai.maxItems) : pending;
     const texts = slice.map((s) => itemEmbedText(s.item.title, s.summary, s.keywords));
+    setPhase(state, "embedding", 0, slice.length);
     console.log(`[feed:${worldId}] embedding ${slice.length} of ${pending.length} item(s)…`);
     const vecs = await withModelLock(() => embedTexts(texts));
 
@@ -848,6 +869,7 @@ function embedPending(worldId: string): Promise<{ remaining: number; progressed:
     }
     // If nothing embedded, embeddings are unavailable: stop the loop.
     const remaining = progressed > 0 ? pendingForEmbedding(worldId).length : 0;
+    if (state.status.phase === "embedding") setPhase(state, remaining === 0 ? "idle" : "embedding", progressed, slice.length);
     console.log(`[feed:${worldId}] embedded ${progressed}/${slice.length}; ${remaining} still need embeddings`);
     return { remaining, progressed };
   })().finally(() => {
@@ -1623,9 +1645,26 @@ function storyEligible(worldId: string, now = Date.now()): StoredItem[] {
     config.feed.retentionMs,
     Math.max(config.stories.windowMs, config.stories.issueWindowMs),
   );
-  return getStore(worldId)
-    .all()
-    .filter((s) => !s.clickbait && s.analyzed && now - s.item.publishedAt <= window);
+  const inWindow = (s: StoredItem) =>
+    !s.clickbait && s.analyzed && now - s.item.publishedAt <= window;
+  // The WORLD / front page draws on ALL the news the system has fetched (front page +
+  // every loaded geo/regional pool), so ongoing stories aren't siloed per-place —
+  // segregating synthesis to one pool defeats its point. A SPECIFIC geo selection (and
+  // other themed topical worlds) stay scoped to their own pool. De-duped by id in case
+  // a source feeds more than one pool.
+  if (worldId === DEFAULT_WORLD_ID) {
+    const seen = new Set<string>();
+    const out: StoredItem[] = [];
+    for (const s of storedAcrossPools(
+      (id) => id === DEFAULT_WORLD_ID || isGeoPoolId(id) || isPlaceWorldId(id),
+    )) {
+      if (seen.has(s.item.id) || !inWindow(s)) continue;
+      seen.add(s.item.id);
+      out.push(s);
+    }
+    return out;
+  }
+  return getStore(worldId).all().filter(inWindow);
 }
 
 /** Token set for a synthesized story (from its title + source headlines), used
@@ -1659,6 +1698,19 @@ function linkRelated(
   }
 }
 
+/** Cache version for a world's synthesized stories. For the WORLD it must advance when
+ *  ANY contributing pool (front page + any loaded geo/regional pool) rebuilds, so news
+ *  fetched while the reader was off browsing a place joins the world's stories on return.
+ *  For other pools it's simply that pool's own build timestamp. */
+function storiesBuildVersion(worldId: string): number {
+  if (worldId !== DEFAULT_WORLD_ID) return ws(worldId).lastBuildAt;
+  let v = ws(DEFAULT_WORLD_ID).lastBuildAt;
+  for (const [id, st] of worldStates) {
+    if (isGeoPoolId(id) || isPlaceWorldId(id)) v = Math.max(v, st.lastBuildAt);
+  }
+  return v;
+}
+
 /**
  * Build (and cache) the synthesized cross-source stories for a world. Clusters
  * the recent analyzed pool by same-event similarity, keeps clusters spanning
@@ -1675,8 +1727,10 @@ export async function getStories(
   if (!config.stories.enabled) return { stories: [], busyWith };
 
   const state = ws(worldId);
+  // For the world this advances when ANY contributing pool rebuilds (see helper).
+  const buildVersion = storiesBuildVersion(worldId);
   const cachedForLang = state.storiesCache.get(lang);
-  if (cachedForLang && cachedForLang.builtAt === state.lastBuildAt) {
+  if (cachedForLang && cachedForLang.builtAt === buildVersion) {
     return { stories: cachedForLang.stories, busyWith };
   }
   const inFlight = state.storiesInFlight.get(lang);
@@ -1684,7 +1738,7 @@ export async function getStories(
 
   // Per-language persistent store so EN and ES syntheses don't cross-pollinate.
   const storeKey = lang === "en" ? worldId : `${worldId}__${lang}`;
-  const builtAtSnapshot = state.lastBuildAt;
+  const builtAtSnapshot = buildVersion;
   const p = (async (): Promise<Story[]> => {
     const eligible = storyEligible(worldId);
     const byId = new Map(eligible.map((s) => [s.item.id, s]));
@@ -1793,6 +1847,7 @@ export async function getStories(
 
     const started = Date.now();
     console.log(`[stories:${worldId}] ${reused.length} reused, ${toSynth.length} (re)synthesizing…`);
+    if (toSynth.length > 0) setPhase(state, "synthesizing", 0, toSynth.length);
     const synthed = await withConcurrency(
       toSynth.map((t) => async (): Promise<Built> => {
         const story =
@@ -1814,6 +1869,7 @@ export async function getStories(
       config.ai.concurrency,
     );
 
+    if (state.status.phase === "synthesizing") setPhase(state, "idle");
     const built = [...reused, ...synthed];
     linkRelated(built);
     store.prune(used);
@@ -1849,7 +1905,13 @@ export async function getStory(
   lang: Lang = "en",
 ): Promise<Story | null> {
   const { stories } = await getStories(worldId, false, lang);
-  return stories.find((s) => s.id === id) ?? null;
+  const live = stories.find((s) => s.id === id);
+  if (live) return live;
+  // Not in the CURRENT set (it dropped out of the top issues/events, or its cluster
+  // membership changed). The story STORE still holds it while within the retention
+  // window, so a deep link / related link resolves instead of dead-ending in a 404.
+  const storeKey = lang === "en" ? worldId : `${worldId}__${lang}`;
+  return getStoryStore(storeKey).get(id)?.story ?? null;
 }
 
 /**
