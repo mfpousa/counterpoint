@@ -10,6 +10,7 @@ import React, {
   useState,
 } from "react";
 import { fetchBriefing, fetchRankedFeed, fetchStatus, gradeSummary, streamBriefing } from "../lib/api";
+import { appendBriefingStream, resetBriefingStream } from "../lib/briefingStream";
 import { buildFeed } from "../lib/buildFeed";
 import { translate } from "../lib/i18n";
 import { PASS_SCORE } from "../lib/knowledge";
@@ -56,8 +57,6 @@ interface AppState {
   /** AI digest of what's happening / where it's headed (null if unavailable). */
   briefing: Briefing | null;
   loadingBriefing: boolean;
-  /** Live token stream of the briefing while it's being written (empty otherwise). */
-  briefingStream: string;
   /** Live backend analysis progress (null until first poll). */
   status: AnalysisStatus | null;
   /** Graded recall summaries (newest first), persisted locally. */
@@ -109,7 +108,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [feedError, setFeedError] = useState<string | null>(null);
   const [briefing, setBriefing] = useState<Briefing | null>(null);
   const [loadingBriefing, setLoadingBriefing] = useState(false);
-  const [briefingStream, setBriefingStream] = useState("");
   const [status, setStatus] = useState<AnalysisStatus | null>(null);
   const [summaries, setSummaries] = useState<StoredSummary[]>([]);
   const [storyViews, setStoryViews] = useState<Record<string, StoryView>>({});
@@ -159,16 +157,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (hadCache) {
       // Show the cached briefing immediately; keep it on screen while we refresh.
       setBriefing(briefingByKeyRef.current.get(key) ?? null);
-      setBriefingStream("");
+      resetBriefingStream();
       setLoadingBriefing(false);
     } else {
       setBriefing(null);
-      setBriefingStream("");
+      resetBriefingStream();
       setLoadingBriefing(true);
     }
     const finish = (b: Briefing | null) => {
       setBriefing(b);
-      setBriefingStream("");
+      resetBriefingStream();
       setLoadingBriefing(false);
       briefingByKeyRef.current.set(key, b);
     };
@@ -187,7 +185,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       lang: langRef.current,
       // Only show the live token stream when we have nothing cached to display.
       onDelta: (d) => {
-        if (!hadCache) setBriefingStream((p) => p + d);
+        if (!hadCache) appendBriefingStream(d);
       },
       onDone: finish,
       onError: fallback,
@@ -437,7 +435,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     feedError,
     briefing,
     loadingBriefing,
-    briefingStream,
     status,
     summaries,
     storyViews,

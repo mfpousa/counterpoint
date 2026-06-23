@@ -28,6 +28,7 @@ import { readLang } from "./lang";
 import { runStartupHealthcheck } from "./healthcheck";
 import { generateKnowledgeInsight, type KnowledgeCandidate } from "./knowledge";
 import { rewriteArticle, rewriteArticleStream } from "./rewrite";
+import { askNews } from "./ask";
 import { getStoredAnyWorld } from "./store";
 import { DEFAULT_WORLD_ID, WORLDS, isPlaceWorldId, isWorldId } from "../src/data/worlds";
 import { GEO_ROOT_ID, isGeoPoolId } from "../src/data/geo";
@@ -172,6 +173,60 @@ app.get("/api/briefing/stream", async (req, res) => {
     send("error", e instanceof Error ? e.message : "briefing failed");
   } finally {
     if (!closed) res.end();
+  }
+});
+
+// Streaming AI news search (SSE): the reader asks a free-text question (e.g. "fires",
+// "Donald Trump") over the WHOLE fetched database. The model streams a synopsis
+// (delta events) and decides whether the matter has a geographic spread — if so its
+// AskResult carries located places the globe marks. Events: delta, done, error.
+app.get("/api/ask/stream", async (req, res) => {
+  res.set({
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache, no-transform",
+    Connection: "keep-alive",
+    "X-Accel-Buffering": "no",
+  });
+  res.flushHeaders?.();
+  let closed = false;
+  req.on("close", () => {
+    closed = true;
+  });
+  const send = (event: string, data: unknown) => {
+    if (closed) return;
+    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  };
+  const q = typeof req.query.q === "string" ? req.query.q : "";
+  if (!q.trim()) {
+    send("error", "empty query");
+    if (!closed) res.end();
+    return;
+  }
+  try {
+    const result = await askNews(q, readLang(req.query.lang), (delta) => send("delta", delta));
+    send("done", result);
+  } catch (e) {
+    console.error("[api] /api/ask/stream failed:", e);
+    send("error", e instanceof Error ? e.message : "ask failed");
+  } finally {
+    if (!closed) res.end();
+  }
+});
+
+// Non-streaming AI news search (the whole AskResult at once) — the fallback where
+// SSE isn't available (e.g. native fetch has no readable body).
+app.get("/api/ask", async (req, res) => {
+  const q = typeof req.query.q === "string" ? req.query.q : "";
+  if (!q.trim()) {
+    res.status(400).json({ error: "q required" });
+    return;
+  }
+  try {
+    const result = await askNews(q, readLang(req.query.lang), () => {});
+    res.json(result);
+  } catch (e) {
+    console.error("[api] /api/ask failed:", e);
+    res.status(500).json({ error: e instanceof Error ? e.message : "ask failed" });
   }
 });
 

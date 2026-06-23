@@ -39,8 +39,10 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { Canvas } from "@react-three/fiber";
 import {
+  fetchAsk,
   fetchCoverage,
   fetchRegions,
+  streamAsk,
   type CoverageNode,
   type CoverageView,
   type RegionFeature,
@@ -63,12 +65,15 @@ import {
   type GeoAlert,
 } from "../../lib/geoAlerts";
 import { searchPlaces, type PlaceHit } from "../../lib/placeSearch";
-import type { AnalysisStatus, Story } from "../../types";
+import { appendAskStream, resetAskStream } from "../../lib/askStream";
+import type { AnalysisStatus, AskResult, Story } from "../../types";
 import countries110m from "../../data/world/countries-110m.json";
-import { useT } from "../../store/AppContext";
+import { useApp, useT } from "../../store/AppContext";
 import { colors, font, radius, spacing } from "../../theme";
+import { AskPanel } from "./AskPanel";
 import {
   GlobeScene,
+  type AskMarkerData,
   type GlobeCountry,
   type GlobeEntityData,
   type GlobeViewRefs,
@@ -209,6 +214,8 @@ export function Globe({
   height?: number;
 }) {
   const t = useT();
+  const { prefs } = useApp();
+  const lang = prefs.language;
   const [browse, setBrowse] = useState<string>(
     browseNode ||
       (activePoolId && geoNodeIdOf(activePoolId)) ||
@@ -224,6 +231,14 @@ export function Globe({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
   const [focusedId, setFocusedId] = useState<string | null>(null);
+  // AI news search ("ask") over the whole database: the streamed answer card + the
+  // located beacons it drops on the globe. The streamed synopsis lives in the isolated
+  // askStream store (not state) so tokens never re-render the globe scene.
+  const [askQuery, setAskQuery] = useState("");
+  const [asking, setAsking] = useState(false);
+  const [askResult, setAskResult] = useState<AskResult | null>(null);
+  const [askError, setAskError] = useState<string | null>(null);
+  const askHandleRef = useRef<{ cancel: () => void } | null>(null);
 
   // View state the gesture layer mutates and the frame loop reads (no re-renders).
   const refs: GlobeViewRefs = {
@@ -363,6 +378,111 @@ export function Globe({
     onPlace?.(hit.label);
     onOpenArticles?.();
   };
+
+  // --- AI news search ("ask") ------------------------------------------------
+  // Stream the AI's answer to a free-text query over ALL fetched news. The model
+  // decides whether the matter has a geographic spread; if so its located places
+  // become globe beacons (mode "map"), else it's just the streamed synopsis.
+  const runAsk = useCallback(
+    (raw: string) => {
+      const q = raw.trim();
+      if (!q) return;
+      askHandleRef.current?.cancel();
+      resetAskStream();
+      setAskQuery(q);
+      setAskError(null);
+      setAskResult(null);
+      setAsking(true);
+      setPlaceQuery(""); // close the place dropdown; the query now lives in the panel
+      Keyboard.dismiss();
+      const settle = (r: AskResult) => {
+        setAskResult(r);
+        setAsking(false);
+        resetAskStream();
+      };
+      const fail = () => {
+        setAskError("failed");
+        setAsking(false);
+      };
+      const fallback = () => {
+        fetchAsk(q, lang)
+          .then((r) => (r ? settle(r) : fail()))
+          .catch(fail);
+      };
+      const handle = streamAsk(q, {
+        lang,
+        onDelta: (d) => appendAskStream(d),
+        onDone: settle,
+        onError: fallback, // SSE failed — try the non-streaming fetch before erroring
+      });
+      askHandleRef.current = handle;
+      if (!handle) fallback(); // streaming unsupported in this runtime (native fetch)
+    },
+    [lang],
+  );
+
+  const clearAsk = useCallback(() => {
+    askHandleRef.current?.cancel();
+    askHandleRef.current = null;
+    resetAskStream();
+    setAsking(false);
+    setAskResult(null);
+    setAskError(null);
+    setAskQuery("");
+  }, []);
+
+  // Cancel any in-flight ask stream on unmount.
+  useEffect(() => () => askHandleRef.current?.cancel(), []);
+
+  // Located beacons for the answer's places: map each ISO2 (or name) to a centroid.
+  const askMarkers = useMemo<AskMarkerData[]>(() => {
+    if (!askResult || !worldGeo) return [];
+    const c = worldGeo.centroids;
+    const byName = new Map(c.countries.map((x) => [x.name.toLowerCase(), x.dir] as const));
+    const out: AskMarkerData[] = [];
+    askResult.places.forEach((p, i) => {
+      const dir = (p.iso2 && c.byIso2.get(p.iso2)) || byName.get(p.label.toLowerCase()) || null;
+      if (dir) out.push({ id: `ask-${i}-${p.iso2 || p.label}`, dir, label: p.label });
+    });
+    return out;
+  }, [askResult, worldGeo]);
+
+  // When an answer lands with locations, orient the globe to frame them (averaged
+  // direction), zoomed out enough to take in the spread.
+  useEffect(() => {
+    if (askMarkers.length === 0) return;
+    let x = 0;
+    let y = 0;
+    let z = 0;
+    for (const m of askMarkers) {
+      x += m.dir.x;
+      y += m.dir.y;
+      z += m.dir.z;
+    }
+    const len = Math.hypot(x, y, z) || 1;
+    const avg = { x: x / len, y: y / len, z: z / len };
+    refs.target.current = {
+      yaw: Math.atan2(-avg.x, avg.z),
+      pitch: clamp(Math.atan2(avg.y, Math.hypot(avg.x, avg.z)), -1.2, 1.2),
+      zoom: askMarkers.length > 1 ? 1.05 : 1.5,
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [askMarkers]);
+
+  // Tapping a beacon flies to that country.
+  const onAskMarkerPress = useCallback(
+    (id: string) => {
+      const m = askMarkers.find((x) => x.id === id);
+      if (!m) return;
+      refs.target.current = {
+        yaw: Math.atan2(-m.dir.x, m.dir.z),
+        pitch: clamp(Math.atan2(m.dir.y, Math.hypot(m.dir.x, m.dir.z)), -1.2, 1.2),
+        zoom: 1.7,
+      };
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [askMarkers],
+  );
 
   // The drill-down options (covered places + anything drillable), placed on the
   // sphere by the deterministic procedural layout (seeded by the parent id).
@@ -795,6 +915,8 @@ export function Globe({
             gizmos={gizmos}
             alerts={alerts}
             onAlertPress={onAlertPress}
+            askMarkers={askMarkers}
+            onAskMarkerPress={onAskMarkerPress}
             rightInset={rightInset}
             autoSpin={browse === GEO_ROOT_ID && !activePoolId}
             focusedId={focusedId}
@@ -825,9 +947,7 @@ export function Globe({
                 autoCapitalize="none"
                 autoCorrect={false}
                 returnKeyType="search"
-                onSubmitEditing={() =>
-                  placeResults[0] && selectPlace(placeResults[0])
-                }
+                onSubmitEditing={() => runAsk(placeQuery)}
               />
               {placeQuery.length > 0 && (
                 <Pressable onPress={() => setPlaceQuery("")} hitSlop={8}>
@@ -839,8 +959,19 @@ export function Globe({
                 </Pressable>
               )}
             </View>
-            {placeResults.length > 0 && (
+            {placeQuery.trim().length > 0 && (
               <View style={styles.searchResults}>
+                {/* Primary action: ask the AI about this query over ALL the news. */}
+                <Pressable
+                  style={styles.searchResult}
+                  onPress={() => runAsk(placeQuery)}
+                  accessibilityRole="button"
+                >
+                  <Ionicons name="sparkles" size={14} color={colors.accent} />
+                  <Text style={styles.searchResultText} numberOfLines={1}>
+                    {t("ask.action", { q: placeQuery.trim() })}
+                  </Text>
+                </Pressable>
                 {placeResults.map((r) => (
                   <Pressable
                     key={`${r.level}-${r.nodeId}`}
@@ -866,6 +997,32 @@ export function Globe({
                 ))}
               </View>
             )}
+          </View>
+        )}
+
+        {/* AI news-search answer card (hero): streamed synopsis + located reads. The
+            globe drops the markers; this carries the prose. */}
+        {hero && (asking || askResult || askError) && (
+          <View
+            style={[styles.askWrap, { right: rightInset + spacing.lg, bottom: bottomInset + 64 }]}
+            pointerEvents="box-none"
+          >
+            <AskPanel
+              query={askQuery}
+              asking={asking}
+              result={askResult}
+              error={askError}
+              onClose={clearAsk}
+              onPlaceTap={(iso2) => {
+                const dir = worldGeo?.centroids.byIso2.get(iso2);
+                if (!dir) return;
+                refs.target.current = {
+                  yaw: Math.atan2(-dir.x, dir.z),
+                  pitch: clamp(Math.atan2(dir.y, Math.hypot(dir.x, dir.z)), -1.2, 1.2),
+                  zoom: 1.8,
+                };
+              }}
+            />
           </View>
         )}
 
@@ -1072,6 +1229,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     // Above the top bar so the results dropdown overlays it instead of being hidden
     // (and stealing its taps) while searching.
+    zIndex: 20,
+  },
+  // AI news-search answer card, anchored bottom-left over the globe (clear of the
+  // bottom bar). `right`/`bottom` are applied inline so it dodges the side panel.
+  askWrap: {
+    position: "absolute",
+    left: spacing.lg,
+    alignItems: "flex-start",
     zIndex: 20,
   },
   searchBox: {

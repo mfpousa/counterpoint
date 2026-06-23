@@ -256,6 +256,39 @@ export interface Briefing {
   basedOn: number;
 }
 
+/** One located place surfaced by an AI news search ("ask"): where something is
+ *  happening, with a one-line read on it. The client maps `iso2` (or `label`) to
+ *  a globe centroid to drop a marker. */
+export interface AskPlace {
+  /** Human place name, e.g. "California" or "Spain". */
+  label: string;
+  /** ISO 3166-1 alpha-2 (lowercase) for centroid lookup; "" if the model gave none. */
+  iso2: string;
+  /** One sentence on what's happening there (grounded in the matched items). */
+  blurb: string;
+}
+
+/**
+ * The AI's answer to a free-text news search over the whole fetched database. The
+ * SAME model both answers AND decides how to show it: `map` when the topic has a
+ * geographic spread (places get globe markers), else `answer` (just the synopsis).
+ * The synopsis is also streamed token-by-token while it's generated.
+ */
+export interface AskResult {
+  /** The query this answers. */
+  query: string;
+  /** How the client should display it: drop markers on the globe, or just the text. */
+  mode: "map" | "answer";
+  /** The prose synopsis (the streamed answer), grounded in the matched items. */
+  synopsis: string;
+  /** Located places to mark on the globe (empty for a pure `answer`). */
+  places: AskPlace[];
+  /** FeedItem ids the answer was grounded in (newest/most-relevant first). */
+  itemIds: string[];
+  /** How many items were searched / matched, for a "based on N" affordance. */
+  basedOn: number;
+}
+
 /** One source article that contributed to a synthesized story. */
 export interface StorySource {
   /** FeedItem id (so the reader can open the AI-rewrite or original). */

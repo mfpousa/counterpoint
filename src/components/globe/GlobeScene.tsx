@@ -342,6 +342,73 @@ function Alerts({
   );
 }
 
+/** One located result of an AI news search ("ask"): a bright accent beacon the reader
+ *  can tap to recenter. Distinct from event alerts (which are category-coloured) — these
+ *  answer "where is X happening". */
+export interface AskMarkerData {
+  id: string;
+  dir: Vec3;
+  label: string;
+}
+
+function AskMarker({ data, onPress }: { data: AskMarkerData; onPress?: (id: string) => void }) {
+  const ping = useRef<Mesh>(null);
+  const mat = useRef<MeshBasicMaterial>(null);
+  const phase = (hashId(data.id) % 1000) / 1000;
+  useFrame((state) => {
+    const tt = (state.clock.elapsedTime * 0.8 + phase) % 1;
+    if (ping.current) ping.current.scale.setScalar(1 + tt * 4);
+    if (mat.current) mat.current.opacity = (1 - tt) * 0.6;
+  });
+  return (
+    <group
+      position={[data.dir.x * ALERT_RADIUS, data.dir.y * ALERT_RADIUS, data.dir.z * ALERT_RADIUS]}
+    >
+      <mesh>
+        <sphereGeometry args={[0.02, 14, 14]} />
+        <meshBasicMaterial color={colors.accent} />
+      </mesh>
+      <mesh ref={ping}>
+        <sphereGeometry args={[0.02, 14, 14]} />
+        <meshBasicMaterial
+          ref={mat}
+          color={colors.accent}
+          transparent
+          opacity={0.5}
+          depthWrite={false}
+        />
+      </mesh>
+      {onPress && (
+        <mesh
+          onClick={(e: ThreeEvent<MouseEvent>) => {
+            e.stopPropagation();
+            onPress(data.id);
+          }}
+        >
+          <sphereGeometry args={[0.06, 8, 8]} />
+          <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+        </mesh>
+      )}
+    </group>
+  );
+}
+
+function AskMarkers({
+  markers,
+  onPress,
+}: {
+  markers: AskMarkerData[];
+  onPress?: (id: string) => void;
+}) {
+  return (
+    <>
+      {markers.map((m) => (
+        <AskMarker key={m.id} data={m} onPress={onPress} />
+      ))}
+    </>
+  );
+}
+
 export function GlobeScene({
   countries,
   regions,
@@ -350,6 +417,8 @@ export function GlobeScene({
   gizmos,
   alerts,
   onAlertPress,
+  askMarkers = [],
+  onAskMarkerPress,
   autoSpin,
   focusedId,
   onFocus,
@@ -366,6 +435,10 @@ export function GlobeScene({
   alerts: GeoAlert[];
   /** Tapping a worldview marker opens its story. */
   onAlertPress?: (id: string) => void;
+  /** Located results from an AI news search to mark on the globe (empty = none). */
+  askMarkers?: AskMarkerData[];
+  /** Tap an ask marker → recenter the globe on it. */
+  onAskMarkerPress?: (id: string) => void;
   /** Idle auto-rotate ONLY on the pristine world landing; stops once a place is chosen. */
   autoSpin: boolean;
   focusedId: string | null;
@@ -520,6 +593,8 @@ export function GlobeScene({
         ))}
         {/* Worldview: category-coloured, gravity-sized event markers (tap to open). */}
         <Alerts alerts={alerts} onPress={onAlertPress} />
+        {/* AI news-search results: accent beacons on the places the answer is about. */}
+        <AskMarkers markers={askMarkers} onPress={onAskMarkerPress} />
       </group>
     </>
   );

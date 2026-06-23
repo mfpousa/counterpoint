@@ -66,7 +66,6 @@ export default function FeedScreen() {
     feedError,
     briefing,
     loadingBriefing,
-    briefingStream,
     status,
     summaries,
     storyViews,
@@ -534,7 +533,7 @@ export default function FeedScreen() {
 
         <AnalysisProgress status={status} />
 
-        <BriefingCard briefing={briefing} loading={loadingBriefing} stream={briefingStream} />
+        <BriefingCard briefing={briefing} loading={loadingBriefing} />
 
         <QuotaMeter consumed={progress.consumedMin} target={prefs.dailyQuotaMin} />
         <LeanDial drift={todayDrift} threshold={prefs.driftThreshold} compact />

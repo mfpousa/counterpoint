@@ -2,11 +2,12 @@
 // things are headed, tuned to the reader's interest. Rendered at the top of the
 // Today screen. Quietly hides itself when there's nothing to show.
 
-import React from "react";
+import React, { useSyncExternalStore } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { Briefing } from "../types";
 import { Cursor } from "./anim";
+import { getBriefingStream, subscribeBriefingStream } from "../lib/briefingStream";
 import { Skeleton } from "./Skeleton";
 import { useT } from "../store/AppContext";
 import { colors, font, radius, spacing } from "../theme";
@@ -14,14 +15,18 @@ import { colors, font, radius, spacing } from "../theme";
 export function BriefingCard({
   briefing,
   loading,
-  stream = "",
 }: {
   briefing: Briefing | null;
   loading: boolean;
-  /** Live token stream while the briefing is being written (empty otherwise). */
-  stream?: string;
 }) {
   const t = useT();
+  // Live token stream subscribed in ISOLATION (see lib/briefingStream): only this
+  // card re-renders as tokens arrive — never the whole Today screen.
+  const stream = useSyncExternalStore(
+    subscribeBriefingStream,
+    getBriefingStream,
+    getBriefingStream,
+  );
   // No briefing yet: keep the SAME reserved footprint (minHeight). While the model
   // writes, show its tokens live with a single top-to-bottom cursor; before any
   // token arrives, show a skeleton so the cards below don't jump when it lands.

@@ -7,6 +7,7 @@
 
 import type {
   AnalysisStatus,
+  AskResult,
   Briefing,
   FeedItem,
   KnowledgeInsight,
@@ -502,6 +503,98 @@ export async function fetchBriefing(
     if (!res.ok) return null;
     const data = (await res.json()) as { briefing?: Briefing | null };
     return data.briefing ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export interface AskStreamHandlers {
+  /** A chunk of the synopsis as it's written (append to the live preview). */
+  onDelta: (delta: string) => void;
+  /** The final parsed result (mode + located places + grounding ids). */
+  onDone: (result: AskResult) => void;
+  /** A failure (or that streaming is unsupported here — caller may fall back). */
+  onError: (message: string) => void;
+  lang?: Lang;
+}
+
+/**
+ * Stream an AI news search ("ask") over SSE so the synopsis appears token-by-token.
+ * Returns a handle with `cancel()`, or `null` when streaming isn't supported in this
+ * runtime (e.g. native fetch has no readable body) — caller should fall back to
+ * the non-streaming `fetchAsk`.
+ */
+export function streamAsk(query: string, h: AskStreamHandlers): { cancel: () => void } | null {
+  if (typeof fetch === "undefined" || typeof ReadableStream === "undefined") return null;
+  const params = new URLSearchParams({ q: query });
+  if (h.lang) params.set("lang", h.lang);
+  const controller = new AbortController();
+
+  const dispatch = (frame: string) => {
+    let event = "message";
+    const dataLines: string[] = [];
+    for (const line of frame.split("\n")) {
+      if (line.startsWith("event:")) event = line.slice(6).trim();
+      else if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
+    }
+    if (dataLines.length === 0) return;
+    let payload: unknown;
+    try {
+      payload = JSON.parse(dataLines.join("\n"));
+    } catch {
+      return;
+    }
+    if (event === "delta" && typeof payload === "string") h.onDelta(payload);
+    else if (event === "done") h.onDone(payload as AskResult);
+    else if (event === "error") h.onError(typeof payload === "string" ? payload : "ask failed");
+  };
+
+  (async () => {
+    try {
+      const res = await fetch(`${apiBaseUrl()}/api/ask/stream?${params.toString()}`, {
+        method: "GET",
+        headers: { Accept: "text/event-stream" },
+        signal: controller.signal,
+      });
+      const reader = res.body?.getReader?.();
+      if (!res.ok || !reader) {
+        h.onError("stream unavailable");
+        return;
+      }
+      const decoder = new TextDecoder();
+      let buffer = "";
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        let idx: number;
+        while ((idx = buffer.indexOf("\n\n")) !== -1) {
+          dispatch(buffer.slice(0, idx));
+          buffer = buffer.slice(idx + 2);
+        }
+      }
+      if (buffer.trim()) dispatch(buffer);
+    } catch (e) {
+      if (!controller.signal.aborted) {
+        h.onError(e instanceof Error ? e.message : "stream failed");
+      }
+    }
+  })();
+
+  return { cancel: () => controller.abort() };
+}
+
+/**
+ * Non-streaming AI news search — the whole result at once. Used as the fallback
+ * where SSE streaming isn't available (native fetch). Returns null on failure.
+ */
+export async function fetchAsk(query: string, lang?: Lang): Promise<AskResult | null> {
+  const params = new URLSearchParams({ q: query });
+  if (lang) params.set("lang", lang);
+  try {
+    const res = await fetch(`${apiBaseUrl()}/api/ask?${params.toString()}`, { method: "GET" });
+    if (!res.ok) return null;
+    return (await res.json()) as AskResult;
   } catch {
     return null;
   }
