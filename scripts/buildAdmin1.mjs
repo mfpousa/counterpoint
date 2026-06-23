@@ -96,11 +96,18 @@ for (const f of raw.features ?? []) {
   }
   if (!iso2) continue; // can't attribute to a country → skip
   const name = p.name || p.name_en || p.gn_name || p.gns_name || "";
+  // The higher-level division this province rolls up to (e.g. its autonomous community).
+  // Coverage is often keyed at THAT level, so the globe binds a province to its covered
+  // region by EITHER the community code (`region_cod`, slugged) OR the community NAME
+  // (`region`, normalised) — neither alone is complete (NE's codes aren't pure ISO 3166-2,
+  // and names vary by language), so we carry both and match on either.
+  const group = typeof p.region === "string" ? p.region : ""; // community NAME
+  const groupCode = typeof p.region_cod === "string" ? p.region_cod : ""; // community CODE
   const geom = simplifyGeometry(g, EPS);
   if (!geom) continue; // simplified away to nothing
   out.features.push({
     type: "Feature",
-    properties: { iso2, code, name },
+    properties: { iso2, code, name, group, groupCode },
     geometry: geom,
   });
 }

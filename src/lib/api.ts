@@ -132,9 +132,11 @@ export async function fetchCoverage(node?: string): Promise<CoverageView> {
   return (await res.json()) as CoverageView;
 }
 
-/** One province/state border polygon (mirrors the server's slim RegionFeature). */
+/** One province/state border polygon (mirrors the server's slim RegionFeature).
+ *  `group`/`groupCode` are the higher-level division name + code (e.g. the autonomous
+ *  community a Spanish province belongs to), which the globe binds by to match coverage. */
 export interface RegionFeature {
-  properties: { iso2: string; code: string; name: string };
+  properties: { iso2: string; code: string; name: string; group?: string; groupCode?: string };
   geometry: { type: "Polygon" | "MultiPolygon"; coordinates: unknown } | null;
 }
 

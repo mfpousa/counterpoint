@@ -9,9 +9,10 @@
 // state/handlers stay in the Today screen. State is driven by the parent:
 //   "hidden" → gone   |   "peek" → mobile pull tab   |   "open" → full panel.
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import {
   Animated,
+  PanResponder,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -55,6 +56,9 @@ export function ArticlesPanel({
   const { height } = useWindowDimensions();
   const anim = useRef(new Animated.Value(0)).current; // 0 = closed/peek, 1 = open
   const open = state === "open";
+  const sheetH = Math.round(height * 0.86);
+  const travel = sheetH - PEEK_H; // px the sheet slides between peek and open
+  const dragStart = useRef(0); // anim progress (0..1) when a drag begins
 
   useEffect(() => {
     Animated.timing(anim, {
@@ -63,6 +67,36 @@ export function ArticlesPanel({
       useNativeDriver: true,
     }).start();
   }, [open, anim]);
+
+  // Drag the handle to pull the sheet up / push it down; a near-stationary release is
+  // treated as a TAP (toggle). The sheet follows the finger live, then snaps on release.
+  const sheetPan = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dy) > 3,
+        onPanResponderGrant: () => {
+          dragStart.current = open ? 1 : 0;
+        },
+        onPanResponderMove: (_e, g) => {
+          const p = Math.min(1, Math.max(0, dragStart.current + -g.dy / travel));
+          anim.setValue(p);
+        },
+        onPanResponderRelease: (_e, g) => {
+          const tap = Math.abs(g.dy) < 6 && Math.abs(g.dx) < 6;
+          const p = Math.min(1, Math.max(0, dragStart.current + -g.dy / travel));
+          const goOpen = tap ? !open : p > 0.5 || g.vy < -0.5;
+          Animated.timing(anim, {
+            toValue: goOpen ? 1 : 0,
+            duration: 200,
+            useNativeDriver: true,
+          }).start();
+          if (goOpen) onExpand();
+          else onClose();
+        },
+      }),
+    [open, travel, anim, onExpand, onClose],
+  );
 
   const refresh = onRefresh ? (
     <RefreshControl refreshing={!!refreshing} onRefresh={onRefresh} tintColor={colors.accent} />
@@ -93,15 +127,14 @@ export function ArticlesPanel({
 
   // MOBILE: gone entirely when hidden; otherwise a bottom sheet that peeks or opens.
   if (state === "hidden") return null;
-  const sheetH = Math.round(height * 0.86);
-  const translateY = anim.interpolate({ inputRange: [0, 1], outputRange: [sheetH - PEEK_H, 0] });
+  const translateY = anim.interpolate({ inputRange: [0, 1], outputRange: [travel, 0] });
   return (
     <Animated.View style={[styles.sheet, { height: sheetH, transform: [{ translateY }] }]}>
-      <Pressable
-        onPress={open ? onClose : onExpand}
+      <View
         style={styles.peek}
         accessibilityRole="button"
         accessibilityLabel={open ? "Collapse articles" : "Open articles"}
+        {...sheetPan.panHandlers}
       >
         <View style={styles.grabber} />
         <View style={styles.peekRow}>
@@ -117,7 +150,7 @@ export function ArticlesPanel({
           </View>
           <Ionicons name={open ? "chevron-down" : "chevron-up"} size={20} color={colors.textDim} />
         </View>
-      </Pressable>
+      </View>
       <ScrollView
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}

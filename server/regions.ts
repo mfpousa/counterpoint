@@ -12,7 +12,10 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 export interface RegionFeature {
-  properties: { iso2: string; code: string; name: string };
+  /** `group`/`groupCode` are the higher-level division name + code (e.g. a Spanish
+   *  province's autonomous community) — coverage is often keyed at THAT level, so the
+   *  globe binds a province to its covered region by either. */
+  properties: { iso2: string; code: string; name: string; group?: string; groupCode?: string };
   geometry: { type: "Polygon" | "MultiPolygon"; coordinates: unknown } | null;
 }
 

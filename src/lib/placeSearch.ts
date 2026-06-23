@@ -11,7 +11,7 @@ import type { Vec3 } from "./globeLayout";
 export interface PlaceHit {
   nodeId: string;
   label: string;
-  level: "continent" | "country";
+  level: "continent" | "country" | "region";
   /** Unit direction on the sphere (centroid) to centre the globe on. */
   dir: Vec3;
 }

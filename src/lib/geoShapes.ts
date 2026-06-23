@@ -161,6 +161,10 @@ export interface RegionShape {
   regionId: string;
   country: string;
   name: string;
+  /** Coverage node id of the higher-level division (slug of the community CODE), if any. */
+  communityCode: string;
+  /** Higher-level division NAME (for the name-based binding fallback). */
+  communityName: string;
   positions: Float32Array;
   normals: Float32Array;
 }
@@ -185,6 +189,9 @@ export function buildRegionShapes(features: GeoFeature[], radius = 1): RegionSha
       regionId: code ? continentSlug(code) : "",
       country: String(f.properties.iso2 ?? "").toLowerCase(),
       name: typeof f.properties.name === "string" ? f.properties.name : "",
+      communityCode:
+        typeof f.properties.groupCode === "string" ? continentSlug(f.properties.groupCode) : "",
+      communityName: typeof f.properties.group === "string" ? f.properties.group : "",
       positions: new Float32Array(pos),
       normals: new Float32Array(norm),
     });

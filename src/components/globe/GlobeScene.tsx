@@ -43,9 +43,12 @@ export interface GlobeViewRefs {
   /** When set, the globe eases to face + zoom this orientation (drill-in focus);
    *  cleared the moment the reader drags so manual control always wins. */
   target: MutableRefObject<{ yaw: number; pitch: number; zoom: number } | null>;
+  /** While a place is SELECTED, panning is clamped to within `range` radians of this
+   *  centre, so the reader can't drag out of the selection (null = free at the world). */
+  focus: MutableRefObject<{ yaw: number; pitch: number; range: number } | null>;
 }
 
-const PLANET_RADIUS = 0.99; // ocean sphere — JUST below the land shell (1.0) so land hugs it
+const PLANET_RADIUS = 0.975; // ocean sphere — a small gap below the land (1.0) so the flat triangles don't clip through, while still hugging
 const ENTITY_RADIUS = 1.05;
 const ALERT_RADIUS = 1.06; // alert pings sit just above everything else
 const OFF = "#000000";
@@ -137,15 +140,24 @@ const CountryMesh = memo(function CountryMesh({
   onFocus: (id: string | null) => void;
   onActivate: (id: string) => void;
 }) {
+  const meshRef = useRef<Mesh>(null);
   const interactive = c.entityId !== null;
   const hot = focused || c.active || c.current;
+  // Hover/active LIFT, eased toward its target each frame for a smooth pop (the
+  // `current` shape doesn't lift, so it never pokes up through its own region fills).
+  const targetScale = focused || c.active ? 1.014 : 1;
+  useFrame(() => {
+    const m = meshRef.current;
+    if (!m) return;
+    m.scale.setScalar(m.scale.x + (targetScale - m.scale.x) * 0.18);
+  });
   let color = LAND_INERT;
   if (interactive) color = c.selectable ? LAND_READY : LAND_DRILL;
   if (c.current) color = LAND_HERE; // the place we're inside — stands out from neighbours
   if (c.active) color = LAND_ACTIVE; // the committed feed — brightest
   return (
     <mesh
-      scale={focused || c.active ? 1.03 : 1}
+      ref={meshRef}
       frustumCulled={false}
       onPointerOver={
         interactive
@@ -319,6 +331,20 @@ export function GlobeScene({
       refs.zoom.current += (tgt.zoom - refs.zoom.current) * 0.12;
     } else if (autoSpin && focusedId === null && !refs.dragging.current) {
       refs.rot.current.yaw += delta * 0.05; // idle auto-spin (landing only)
+    }
+    // While a place is selected (and the reader is PANNING, not mid-flight to it), keep
+    // the view within the selection's bounds — you can't drag away to other regions.
+    if (refs.focus.current && !refs.target.current) {
+      const f = refs.focus.current;
+      const dy = Math.atan2(
+        Math.sin(refs.rot.current.yaw - f.yaw),
+        Math.cos(refs.rot.current.yaw - f.yaw),
+      );
+      refs.rot.current.yaw = f.yaw + Math.max(-f.range, Math.min(f.range, dy));
+      refs.rot.current.pitch = Math.max(
+        f.pitch - f.range,
+        Math.min(f.pitch + f.range, refs.rot.current.pitch),
+      );
     }
     g.rotation.y = refs.rot.current.yaw;
     g.rotation.x = Math.max(-1.2, Math.min(1.2, refs.rot.current.pitch));

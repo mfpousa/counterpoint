@@ -23,12 +23,13 @@ import { AnalysisProgress } from "../../src/components/AnalysisProgress";
 import { WorldSwitcher } from "../../src/components/WorldSwitcher";
 import { Globe } from "../../src/components/globe/Globe";
 import { ArticlesPanel, type PanelState } from "../../src/components/ArticlesPanel";
-import { GEO_ROOT_ID, poolIdForNode } from "../../src/data/geo";
+import { GEO_ROOT_ID, geoNodeIdOf, poolIdForNode } from "../../src/data/geo";
 import { DEFAULT_WORLD_ID } from "../../src/data/worlds";
 import { fetchStories } from "../../src/lib/api";
 import { cacheStories } from "../../src/lib/storyCache";
 import { lastMinuteStories } from "../../src/lib/storyUpdates";
 import { openNews, openStory } from "../../src/lib/nav";
+import { router, useLocalSearchParams } from "expo-router";
 import { LeanDial, QuotaMeter } from "../../src/components/meters";
 import { colors, font, radius, spacing } from "../../src/theme";
 import type { FeedItem, Story, Topic } from "../../src/types";
@@ -314,6 +315,15 @@ export default function FeedScreen() {
   }, [stories, feed, storyViews, activeSelected, prefs.interestPrompt]);
 
   const [panelState, setPanelState] = useState<PanelState>("hidden");
+  // The selected place's name, shown as the panel title (e.g. "Spain" instead of "Today").
+  const [placeTitle, setPlaceTitle] = useState<string | null>(null);
+  // Map navigation lives in the URL so the browser's back/forward arrows move the map.
+  const navParams = useLocalSearchParams<{ place?: string }>();
+  const place =
+    (typeof navParams.place === "string" && navParams.place) ||
+    (prefs.geoPool && geoNodeIdOf(prefs.geoPool)) ||
+    prefs.geoHome ||
+    GEO_ROOT_ID;
 
   // Responsive layout math — the feed now lives in the side/sheet panel, so card
   // sizing is driven by the PANEL width, not the full viewport.
@@ -335,8 +345,17 @@ export default function FeedScreen() {
         home={prefs.geoHome}
         stories={stories}
         worldActive={worldId === DEFAULT_WORLD_ID && !prefs.geoPool}
+        topInset={insets.top}
+        onPlace={setPlaceTitle}
+        browseNode={place}
+        onNavigate={(nodeId) =>
+          router.push(
+            nodeId && nodeId !== GEO_ROOT_ID ? `/?place=${encodeURIComponent(nodeId)}` : "/",
+          )
+        }
         onSelectWorld={() => {
           setWorld(DEFAULT_WORLD_ID);
+          setPlaceTitle(null);
           setPanelState(isWide ? "open" : "peek");
         }}
         onSelect={(poolId) => {
@@ -354,7 +373,7 @@ export default function FeedScreen() {
         wide={isWide}
         width={panelW}
         topInset={insets.top}
-        peekTitle={t("feed.title")}
+        peekTitle={placeTitle ?? t("feed.title")}
         peekSubtitle={
           unreadCount > 0
             ? t(unreadCount === 1 ? "feed.summaryOne" : "feed.summary", {

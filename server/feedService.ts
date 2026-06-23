@@ -277,6 +277,19 @@ function analyzeCutoff(now = Date.now()): number {
  *  stable as items get analyzed — we never deep-analyze more than N locals — and
  *  the returned backlog is importance-ordered so the most newsworthy go first. */
 function pendingForAnalysis(worldId: string): StoredItem[] {
+  // GEO pools deep-analyze only the top-N near-clone CLUSTERS (see planGeoAnalysis +
+  // analyzeGeoChunk), so the "pending" set MUST mirror that — the still-unanalyzed
+  // cluster representatives. The generic all-unanalyzed list (below) is what made
+  // items BEYOND the cap (and clones not yet folded into a rep) show as provisional
+  // FOREVER: they were served to the feed but the analyzer never reached them, so
+  // they stayed "analyzing" across every refresh. Mirroring the plan fixes it — every
+  // provisional geo item is now one the analyzer WILL reach (and the long tail beyond
+  // the cap is simply not shown, never stuck).
+  if (isGeoPoolId(worldId)) {
+    return planGeoAnalysis(worldId, config.geo.deepAnalyzeKeep)
+      .filter((c) => !c.rep.analyzed)
+      .map((c) => c.rep);
+  }
   const cutoff = analyzeCutoff();
   const all = getStore(worldId).all();
   if (isPlaceWorldId(worldId) && config.place.deepAnalyzeKeep > 0) {

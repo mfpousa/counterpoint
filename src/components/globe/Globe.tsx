@@ -18,6 +18,7 @@ import {
   ActivityIndicator,
   Keyboard,
   PanResponder,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -25,6 +26,7 @@ import {
   View,
   type GestureResponderEvent,
   type PanResponderGestureState,
+  type ViewStyle,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Canvas } from "@react-three/fiber";
@@ -42,6 +44,7 @@ import {
   buildOutline,
   buildRegionShapes,
   computeCentroids,
+  continentSlug,
   type CountryShape,
   type GeoCentroids,
 } from "../../lib/geoShapes";
@@ -61,6 +64,14 @@ import {
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 const ZOOM_MIN = 0.6;
 const ZOOM_MAX = 2.6;
+const WORLD_ZOOM = 0.9; // zoomed-OUT scale for the world landing (whole globe in view)
+// Pixels→radians drag gain: 2·cameraZ·tan(fov/2) = the world height the viewport spans
+// at the globe's distance. Dividing by (zoom·canvasHeightPx) makes a drag STICK to the
+// surface — same arc under the finger regardless of how zoomed in we are.
+const DRAG_K = 2 * 3.2 * Math.tan((45 * Math.PI) / 180 / 2);
+// On web, stop the BROWSER from claiming pinch/drag (page zoom + scroll) over the canvas.
+const WEB_TOUCH: ViewStyle | null =
+  Platform.OS === "web" ? ({ touchAction: "none" } as unknown as ViewStyle) : null;
 const LAND_RADIUS = 1.0;
 const REGION_RADIUS = 1.004; // province fills sit just above the country fill (1.0)
 const OUTLINE_RADIUS = 1.006; // region borders just above the province fills
@@ -82,6 +93,22 @@ const ZONE_ISO2: Record<string, string> = {
   korea: "kr",
 };
 
+/** Normalise a community/region NAME so Natural Earth's `region` field (e.g. "Cataluña")
+ *  matches a coverage node's label, despite accents + filler words ("Comunidad de…"). */
+function normRegion(s: string): string {
+  return s
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(
+      /\b(comunidad|comunitat|de|del|la|el|los|las|region|regio|foral|principado|principat|islas|illes|ciudad|autonoma)\b/g,
+      " ",
+    )
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
 export function Globe({
   activePoolId,
   home,
@@ -92,6 +119,10 @@ export function Globe({
   stories = [],
   variant = "card",
   onOpenArticles,
+  onPlace,
+  browseNode,
+  onNavigate,
+  topInset = 0,
   height = 320,
 }: {
   activePoolId?: string;
@@ -106,13 +137,26 @@ export function Globe({
   variant?: "card" | "hero";
   /** Called when a place is chosen, so the host can reveal the articles panel. */
   onOpenArticles?: () => void;
+  /** Reports the selected place's label (null = world) so the host can title itself. */
+  onPlace?: (label: string | null) => void;
+  /** Controlled current node id, driven by the URL/history (so back/forward move the map). */
+  browseNode?: string;
+  /** Fired on every USER map navigation so the host can push a page-history entry. */
+  onNavigate?: (nodeId: string) => void;
+  /** Safe-area top inset (px) so the hero search clears the status bar/notch. */
+  topInset?: number;
   /** Canvas height in px (it sits inside a scroll view). */
   height?: number;
 }) {
   const t = useT();
   const [browse, setBrowse] = useState<string>(
-    (activePoolId && geoNodeIdOf(activePoolId)) || home || GEO_ROOT_ID,
+    browseNode || (activePoolId && geoNodeIdOf(activePoolId)) || home || GEO_ROOT_ID,
   );
+  // Every USER navigation goes through here so it's recorded in the page history.
+  const navTo = (nodeId: string) => {
+    setBrowse(nodeId);
+    onNavigate?.(nodeId);
+  };
   const [view, setView] = useState<CoverageView | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
@@ -124,15 +168,24 @@ export function Globe({
     zoom: useRef(1),
     dragging: useRef(false),
     target: useRef<{ yaw: number; pitch: number; zoom: number } | null>(null),
+    focus: useRef<{ yaw: number; pitch: number; range: number } | null>(null),
   };
   const lastDrag = useRef({ x: 0, y: 0 });
   const pinchDist = useRef(0);
+  const canvasH = useRef(0); // measured canvas height (px) for surface-correct drag gain
 
   // Follow an externally-committed pool so the globe opens where the feed is.
   useEffect(() => {
     const n = activePoolId && geoNodeIdOf(activePoolId);
     if (n) setBrowse(n);
   }, [activePoolId]);
+
+  // Back/forward (or any external URL change) drives the map: follow browseNode. This
+  // does NOT re-report navigation, so restoring history never pushes a new entry.
+  useEffect(() => {
+    if (browseNode && browseNode !== browse) setBrowse(browseNode);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [browseNode]);
 
   // Fetch the coverage for the focused node whenever the browse cursor moves.
   useEffect(() => {
@@ -204,7 +257,6 @@ export function Globe({
     ];
   }, [worldGeo]);
   const [placeQuery, setPlaceQuery] = useState("");
-  const placeResults = useMemo(() => searchPlaces(placeIndex, placeQuery, 7), [placeIndex, placeQuery]);
 
   const selectPlace = (hit: PlaceHit) => {
     setPlaceQuery("");
@@ -213,10 +265,11 @@ export function Globe({
     refs.target.current = {
       yaw: Math.atan2(-d.x, d.z),
       pitch: clamp(Math.atan2(d.y, Math.hypot(d.x, d.z)), -1.2, 1.2),
-      zoom: hit.level === "country" ? 1.9 : 1.4,
+      zoom: hit.level === "continent" ? 1.4 : 1.9,
     };
-    setBrowse(hit.nodeId);
+    navTo(hit.nodeId);
     onSelect(poolIdForNode(hit.nodeId));
+    onPlace?.(hit.label);
     onOpenArticles?.();
   };
 
@@ -308,6 +361,21 @@ export function Globe({
     return null;
   }, [view]);
 
+  // The browsed country's regions (communities) are searchable too — centred on the
+  // country (the camera settles by level) so you can find e.g. "Galicia" inside Spain.
+  const regionPlaces = useMemo<PlaceHit[]>(() => {
+    if (!worldGeo || !regionCc) return [];
+    const dir = worldGeo.centroids.byIso2.get(regionCc);
+    if (!dir) return [];
+    const out: PlaceHit[] = [];
+    for (const c of view?.children ?? []) {
+      if (c.level === "region" || c.level === "province") {
+        out.push({ nodeId: c.nodeId, label: c.label, level: "region", dir });
+      }
+    }
+    return out;
+  }, [worldGeo, regionCc, view]);
+
   const [regionData, setRegionData] = useState<{ cc: string; features: RegionFeature[] } | null>(
     null,
   );
@@ -325,20 +393,70 @@ export function Globe({
     };
   }, [regionCc]);
 
+  // Provinces are searchable too — each routes to the covered region (community) it
+  // belongs to, labelled "Province · Region" so the rollup is clear (e.g. "Lugo · Galicia").
+  const provincePlaces = useMemo<PlaceHit[]>(() => {
+    if (!worldGeo || !regionCc || !regionData || regionData.cc !== regionCc) return [];
+    const dir = worldGeo.centroids.byIso2.get(regionCc);
+    if (!dir) return [];
+    const byNodeId = new Map<string, CoverageNode>();
+    const byName = new Map<string, CoverageNode>();
+    for (const c of view?.children ?? []) {
+      if (c.level === "region" || c.level === "province") {
+        byNodeId.set(c.nodeId, c);
+        byName.set(normRegion(c.label), c);
+      }
+    }
+    const out: PlaceHit[] = [];
+    for (const f of regionData.features) {
+      const p = f.properties;
+      if (!p.name) continue;
+      const child =
+        byNodeId.get(continentSlug(p.code)) ??
+        (p.groupCode ? byNodeId.get(continentSlug(p.groupCode)) : undefined) ??
+        byName.get(normRegion(p.group ?? ""));
+      if (child) {
+        out.push({ nodeId: child.nodeId, label: `${p.name} · ${child.label}`, level: "region", dir });
+      }
+    }
+    return out;
+  }, [worldGeo, regionCc, regionData, view]);
+  const placeResults = useMemo(
+    () => searchPlaces([...placeIndex, ...regionPlaces, ...provincePlaces], placeQuery, 8),
+    [placeIndex, regionPlaces, provincePlaces, placeQuery],
+  );
+
   const { regions, regionOutline } = useMemo<{
     regions: GlobeCountry[];
     regionOutline: Float32Array | null;
   }>(() => {
     if (!regionData || regionData.cc !== regionCc) return { regions: [], regionOutline: null };
-    const byRegionId = new Map<string, CoverageNode>();
+    // Coverage can be coarser than the rendered provinces (e.g. Spain's communities),
+    // so bind by the province's own ISO code FIRST, then by its community group name —
+    // clicking any province then selects the covered region it belongs to, and all the
+    // provinces of that region highlight together.
+    const byNodeId = new Map<string, CoverageNode>();
+    const byName = new Map<string, CoverageNode>();
     for (const c of view?.children ?? []) {
-      if (c.level === "region" || c.level === "province") byRegionId.set(c.nodeId, c);
+      if (c.level === "region" || c.level === "province") {
+        byNodeId.set(c.nodeId, c);
+        byName.set(normRegion(c.label), c);
+      }
     }
-    const currentRegion =
+    const currentNode =
       view?.node.level === "region" || view?.node.level === "province" ? view.node.nodeId : null;
+    const currentName =
+      view?.node.level === "region" || view?.node.level === "province"
+        ? normRegion(view.node.label)
+        : null;
     const regions: GlobeCountry[] = buildRegionShapes(regionData.features, REGION_RADIUS).map(
       (s, i) => {
-        const child = s.regionId ? byRegionId.get(s.regionId) : undefined;
+        const nameKey = normRegion(s.communityName);
+        // Bind by the province's OWN code, else its community code, else community name.
+        const child =
+          (s.regionId ? byNodeId.get(s.regionId) : undefined) ??
+          (s.communityCode ? byNodeId.get(s.communityCode) : undefined) ??
+          (nameKey ? byName.get(nameKey) : undefined);
         return {
           key: `r-${s.regionId || i}`,
           positions: s.positions,
@@ -346,7 +464,9 @@ export function Globe({
           entityId: child ? child.nodeId : null,
           selectable: child ? child.state === "ready" : false,
           active: !!child && !!activePoolId && child.poolId === activePoolId,
-          current: !!currentRegion && s.regionId === currentRegion,
+          current:
+            (!!currentNode && (s.regionId === currentNode || s.communityCode === currentNode)) ||
+            (!!currentName && nameKey === currentName),
         };
       },
     );
@@ -378,16 +498,29 @@ export function Globe({
       zoom = 2.2;
     }
     if (!dir || n.level === "world") {
+      // World landing / no place selected: spin freely (no orientation target), pan is
+      // unbounded, and ease OUT so the WHOLE world shows, undoing any prior zoom-in.
       refs.target.current = null;
+      refs.focus.current = null;
+      refs.zoom.current = WORLD_ZOOM;
       return;
     }
-    refs.target.current = {
-      yaw: Math.atan2(-dir.x, dir.z),
-      pitch: Math.max(-1.2, Math.min(1.2, Math.atan2(dir.y, Math.hypot(dir.x, dir.z)))),
-      zoom,
-    };
+    const fy = Math.atan2(-dir.x, dir.z);
+    const fp = Math.max(-1.2, Math.min(1.2, Math.atan2(dir.y, Math.hypot(dir.x, dir.z))));
+    refs.target.current = { yaw: fy, pitch: fp, zoom };
+    // Bound panning around the selection — tighter the more we're zoomed in.
+    refs.focus.current = { yaw: fy, pitch: fp, range: 0.7 / zoom };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, worldGeo]);
+
+  // Report the committed place's label so the articles panel can title itself with it
+  // (covers the initial open, where the pool was set before any in-app selection).
+  useEffect(() => {
+    if (!view) return;
+    const committed = activePoolId ? geoNodeIdOf(activePoolId) : null;
+    if (committed && view.node.nodeId === committed) onPlace?.(view.node.label);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, activePoolId]);
 
   const focused = entities.find((e) => e.id === focusedId) ?? null;
   const atRoot = browse === GEO_ROOT_ID;
@@ -403,15 +536,16 @@ export function Globe({
     if (!node) return;
     if (node.state === "ready") {
       onSelect(node.poolId);
+      onPlace?.(node.label);
       onOpenArticles?.(); // selecting a covered place reveals the articles panel
     }
-    if (node.hasChildren) setBrowse(node.nodeId);
+    if (node.hasChildren) navTo(node.nodeId);
   };
 
   const goUp = () => {
     const path = view?.path ?? [];
     const parent = path.length >= 2 ? path[path.length - 2] : null;
-    setBrowse(parent ? parent.nodeId : GEO_ROOT_ID);
+    navTo(parent ? parent.nodeId : GEO_ROOT_ID);
   };
 
   const zoomBy = (factor: number) => {
@@ -440,12 +574,16 @@ export function Globe({
             pinchDist.current = dist;
             return;
           }
-          // Incremental delta since the last move event → smooth rotation.
+          // Incremental delta since the last move event → smooth rotation. The gain
+          // scales with the on-screen globe size (∝ zoom) so the drag STICKS to the
+          // surface — the same world arc stays under the finger — instead of spinning
+          // about the core at a fixed rate (which felt far too fast).
           const dX = g.dx - lastDrag.current.x;
           const dY = g.dy - lastDrag.current.y;
           lastDrag.current = { x: g.dx, y: g.dy };
-          refs.rot.current.yaw += dX * 0.01;
-          refs.rot.current.pitch += dY * 0.01;
+          const gain = DRAG_K / (refs.zoom.current * (canvasH.current || 600));
+          refs.rot.current.yaw += dX * gain;
+          refs.rot.current.pitch += dY * gain;
         },
         onPanResponderRelease: () => {
           refs.dragging.current = false;
@@ -463,7 +601,10 @@ export function Globe({
   return (
     <View style={[styles.wrap, hero && styles.wrapHero]}>
       <View
-        style={[styles.canvasWrap, hero ? styles.canvasHero : { height }]}
+        style={[styles.canvasWrap, hero ? styles.canvasHero : { height }, WEB_TOUCH]}
+        onLayout={(e) => {
+          canvasH.current = e.nativeEvent.layout.height;
+        }}
         {...panResponder.panHandlers}
       >
         <Canvas
@@ -487,7 +628,7 @@ export function Globe({
 
         {/* Centered place finder (hero only): one box for continent / country. */}
         {variant === "hero" && (
-          <View style={styles.searchWrap} pointerEvents="box-none">
+          <View style={[styles.searchWrap, { top: topInset + spacing.sm }]} pointerEvents="box-none">
             <View style={styles.searchBox}>
               <Ionicons name="search" size={16} color={colors.textDim} />
               <TextInput
@@ -517,7 +658,13 @@ export function Globe({
                     accessibilityRole="button"
                   >
                     <Ionicons
-                      name={r.level === "continent" ? "earth" : "flag-outline"}
+                      name={
+                        r.level === "continent"
+                          ? "earth"
+                          : r.level === "region"
+                            ? "location-outline"
+                            : "flag-outline"
+                      }
                       size={14}
                       color={colors.accent}
                     />
@@ -531,8 +678,12 @@ export function Globe({
           </View>
         )}
 
-        {/* Top bar: where we are + up-one-level + pin home. */}
-        <View style={styles.topBar} pointerEvents="box-none">
+        {/* Top bar: where we are + up-one-level + pin home. In hero it sits BELOW the
+            search box so the two never overlap. */}
+        <View
+          style={[styles.topBar, hero && { top: topInset + 78 }]}
+          pointerEvents="box-none"
+        >
           {!atRoot && (
             <Pressable onPress={goUp} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel={t("geo.allRegions")}>
               <Ionicons name="arrow-up" size={14} color={colors.text} />
@@ -631,10 +782,11 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     width: "100%",
     maxWidth: 460,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    minHeight: 52,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
     borderRadius: radius.pill,
-    backgroundColor: colors.surface + "E6",
+    backgroundColor: colors.surface + "F0",
     borderWidth: 1,
     borderColor: colors.border,
   },
