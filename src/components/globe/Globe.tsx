@@ -311,6 +311,11 @@ export function Globe({
             <Text style={styles.errorText}>{t("geo.error")}</Text>
           </View>
         )}
+
+        {/* TEMP diagnostic: how many land triangles got built (remove once shapes show). */}
+        <Text style={styles.debug}>
+          {worldGeo ? `land ${Math.floor(worldGeo.land.indices.length / 3)} tris` : "land: none"}
+        </Text>
       </View>
     </View>
   );
@@ -385,4 +390,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   errorText: { color: colors.textDim, fontSize: font.small },
+  debug: {
+    position: "absolute",
+    left: spacing.sm,
+    top: 44,
+    color: colors.textFaint,
+    fontSize: font.tiny,
+  },
 });

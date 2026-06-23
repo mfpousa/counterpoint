@@ -64,7 +64,11 @@ function addPolygon(rings: Ring[], radius: number, outPos: number[], outIdx: num
   const holes: number[] = [];
   rings.forEach((ring, ri) => {
     if (ri > 0) holes.push(flat.length / 2);
-    for (const [lon, lat] of ring) flat.push(lon, lat);
+    for (const pt of ring) {
+      const lon = Number(pt[0]);
+      const lat = Number(pt[1]);
+      if (Number.isFinite(lon) && Number.isFinite(lat)) flat.push(lon, lat);
+    }
   });
   if (flat.length < 6) return; // need at least a triangle
   const tris = earcut(flat, holes.length ? holes : undefined, 2);

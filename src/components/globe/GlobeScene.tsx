@@ -10,10 +10,10 @@
 // zoom are driven by refs the wrapper mutates from gestures, applied here in the
 // per-frame loop so the gesture layer never has to re-render React.
 
-import React, { useMemo, useRef } from "react";
+import React, { useRef } from "react";
 import type { MutableRefObject } from "react";
 import { useFrame, type ThreeEvent } from "@react-three/fiber";
-import { AdditiveBlending, BackSide, BufferAttribute, BufferGeometry, DoubleSide } from "three";
+import { AdditiveBlending, BackSide, DoubleSide } from "three";
 import type { Group, Mesh } from "three";
 import { colors } from "../../theme";
 import type { Vec3 } from "../../lib/globeLayout";
@@ -103,18 +103,17 @@ function GlobeEntity({
 /** The real landmasses: one merged, sphere-wrapped mesh built from the GeoJSON
  *  borders, with a metallic "land" material distinct from the ocean beneath. */
 function Land({ data }: { data: LandGeometry }) {
-  const geom = useMemo(() => {
-    const g = new BufferGeometry();
-    g.setAttribute("position", new BufferAttribute(data.positions, 3));
-    g.setIndex(new BufferAttribute(data.indices, 1));
-    g.computeVertexNormals();
-    return g;
-  }, [data]);
+  // Build the geometry with r3f's OWN three instance (JSX) — a manually `new
+  // BufferGeometry()` can be silently rejected if a second copy of three slips in.
+  // No vertex normals needed: flatShading derives per-face normals in-shader (also
+  // dodging earcut's inverted winding). frustumCulled off so a stray/NaN vertex in
+  // the merged geometry can't cull the entire landmass.
   return (
-    <mesh geometry={geom}>
-      {/* flatShading computes per-FACE normals in-shader, so the land lights correctly
-          even though earcut's triangle winding leaves the vertex normals inverted;
-          the emissive floor guarantees the continents read against the dark ocean. */}
+    <mesh frustumCulled={false}>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position" args={[data.positions, 3]} />
+        <bufferAttribute attach="index" args={[data.indices, 1]} />
+      </bufferGeometry>
       <meshStandardMaterial
         color="#9bb1c7"
         metalness={0.45}
