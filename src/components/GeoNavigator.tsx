@@ -20,6 +20,8 @@ export function GeoNavigator({
   activePoolId,
   home,
   onSelect,
+  onSelectWorld,
+  worldActive,
   onSetHome,
 }: {
   /** The currently-selected geo pool id (prefs.geoPool), if any. */
@@ -29,6 +31,11 @@ export function GeoNavigator({
   home?: string;
   /** Select a pool (a node's `poolId`), or pass undefined to leave geo mode. */
   onSelect: (poolId?: string) => void;
+  /** Commit the international Front Page — the "World" level of the hierarchy. */
+  onSelectWorld?: () => void;
+  /** True when the international Front Page is the live feed (no geographic
+   *  override), so the World chip can render as selected. */
+  worldActive?: boolean;
   /** Pin the given node id as the reader's home (the lightweight "picker"). */
   onSetHome?: (nodeId: string) => void;
 }) {
@@ -86,6 +93,10 @@ export function GeoNavigator({
   const visibleChildren: CoverageNode[] = (view?.children ?? []).filter(
     (n) => n.state === "ready" || n.hasChildren,
   );
+
+  // At the root, the "World" level is offered as the international Front Page (a
+  // TOPICAL, not geographic, pool) — a leading chip ahead of the continent list.
+  const worldChipVisible = browse === GEO_ROOT_ID && !!onSelectWorld;
 
   const chip = (node: CoverageNode, showChevron: boolean) => {
     const active = !!activePoolId && node.poolId === activePoolId;
@@ -170,8 +181,26 @@ export function GeoNavigator({
         </View>
       )}
       {error && !loading && <Text style={styles.statusText}>{t("geo.error")}</Text>}
-      {!loading && !error && view && visibleChildren.length > 0 && (
+      {!loading && !error && view && (worldChipVisible || visibleChildren.length > 0) && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
+          {worldChipVisible && (
+            <Pressable
+              key="__world__"
+              onPress={() => {
+                setBrowse(GEO_ROOT_ID);
+                onSelectWorld?.();
+              }}
+              style={[styles.chip, worldActive && styles.chipActive]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: !!worldActive }}
+              accessibilityLabel={t("geo.world")}
+            >
+              <Ionicons name="earth" size={12} color={worldActive ? colors.bg : colors.textDim} />
+              <Text style={[styles.label, worldActive && styles.labelActive]} numberOfLines={1}>
+                {t("geo.world")}
+              </Text>
+            </Pressable>
+          )}
           {visibleChildren.map((n) => chip(n, true))}
         </ScrollView>
       )}

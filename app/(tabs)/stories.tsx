@@ -20,7 +20,7 @@ import { GeoNavigator } from "../../src/components/GeoNavigator";
 import { GEO_ROOT_ID, isGeoPoolId, poolIdForNode } from "../../src/data/geo";
 import { openStory } from "../../src/lib/nav";
 import { AnalysisProgress } from "../../src/components/AnalysisProgress";
-import { worldById } from "../../src/data/worlds";
+import { DEFAULT_WORLD_ID, worldById } from "../../src/data/worlds";
 import { colors, font, radius, spacing } from "../../src/theme";
 import type { Story } from "../../src/types";
 
@@ -112,6 +112,8 @@ export default function StoriesScreen() {
           <GeoNavigator
             activePoolId={prefs.geoPool}
             home={prefs.geoHome}
+            worldActive={worldId === DEFAULT_WORLD_ID && !prefs.geoPool}
+            onSelectWorld={() => setWorld(DEFAULT_WORLD_ID)}
             onSelect={(poolId) => {
               const next = !poolId || poolId === poolIdForNode(GEO_ROOT_ID) ? undefined : poolId;
               if (next !== prefs.geoPool) void updatePrefs({ geoPool: next });

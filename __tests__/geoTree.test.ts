@@ -41,16 +41,22 @@ describe("geoTree (data-driven from discovered placeSources)", () => {
     expect(sourcesForGeoNode("es").length).toBe(4);
     expect(sourcesForGeoNode("es-ga").map((s) => s.id).sort()).toEqual(["es-faro", "es-lavoz"]);
     expect(sourcesForGeoNode("es-md").map((s) => s.id)).toEqual(["es-elpais"]);
-    // World/continent serve nothing directly (drill in).
+    // World serves nothing directly (it maps to the Front Page, not a geo pool).
     expect(sourcesForGeoNode("world")).toEqual([]);
-    expect(sourcesForGeoNode("europe")).toEqual([]);
+    // A CONTINENT aggregates its countries' outlets (here: all of Spain's).
+    expect(sourcesForGeoNode("europe").map((s) => s.id).sort()).toEqual([
+      "es-elpais",
+      "es-faro",
+      "es-lavoz",
+      "es-rtve",
+    ]);
   });
 
   it("colors coverage from discovered outlets", () => {
     expect(coverageStateOf("es")).toBe("ready");
     expect(coverageStateOf("es-ga")).toBe("ready");
-    expect(coverageStateOf("europe")).toBe("unknown"); // drill in for coverage
-    expect(coverageStateOf("world")).toBe("unknown");
+    expect(coverageStateOf("europe")).toBe("ready"); // continent aggregates its countries
+    expect(coverageStateOf("world")).toBe("unknown"); // World maps to the Front Page
     expect(coverageStateOf("nope")).toBe("unknown");
   });
 });

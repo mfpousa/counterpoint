@@ -199,6 +199,11 @@ export const config = {
     // and then deep-analyze only the top-N CLUSTERS by that score — ~200 is
     // "plenty" for any level. 0 = no cap.
     deepAnalyzeKeep: numOrZero("GEO_DEEP_ANALYZE_KEEP", 200),
+    // A CONTINENT pool aggregates its countries' outlets — capped to the top N per
+    // country so a whole continent stays fetchable (it would otherwise pull every
+    // local paper). 0 = no cap. World is never aggregated: it maps to the curated
+    // international Front Page client-side, not a geo pool.
+    continentPerCountryCap: numOrZero("GEO_CONTINENT_PER_COUNTRY_CAP", 6),
     // Min title Jaccard for two items to count as the SAME story (near-clone).
     dedupeJaccard: num("GEO_DEDUPE_JACCARD", 0.7),
     // Max publish-time gap (ms) for two items to be considered clones.

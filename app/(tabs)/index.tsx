@@ -23,6 +23,7 @@ import { AnalysisProgress } from "../../src/components/AnalysisProgress";
 import { WorldSwitcher } from "../../src/components/WorldSwitcher";
 import { GeoNavigator } from "../../src/components/GeoNavigator";
 import { GEO_ROOT_ID, poolIdForNode } from "../../src/data/geo";
+import { DEFAULT_WORLD_ID } from "../../src/data/worlds";
 import { fetchStories } from "../../src/lib/api";
 import { cacheStories } from "../../src/lib/storyCache";
 import { lastMinuteStories } from "../../src/lib/storyUpdates";
@@ -330,6 +331,8 @@ export default function FeedScreen() {
         <GeoNavigator
           activePoolId={prefs.geoPool}
           home={prefs.geoHome}
+          worldActive={worldId === DEFAULT_WORLD_ID && !prefs.geoPool}
+          onSelectWorld={() => setWorld(DEFAULT_WORLD_ID)}
           onSelect={(poolId) => {
             // World root = the Front Page (clear any geographic override).
             const next = !poolId || poolId === poolIdForNode(GEO_ROOT_ID) ? undefined : poolId;

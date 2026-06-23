@@ -23,6 +23,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import type { Source } from "../src/types";
 import { GEO_ROOT_ID, type GeoNode } from "../src/data/geo";
+import { config } from "./config";
 
 /** Whether (and how well) a node is covered by discovered outlets. */
 export type CoverageState = "ready" | "none" | "unknown";
@@ -161,21 +162,39 @@ export function geoLabel(id: string | null | undefined): string {
 }
 
 /**
- * Outlets for a geo node: the country's discovered outlets, NARROWED to the
- * region for region nodes (region discovery). World/continent nodes serve nothing
- * directly — the reader drills into a country/region.
+ * Outlets for a geo node:
+ *   - region   → the country's outlets NARROWED to that ISO 3166-2 region;
+ *   - country  → all the country's discovered outlets;
+ *   - continent → its countries' outlets aggregated, CAPPED per country so a whole
+ *                 continent stays fetchable (it would otherwise pull every local
+ *                 paper). World is intentionally NOT aggregated — it maps to the
+ *                 curated international Front Page client-side, never a geo pool.
  */
 export function sourcesForGeoNode(id: string | null | undefined): Source[] {
   const node = geoNode(id);
-  if (!node || !node.country) return [];
+  if (!node) return [];
+  if (node.level === "continent") {
+    const cap = config.geo.continentPerCountryCap;
+    const out: Source[] = [];
+    for (const child of childrenOf(node.id)) {
+      if (child.level !== "country" || !child.country) continue;
+      const all = tree().sourcesByCc.get(child.country) ?? [];
+      out.push(...(cap > 0 ? all.slice(0, cap) : all));
+    }
+    return out;
+  }
+  if (!node.country) return [];
   const all = tree().sourcesByCc.get(node.country) ?? [];
   return node.regionCode ? all.filter((s) => s.region === node.regionCode) : all;
 }
 
-/** Whether a geo node has any discovered coverage (colors the navigation map). */
+/** Whether a geo node has any discovered coverage (colors the navigation map).
+ *  Continents are now SELECTABLE when their countries aggregate to >= 1 outlet;
+ *  only World stays "unknown" (it maps to the international Front Page client-side,
+ *  not a geo pool). */
 export function coverageStateOf(id: string | null | undefined): CoverageState {
   const node = geoNode(id);
   if (!node) return "unknown";
-  if (node.level === "world" || node.level === "continent") return "unknown"; // drill in
+  if (node.level === "world") return "unknown"; // World = Front Page (handled client-side)
   return sourcesForGeoNode(id).length > 0 ? "ready" : "unknown";
 }

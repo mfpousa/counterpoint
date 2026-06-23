@@ -30,8 +30,8 @@ describe("getCoverage (drill-down navigation)", () => {
     // Spain is covered; its region nodes come from the outlets' ISO 3166-2 tags.
     expect(getCoverage("es").node.state).toBe("ready");
     expect(getCoverage("es-ga").node.state).toBe("ready"); // region discovery
-    // Continents are browsed into (no direct outlets).
-    expect(getCoverage("europe").node.state).toBe("unknown");
+    // Continents are now selectable — they aggregate their countries' outlets.
+    expect(getCoverage("europe").node.state).toBe("ready");
   });
 
   it("flags region leaves as having no children", () => {
