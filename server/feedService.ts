@@ -107,6 +107,9 @@ interface WorldState {
    *  builtAt === lastBuildAt). */
   storiesCache: Map<string, { builtAt: number; stories: Story[] }>;
   storiesInFlight: Map<string, Promise<Story[]>>;
+  /** Fetched-but-not-yet-prescreened items, drained in chunks by the catch-up
+   *  loop so a flood doesn't block the cold-start feed. */
+  prescreenQueue: FeedItem[];
   buildInFlight: Promise<void> | null;
   analyzeInFlight: Promise<{ remaining: number; progressed: number }> | null;
   embedInFlight: Promise<{ remaining: number; progressed: number }> | null;
@@ -131,6 +134,7 @@ function ws(worldId: string): WorldState {
       briefingInFlight: new Map(),
       storiesCache: new Map(),
       storiesInFlight: new Map(),
+      prescreenQueue: [],
       buildInFlight: null,
       analyzeInFlight: null,
       embedInFlight: null,
@@ -170,7 +174,9 @@ export function getStatus(worldId: string = DEFAULT_WORLD_ID): AnalysisStatus {
   const state = ws(worldId);
   const st = getStore(worldId);
   const cutoff = analyzeCutoff();
-  let pending = 0;
+  // Queued-but-not-yet-prescreened items count as pending too, so the UI reflects
+  // the FULL remaining backlog (not just what's already in the store).
+  let pending = state.prescreenQueue.length;
   let analyzed = 0;
   for (const s of st.all()) {
     if (s.clickbait || s.item.publishedAt < cutoff) continue;
@@ -181,6 +187,7 @@ export function getStatus(worldId: string = DEFAULT_WORLD_ID): AnalysisStatus {
     state.status.phase !== "idle" ||
     state.buildInFlight !== null ||
     state.analyzeInFlight !== null ||
+    state.prescreenQueue.length > 0 ||
     state.catchUpTimer !== null;
   // Worlds no longer block each other (model passes serialize on a mutex but each
   // world builds independently), so nothing is ever "busy with" another world.
@@ -314,9 +321,110 @@ function sourcesForWorld(worldId: string): Source[] {
 }
 
 /**
- * Network phase: fetch all sources, triage brand-new & recent items, and store
- * them — junk flagged, survivors marked PENDING (analyzed:false). Deep analysis
- * is deferred to analyzePending() so the build is chunked, not a multi-hour block.
+ * Prescreen (cheap title-only triage) a SLICE of fetched items and store the
+ * survivors as PENDING (analyzed:false). Extracted so both the synchronous
+ * cold-start first chunk and the background catch-up loop share one path. The
+ * caller must have confirmed the model is reachable.
+ */
+async function prescreenAndStore(worldId: string, items: FeedItem[]): Promise<void> {
+  if (items.length === 0) return;
+  const state = ws(worldId);
+  const st = getStore(worldId);
+  const cc = placeCountryOf(worldId);
+  const regional = !!cc && config.place.sourcesEnabled;
+  const geo = isGeoPoolId(worldId);
+
+  const junk = new Set<string>();
+  const coarse = new Map<string, number>(); // id -> coarse importance (capped pools)
+  const globals = new Set<string>();
+  if (geo) {
+    // ONE cheap title-only pass: clickbait + coarse importance (no global flag).
+    const batches = Math.ceil(items.length / config.ai.triageBatchSize);
+    console.log(`[feed:${worldId}] prescreen(geo): ${items.length} headline(s) in ${batches} batch(es)…`);
+    const verdicts = await withModelLock(() =>
+      prescreenGeo(
+        items.map((it) => ({ id: it.id, title: it.title, summary: it.summary })),
+        geoLabel(geoNodeIdOf(worldId)),
+        progressLogger(state, "triage"),
+      ),
+    );
+    for (const it of items) {
+      const v = verdicts.get(it.id);
+      if (!v) continue; // absent → kept, neutral importance
+      if (config.feed.clickbaitFilter && v.junk) junk.add(it.id);
+      coarse.set(it.id, v.importance);
+    }
+    console.log(`[feed:${worldId}] prescreen(geo) flagged ${junk.size} junk of ${items.length}`);
+  } else if (regional && cc) {
+    // Regional pools: ONE cheap title-only pass folds clickbait + local/global +
+    // a coarse importance, so we scan the flood once and later deep-analyze only
+    // the top-N local items by that score.
+    const batches = Math.ceil(items.length / config.ai.triageBatchSize);
+    console.log(`[feed:${worldId}] prescreen: ${items.length} headline(s) in ${batches} batch(es)…`);
+    const verdicts = await withModelLock(() =>
+      prescreenRegional(
+        items.map((it) => ({ id: it.id, title: it.title, summary: it.summary })),
+        placeLabelFor(cc),
+        progressLogger(state, "triage"),
+      ),
+    );
+    for (const it of items) {
+      const v = verdicts.get(it.id);
+      if (!v) continue; // absent from reply → treat conservatively (kept, default importance)
+      if (config.feed.clickbaitFilter && v.junk) junk.add(it.id);
+      if (v.global) globals.add(it.id);
+      coarse.set(it.id, v.importance);
+    }
+    console.log(
+      `[feed:${worldId}] prescreen flagged ${junk.size} junk, ${globals.size} global ` +
+        `of ${items.length}`,
+    );
+  } else if (config.feed.clickbaitFilter) {
+    // TOPICAL worlds: ONE cheap title-only pass folds clickbait + a coarse
+    // importance, so the front page can rank its provisional items (and order
+    // its analysis backlog) by newsworthiness instead of pure recency.
+    const batches = Math.ceil(items.length / config.ai.triageBatchSize);
+    console.log(`[feed:${worldId}] triage: ${items.length} headline(s) in ${batches} batch(es)…`);
+    const verdicts = await withModelLock(() =>
+      detectClickbait(items, progressLogger(state, "triage")),
+    );
+    for (const it of items) {
+      const v = verdicts.get(it.id);
+      if (!v) continue; // absent → kept, neutral importance
+      if (v.junk) junk.add(it.id);
+      coarse.set(it.id, v.importance);
+    }
+    console.log(`[feed:${worldId}] triage flagged ${junk.size}/${items.length} as clickbait/junk`);
+  }
+
+  for (const it of items) {
+    st.upsert({
+      item: it,
+      clickbait: junk.has(it.id),
+      // Set at prescreen for legacy regional pools so global stories are excluded
+      // from the backlog + feed. Geo pools never drop globals (undefined).
+      global: regional ? globals.has(it.id) : undefined,
+      // Coarse newsworthiness from the cheap triage pass — now scored for EVERY
+      // pool (topical included). Drives provisional ranking + analysis order;
+      // overwritten by the real score once deep-analyzed.
+      prescreenImportance: coarse.has(it.id) ? coarse.get(it.id) : undefined,
+      analyzed: false, // deep analysis pending
+      topic: it.topic,
+      lean: it.lean,
+      importance: 0,
+      summary: "",
+      keywords: [],
+      analyzedAt: 0,
+    });
+  }
+}
+
+/**
+ * Network phase: fetch all sources, then prescreen ONLY the freshest chunk
+ * synchronously so the cold-start feed lands FAST even when a pool floods with
+ * thousands of items. The remainder is queued on the world state; the background
+ * catch-up loop (prescreenPending) drains it in chunks, populating the feed
+ * continuously while it's in use. Deep analysis is likewise chunked downstream.
  */
 async function refreshSources(worldId: string): Promise<void> {
   const state = ws(worldId);
@@ -327,8 +435,11 @@ async function refreshSources(worldId: string): Promise<void> {
   console.log(`[feed:${worldId}] refresh — fetching ${sources.length} sources…`);
   const raw = await fetchAll(sources);
   const cutoff = analyzeCutoff();
-  // Never-seen items inside the recency window are all that need triage.
-  const untriaged = raw.filter((it) => !st.has(it.id) && it.publishedAt >= cutoff);
+  // Never-seen items inside the recency window are all that need triage, FRESHEST
+  // first so the synchronous first chunk prescreens the most recent news.
+  const untriaged = raw
+    .filter((it) => !st.has(it.id) && it.publishedAt >= cutoff)
+    .sort((a, b) => b.publishedAt - a.publishedAt);
   console.log(
     `[feed:${worldId}] fetched ${raw.length}; ${untriaged.length} new & recent to triage; ${st.size()} in store`,
   );
@@ -337,104 +448,54 @@ async function refreshSources(worldId: string): Promise<void> {
     // Fail fast if the model is down: don't store half-processed items; retry later.
     if (!(await aiReachable())) {
       console.warn(`[feed:${worldId}] AI endpoint unreachable — skipping triage this refresh.`);
+      state.prescreenQueue = [];
       state.lastBuildAt = Date.now();
       setPhase(state, "idle");
       return;
     }
-    const cc = placeCountryOf(worldId);
-    const regional = !!cc && config.place.sourcesEnabled;
-    const geo = isGeoPoolId(worldId);
-
-    const junk = new Set<string>();
-    const coarse = new Map<string, number>(); // id -> coarse importance (capped pools)
-    const globals = new Set<string>();
-    if (geo) {
-      // ONE cheap title-only pass: clickbait + coarse importance (no global flag).
-      const batches = Math.ceil(untriaged.length / config.ai.triageBatchSize);
-      console.log(`[feed:${worldId}] prescreen(geo): ${untriaged.length} headline(s) in ${batches} batch(es)…`);
-      const verdicts = await withModelLock(() =>
-        prescreenGeo(
-          untriaged.map((it) => ({ id: it.id, title: it.title, summary: it.summary })),
-          geoLabel(geoNodeIdOf(worldId)),
-          progressLogger(state, "triage"),
-        ),
-      );
-      for (const it of untriaged) {
-        const v = verdicts.get(it.id);
-        if (!v) continue; // absent → kept, neutral importance
-        if (config.feed.clickbaitFilter && v.junk) junk.add(it.id);
-        coarse.set(it.id, v.importance);
-      }
-      console.log(`[feed:${worldId}] prescreen(geo) flagged ${junk.size} junk of ${untriaged.length}`);
-    } else if (regional && cc) {
-      // Regional pools: ONE cheap title-only pass folds clickbait + local/global +
-      // a coarse importance, so we scan the flood once and later deep-analyze only
-      // the top-N local items by that score.
-      const batches = Math.ceil(untriaged.length / config.ai.triageBatchSize);
-      console.log(`[feed:${worldId}] prescreen: ${untriaged.length} headline(s) in ${batches} batch(es)…`);
-      const verdicts = await withModelLock(() =>
-        prescreenRegional(
-          untriaged.map((it) => ({ id: it.id, title: it.title, summary: it.summary })),
-          placeLabelFor(cc),
-          progressLogger(state, "triage"),
-        ),
-      );
-      for (const it of untriaged) {
-        const v = verdicts.get(it.id);
-        if (!v) continue; // absent from reply → treat conservatively (kept, default importance)
-        if (config.feed.clickbaitFilter && v.junk) junk.add(it.id);
-        if (v.global) globals.add(it.id);
-        coarse.set(it.id, v.importance);
-      }
-      console.log(
-        `[feed:${worldId}] prescreen flagged ${junk.size} junk, ${globals.size} global ` +
-          `of ${untriaged.length}`,
-      );
-    } else if (config.feed.clickbaitFilter) {
-      // TOPICAL worlds: ONE cheap title-only pass folds clickbait + a coarse
-      // importance, so the front page can rank its provisional items (and order
-      // its analysis backlog) by newsworthiness instead of pure recency.
-      const batches = Math.ceil(untriaged.length / config.ai.triageBatchSize);
-      console.log(`[feed:${worldId}] triage: ${untriaged.length} headline(s) in ${batches} batch(es)…`);
-      const verdicts = await withModelLock(() =>
-        detectClickbait(untriaged, progressLogger(state, "triage")),
-      );
-      for (const it of untriaged) {
-        const v = verdicts.get(it.id);
-        if (!v) continue; // absent → kept, neutral importance
-        if (v.junk) junk.add(it.id);
-        coarse.set(it.id, v.importance);
-      }
-      console.log(`[feed:${worldId}] triage flagged ${junk.size}/${untriaged.length} as clickbait/junk`);
-    }
-
-    for (const it of untriaged) {
-      st.upsert({
-        item: it,
-        clickbait: junk.has(it.id),
-        // Set at prescreen for legacy regional pools so global stories are excluded
-        // from the backlog + feed. Geo pools never drop globals (undefined).
-        global: regional ? globals.has(it.id) : undefined,
-        // Coarse newsworthiness from the cheap triage pass — now scored for EVERY
-        // pool (topical included). Drives provisional ranking + analysis order;
-        // overwritten by the real score once deep-analyzed.
-        prescreenImportance: coarse.has(it.id) ? coarse.get(it.id) : undefined,
-        analyzed: false, // deep analysis pending
-        topic: it.topic,
-        lean: it.lean,
-        importance: 0,
-        summary: "",
-        keywords: [],
-        analyzedAt: 0,
-      });
-    }
+    // Only the FIRST chunk is awaited (one cheap model round); the rest is queued
+    // for the background loop so the cold-start response isn't held by a flood.
+    const firstN = config.feed.prescreenChunk > 0 ? config.feed.prescreenChunk : untriaged.length;
+    state.prescreenQueue = untriaged.slice(firstN);
+    await prescreenAndStore(worldId, untriaged.slice(0, firstN));
+  } else {
+    state.prescreenQueue = [];
   }
 
   const removed = st.prune();
   if (removed > 0) console.log(`[feed:${worldId}] pruned ${removed} stale item(s)`);
   st.save();
   state.lastBuildAt = Date.now();
-  console.log(`[feed:${worldId}] refresh done in ${state.lastBuildAt - started}ms`);
+  console.log(
+    `[feed:${worldId}] refresh done in ${state.lastBuildAt - started}ms ` +
+      `(${state.prescreenQueue.length} queued for background prescreen)`,
+  );
+}
+
+/**
+ * Background: prescreen ONE chunk of the queued (fetched-but-not-yet-triaged)
+ * items and store the survivors, so provisional items keep entering the feed bit
+ * by bit. Returns the remaining queue + how many we processed.
+ */
+function prescreenPending(worldId: string): Promise<{ remaining: number; progressed: number }> {
+  const state = ws(worldId);
+  return (async () => {
+    if (state.prescreenQueue.length === 0) return { remaining: 0, progressed: 0 };
+    if (!(await aiReachable())) return { remaining: state.prescreenQueue.length, progressed: 0 };
+    const size =
+      config.feed.prescreenChunk > 0 ? config.feed.prescreenChunk : state.prescreenQueue.length;
+    const chunk = state.prescreenQueue.splice(0, size);
+    await prescreenAndStore(worldId, chunk);
+    getStore(worldId).save();
+    // New provisional items are now servable — invalidate assembled views/briefings.
+    state.lastBuildAt = Date.now();
+    state.viewCache.clear();
+    state.briefingCache.clear();
+    console.log(
+      `[feed:${worldId}] prescreened ${chunk.length}; ${state.prescreenQueue.length} still queued`,
+    );
+    return { remaining: state.prescreenQueue.length, progressed: chunk.length };
+  })();
 }
 
 /** Resolve an analysis onto a stored item (rep OR clone). The model's topic /
@@ -1195,15 +1256,21 @@ function scheduleCatchUp(worldId: string): void {
     state.catchUpTimer = null;
     void (async () => {
       try {
+        // Drain a chunk of the prescreen queue first so more provisional items keep
+        // entering the feed, then deep-analyze + embed a chunk of what's ready.
+        const p = await prescreenPending(worldId);
         const a = await analyzePending(worldId);
         // Only embed once a chunk's analysis is in (embedding needs the summary).
         const e = await embedPending(worldId);
         const moreWork =
-          (a.remaining > 0 && a.progressed > 0) || (e.remaining > 0 && e.progressed > 0);
+          (p.remaining > 0 && p.progressed > 0) ||
+          (a.remaining > 0 && a.progressed > 0) ||
+          (e.remaining > 0 && e.progressed > 0);
         if (moreWork) {
           scheduleCatchUp(worldId);
         } else {
-          if (a.remaining > 0) console.warn(`[feed:${worldId}] catch-up stalled with ${a.remaining} pending`);
+          const stuck = p.remaining + a.remaining;
+          if (stuck > 0) console.warn(`[feed:${worldId}] catch-up stalled with ${stuck} pending`);
           else console.log(`[feed:${worldId}] analysis + embedding backlog cleared`);
           // The pool is now fully analyzed — reactively extend the stories with
           // relevant YouTube videos and international (per-zone) coverage.

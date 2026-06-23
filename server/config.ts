@@ -136,6 +136,13 @@ export const config = {
     recencyBucketHours: num("FEED_RECENCY_BUCKET_HOURS", 2),
     // Gap between background analysis chunks while draining the backlog.
     catchUpDelayMs: num("FEED_CATCHUP_DELAY_MS", 1500),
+    // Headlines PRESCREENED (cheap title-only triage) per chunk. The cold-start
+    // feed only WAITS on the FIRST chunk, so it lands fast even when a pool floods
+    // with thousands of items; the background catch-up loop prescreens the rest in
+    // chunks, populating the feed continuously while it's in use. Keep it ~one
+    // triage batch so the first paint is a single model round. 0 = prescreen
+    // everything up front (one big, blocking pass).
+    prescreenChunk: numOrZero("FEED_PRESCREEN_CHUNK", 40),
     // REACTIVE LOADING. Serve fetched + cheaply-triaged items that haven't been
     // deep-analyzed yet ("provisional") so the feed is usable in seconds instead
     // of waiting for the model to chew through the whole corpus. They carry the
