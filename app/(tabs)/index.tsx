@@ -36,6 +36,8 @@ import type { FeedItem, Story, Topic } from "../../src/types";
 
 const MAX_CONTENT_WIDTH = 1180;
 const H_PAD = spacing.lg;
+// Cap on the standalone "Developing" band (ongoing storylines not in "Last minute").
+const DEVELOPING_MAX = 12;
 
 // Per world+language story cache at MODULE scope so it SURVIVES a remount of the
 // Today screen. Backing out of a /news/[id] or /story/[id] route remounts this
@@ -314,6 +316,27 @@ export default function FeedScreen() {
     return activeSelected === "all" ? lm : lm.filter((s) => s.topic === activeSelected);
   }, [stories, feed, storyViews, activeSelected, prefs.interestPrompt]);
 
+  // Ongoing storylines that AREN'T already in the recent-activity band above. Developing
+  // issues span days (the backend keeps them developing for ~36h), but "Last minute" only
+  // surfaces the last ~2h — so without this band an active development older than 2h would
+  // render NOWHERE (it's excluded from the topic sections). Recency-sorted + capped; honours
+  // the topic filter and, when steering, the in-feed constraint.
+  const visibleDeveloping = useMemo(() => {
+    const recent = new Set(visibleLastMinute.map((s) => s.id));
+    const searching = (prefs.interestPrompt ?? "").trim().length > 0;
+    const feedIds = searching ? new Set(feed.map((it) => it.id)) : null;
+    return stories
+      .filter(
+        (s) =>
+          s.developing &&
+          !recent.has(s.id) &&
+          (!feedIds || s.sources.some((src) => feedIds.has(src.id))) &&
+          (activeSelected === "all" || s.topic === activeSelected),
+      )
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+      .slice(0, DEVELOPING_MAX);
+  }, [stories, feed, visibleLastMinute, activeSelected, prefs.interestPrompt]);
+
   const [panelState, setPanelState] = useState<PanelState>("hidden");
   // The selected place's name, shown as the panel title (e.g. "Spain" instead of "Today").
   const [placeTitle, setPlaceTitle] = useState<string | null>(null);
@@ -587,9 +610,31 @@ export default function FeedScreen() {
           </View>
         )}
 
-        {/* Body: per-topic stream of story cards + standalone articles, treated
-            alike. Developing/synthesized stories sit in their own topic section
-            (no separate band) and just show stale until a refresh updates them. */}
+        {/* Developing — ongoing storylines (multi-day issues) not already shown in
+            "Last minute". This is their home: they're kept out of the topic sections,
+            and the recent-activity band only covers the last couple of hours. */}
+        {visibleDeveloping.length > 0 && (
+          <View style={{ gap: spacing.md }}>
+            <View style={styles.sectionHeader}>
+              <View style={[styles.sectionIcon, { backgroundColor: colors.accent + "22" }]}>
+                <Ionicons name="trending-up" size={15} color={colors.accent} />
+              </View>
+              <Text style={styles.sectionTitle}>{t("feed.developing")}</Text>
+              <Text style={styles.sectionCount}>{visibleDeveloping.length}</Text>
+            </View>
+            <Text style={styles.lastMinuteSub}>{t("feed.developingSub")}</Text>
+            <View style={[styles.grid, { gap: GAP }]}>
+              {visibleDeveloping.map((story) => (
+                <FadeInView key={`dev-${story.id}`} style={{ width: cardW }}>
+                  <StoryCard story={story} onOpen={(s) => openStory(s.id)} />
+                </FadeInView>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* Body: per-topic stream of synthesized EVENT story cards + standalone
+            articles, treated alike. Developing issues live in the band above, not here. */}
         {sections.length === 0 ? (
           loadingFeed ? (
             <View style={styles.empty}>
