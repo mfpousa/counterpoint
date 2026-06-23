@@ -42,8 +42,8 @@ export interface GlobeViewRefs {
   dragging: MutableRefObject<boolean>;
 }
 
-const PLANET_RADIUS = 0.98;
-const ENTITY_RADIUS = 1.04;
+const PLANET_RADIUS = 0.94; // ocean sphere — sits BELOW the land shell (radius 1.0)
+const ENTITY_RADIUS = 1.05;
 const OFF = "#000000";
 
 function entityColor(d: GlobeEntityData): string {
@@ -88,7 +88,7 @@ function GlobeEntity({
       }}
       onPointerOut={() => onFocus(null)}
     >
-      <icosahedronGeometry args={[0.075, 1]} />
+      <icosahedronGeometry args={[0.045, 1]} />
       <meshStandardMaterial
         color={color}
         metalness={0.5}
@@ -112,7 +112,18 @@ function Land({ data }: { data: LandGeometry }) {
   }, [data]);
   return (
     <mesh geometry={geom}>
-      <meshStandardMaterial color="#5d7184" metalness={0.6} roughness={0.45} side={DoubleSide} />
+      {/* flatShading computes per-FACE normals in-shader, so the land lights correctly
+          even though earcut's triangle winding leaves the vertex normals inverted;
+          the emissive floor guarantees the continents read against the dark ocean. */}
+      <meshStandardMaterial
+        color="#9bb1c7"
+        metalness={0.45}
+        roughness={0.5}
+        emissive="#33445a"
+        emissiveIntensity={0.55}
+        side={DoubleSide}
+        flatShading
+      />
     </mesh>
   );
 }
