@@ -49,7 +49,7 @@ import {
 import { generateBriefing, generateBriefingStream } from "./briefing";
 import {
   clusterItems,
-  distinctSources,
+  coverageOf,
   groupIntoIssues,
   isDevelopingIssue,
   jaccard,
@@ -1633,20 +1633,20 @@ export async function getBriefingStream(
 /** The recent, analyzed pool eligible to be clustered into stories. Uses the
  *  WIDER of the event/issue windows so multi-day developing issues are covered.
  *
- *  NB: near-clones (`cloneOf`) are KEPT here, unlike the feed/provisional sets. GEO
- *  pools dedup near-identical wire copy down to ONE representative for the feed + for
- *  analysis — but story synthesis NEEDS those copies: a story requires several DISTINCT
- *  sources, and that multi-source signal lives ENTIRELY in the clones. Excluding them
- *  collapsed every geo event to a single-source rep, so multi-source events and
- *  developing issues never formed for geo pools (and the globe's alert markers stayed
- *  empty). Clones inherit the rep's analysis, so they re-cluster onto the same event. */
+ *  Near-clones (`cloneOf`) are EXCLUDED — only REPRESENTATIVES cluster. A rep carries
+ *  `coveredBy` (its near-clone group's outlet count), and synthesis counts breadth via
+ *  coverageOf(), so a geo event still clears the multi-source thresholds WITHOUT the
+ *  flood of duplicate copies. (Briefly keeping the copies churned each ongoing issue's
+ *  member set every rebuild — its article-derived id drifted, bestMatch missed, and the
+ *  development kept vanishing/recreating. Excluding them keeps member sets small +
+ *  STABLE, while coveredBy preserves the multi-source signal the threshold needs.) */
 function storyEligible(worldId: string, now = Date.now()): StoredItem[] {
   const window = Math.min(
     config.feed.retentionMs,
     Math.max(config.stories.windowMs, config.stories.issueWindowMs),
   );
   const inWindow = (s: StoredItem) =>
-    !s.clickbait && s.analyzed && now - s.item.publishedAt <= window;
+    !s.clickbait && s.analyzed && !s.cloneOf && now - s.item.publishedAt <= window;
   // The WORLD / front page draws on ALL the news the system has fetched (front page +
   // every loaded geo/regional pool), so ongoing stories aren't siloed per-place —
   // segregating synthesis to one pool defeats its point. A SPECIFIC geo selection (and
@@ -1751,6 +1751,9 @@ export async function getStories(
       title: s.item.title,
       keywords: s.keywords,
       embedding: s.embedding,
+      // A representative stands in for `coveredBy` outlets (its near-clone group), so
+      // coverage thresholds still see the full breadth though we cluster one copy.
+      coveredBy: s.coveredBy,
     }));
 
     // Level 1: dedupe into same-event clusters.
@@ -1779,8 +1782,8 @@ export async function getStories(
         }),
       )
       .sort((a, b) => {
-        const sa = distinctSources(a.members);
-        const sb = distinctSources(b.members);
+        const sa = coverageOf(a.members);
+        const sb = coverageOf(b.members);
         if (sb !== sa) return sb - sa;
         return b.latestAt - a.latestAt;
       })
@@ -1791,7 +1794,7 @@ export async function getStories(
     // client tags each story/article with a link up to its ongoing issue. The
     // issue itself is still emitted as its own umbrella story (with the timeline).
     const eventCandidates = clusters.filter(
-      (c) => distinctSources(c.members) >= config.stories.minSources,
+      (c) => coverageOf(c.members) >= config.stories.minSources,
     );
     const remainingSlots = Math.max(0, config.stories.maxStories - developing.length);
     const topEvents = rankClusters(eventCandidates).slice(0, remainingSlots);

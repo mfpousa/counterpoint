@@ -21,6 +21,10 @@ export interface ClusterInput {
   keywords: string[];
   /** Semantic embedding, when available (preferred similarity signal). */
   embedding?: number[];
+  /** Outlets this item REPRESENTS after near-clone dedup (>=1). A deduped wire-copy
+   *  representative stands in for its whole group, so coverage counts it as `coveredBy`
+   *  outlets even though only one copy is clustered. Absent/1 for a stand-alone item. */
+  coveredBy?: number;
 }
 
 export interface ClusterOptions {
@@ -168,14 +172,26 @@ export function distinctSources<T extends ClusterInput>(members: T[]): number {
   return new Set(members.map((m) => m.sourceId)).size;
 }
 
+/** Total OUTLET coverage of a member list. A near-clone REPRESENTATIVE stands in for
+ *  its whole group (`coveredBy` outlets), so we count that rather than one — which lets
+ *  us DEDUP duplicates out of the cluster (keeping member sets small + stable across
+ *  rebuilds) WITHOUT under-counting the many outlets that actually carried the story.
+ *  This is what stops a flood of near-clones from churning an ongoing issue's identity
+ *  while still letting genuinely multi-source events clear the story thresholds. */
+export function coverageOf<T extends ClusterInput>(members: T[]): number {
+  let n = 0;
+  for (const m of members) n += Math.max(1, m.coveredBy ?? 1);
+  return n;
+}
+
 /**
  * Rank clusters for synthesis: more outlets first (richer comparison), then
  * higher peak importance, then more recent. Deterministic.
  */
 export function rankClusters<T extends ClusterInput>(clusters: Cluster<T>[]): Cluster<T>[] {
   return clusters.slice().sort((a, b) => {
-    const sa = distinctSources(a.members);
-    const sb = distinctSources(b.members);
+    const sa = coverageOf(a.members);
+    const sb = coverageOf(b.members);
     if (sb !== sa) return sb - sa;
     const ia = Math.max(...a.members.map((m) => m.importance), 0);
     const ib = Math.max(...b.members.map((m) => m.importance), 0);
@@ -262,8 +278,8 @@ export function groupIntoIssues<T extends ClusterInput>(
   opts: IssueOptions,
 ): Issue<T>[] {
   const ordered = clusters.slice().sort((a, b) => {
-    const sa = distinctSources(a.members);
-    const sb = distinctSources(b.members);
+    const sa = coverageOf(a.members);
+    const sb = coverageOf(b.members);
     if (sb !== sa) return sb - sa;
     return Math.max(...b.members.map((m) => m.publishedAt)) -
       Math.max(...a.members.map((m) => m.publishedAt));
@@ -352,7 +368,7 @@ export function isDevelopingIssue<T extends ClusterInput>(
   return (
     issue.clusters.length >= opts.minEvents &&
     issueSpan >= opts.minSpanMs &&
-    distinctSources(issue.members) >= opts.minSources &&
+    coverageOf(issue.members) >= opts.minSources &&
     now - issue.latestAt <= opts.activeMs
   );
 }

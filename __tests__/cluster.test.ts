@@ -1,5 +1,6 @@
 import {
   clusterItems,
+  coverageOf,
   distinctSources,
   groupIntoIssues,
   isDevelopingIssue,
@@ -82,10 +83,17 @@ describe("clusterItems (text fallback, no embeddings)", () => {
   });
 });
 
-describe("distinctSources / rankClusters", () => {
+describe("distinctSources / coverageOf / rankClusters", () => {
   it("counts distinct sources (not raw members)", () => {
     const members = [item({ sourceId: "x" }), item({ sourceId: "x" }), item({ sourceId: "y" })];
     expect(distinctSources(members)).toBe(2);
+  });
+
+  it("coverageOf counts a near-clone representative as the outlets it stands for", () => {
+    // A deduped rep (coveredBy 5) + a stand-alone item = 6 outlets of coverage, even
+    // though only 2 items are clustered — so dedup never under-counts breadth.
+    expect(coverageOf([item({ sourceId: "a", coveredBy: 5 }), item({ sourceId: "b" })])).toBe(6);
+    expect(coverageOf([item(), item(), item()])).toBe(3); // missing coveredBy => 1 each
   });
 
   it("ranks clusters with more outlets first, then importance", () => {
@@ -96,6 +104,15 @@ describe("distinctSources / rankClusters", () => {
     };
     const ranked = rankClusters([small, big]);
     expect(ranked[0]).toBe(big);
+  });
+
+  it("ranks a deduped rep (high coveredBy) above a smaller cluster", () => {
+    const rep = { members: [item({ sourceId: "a", coveredBy: 8 })], centroid: null };
+    const twoOutlets = {
+      members: [item({ sourceId: "b" }), item({ sourceId: "c" })],
+      centroid: null,
+    };
+    expect(rankClusters([twoOutlets, rep])[0]).toBe(rep);
   });
 });
 
