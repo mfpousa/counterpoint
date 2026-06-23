@@ -12,7 +12,7 @@
 
 import React, { memo, useRef } from "react";
 import type { MutableRefObject } from "react";
-import { useFrame, type ThreeEvent } from "@react-three/fiber";
+import { useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import { AdditiveBlending, BackSide, DoubleSide } from "three";
 import type { Group, Mesh, MeshBasicMaterial } from "three";
 import { colors } from "../../theme";
@@ -86,7 +86,11 @@ function GlobeEntity({
   return (
     <mesh
       ref={ref}
-      position={[data.dir.x * ENTITY_RADIUS, data.dir.y * ENTITY_RADIUS, data.dir.z * ENTITY_RADIUS]}
+      position={[
+        data.dir.x * ENTITY_RADIUS,
+        data.dir.y * ENTITY_RADIUS,
+        data.dir.z * ENTITY_RADIUS,
+      ]}
       onClick={(e: ThreeEvent<MouseEvent>) => {
         e.stopPropagation();
         onActivate(data.id);
@@ -95,7 +99,9 @@ function GlobeEntity({
         e.stopPropagation();
         onFocus(data.id);
       }}
-      onPointerMove={(e: ThreeEvent<PointerEvent>) => onHoverMove?.(e.pointer.x, e.pointer.y)}
+      onPointerMove={(e: ThreeEvent<PointerEvent>) =>
+        onHoverMove?.(e.pointer.x, e.pointer.y)
+      }
       onPointerOut={() => onFocus(null)}
     >
       <icosahedronGeometry args={[0.045, 1]} />
@@ -179,7 +185,8 @@ const CountryMesh = memo(function CountryMesh({
       }
       onPointerMove={
         interactive
-          ? (e: ThreeEvent<PointerEvent>) => onHoverMove?.(e.pointer.x, e.pointer.y)
+          ? (e: ThreeEvent<PointerEvent>) =>
+              onHoverMove?.(e.pointer.x, e.pointer.y)
           : undefined
       }
       onPointerOut={interactive ? () => onFocus(null) : undefined}
@@ -201,7 +208,9 @@ const CountryMesh = memo(function CountryMesh({
         metalness={0.45}
         roughness={0.5}
         emissive={hot ? colors.accent : OFF}
-        emissiveIntensity={c.active ? 0.9 : focused ? 0.95 : c.current ? 0.6 : 0}
+        emissiveIntensity={
+          c.active ? 0.9 : focused ? 0.95 : c.current ? 0.6 : 0
+        }
         side={DoubleSide}
       />
     </mesh>
@@ -263,7 +272,13 @@ function Countries({
  *  gravity and COLOURED BY EVENT CATEGORY (conflict/health/tech…). The phase is desynced
  *  per id so they shimmer, and an invisible larger hit sphere makes the tiny dot tappable
  *  (→ open the story), turning the globe into an explorable worldview. */
-function AlertMarker({ alert, onPress }: { alert: GeoAlert; onPress?: (id: string) => void }) {
+function AlertMarker({
+  alert,
+  onPress,
+}: {
+  alert: GeoAlert;
+  onPress?: (id: string) => void;
+}) {
   const ping = useRef<Mesh>(null);
   const mat = useRef<MeshBasicMaterial>(null);
   const r = 0.012 + alert.severity * 0.02;
@@ -276,7 +291,11 @@ function AlertMarker({ alert, onPress }: { alert: GeoAlert; onPress?: (id: strin
   });
   return (
     <group
-      position={[alert.dir.x * ALERT_RADIUS, alert.dir.y * ALERT_RADIUS, alert.dir.z * ALERT_RADIUS]}
+      position={[
+        alert.dir.x * ALERT_RADIUS,
+        alert.dir.y * ALERT_RADIUS,
+        alert.dir.z * ALERT_RADIUS,
+      ]}
     >
       <mesh>
         <sphereGeometry args={[r, 12, 12]} />
@@ -284,7 +303,13 @@ function AlertMarker({ alert, onPress }: { alert: GeoAlert; onPress?: (id: strin
       </mesh>
       <mesh ref={ping}>
         <sphereGeometry args={[r, 12, 12]} />
-        <meshBasicMaterial ref={mat} color={color} transparent opacity={0.45} depthWrite={false} />
+        <meshBasicMaterial
+          ref={mat}
+          color={color}
+          transparent
+          opacity={0.45}
+          depthWrite={false}
+        />
       </mesh>
       {onPress && (
         <mesh
@@ -301,7 +326,13 @@ function AlertMarker({ alert, onPress }: { alert: GeoAlert; onPress?: (id: strin
   );
 }
 
-function Alerts({ alerts, onPress }: { alerts: GeoAlert[]; onPress?: (id: string) => void }) {
+function Alerts({
+  alerts,
+  onPress,
+}: {
+  alerts: GeoAlert[];
+  onPress?: (id: string) => void;
+}) {
   return (
     <>
       {alerts.map((a) => (
@@ -325,6 +356,7 @@ export function GlobeScene({
   onActivate,
   onHoverMove,
   refs,
+  rightInset = 0,
 }: {
   countries: GlobeCountry[];
   regions: GlobeCountry[];
@@ -342,7 +374,11 @@ export function GlobeScene({
   /** Cursor position (NDC, -1..1) while a place is hovered — drives the floating pin. */
   onHoverMove?: (x: number, y: number) => void;
   refs: GlobeViewRefs;
+  /** Width (px) the side panel covers on the RIGHT (desktop). The globe eases LEFT by
+   *  half this so the focused content stays centred in the visible area. 0 = no shift. */
+  rightInset?: number;
 }) {
+  const viewport = useThree((s) => s.viewport);
   const group = useRef<Group>(null);
   useFrame((_, delta) => {
     const g = group.current;
@@ -366,6 +402,13 @@ export function GlobeScene({
     g.rotation.x = Math.max(-1.2, Math.min(1.2, refs.rot.current.pitch));
     const s = g.scale.x + (refs.zoom.current - g.scale.x) * 0.2;
     g.scale.setScalar(s);
+    // Desktop: when the side panel covers the right, ease the globe LEFT so the focused
+    // content centres in the VISIBLE area instead of hiding behind the panel.
+    const targetX =
+      rightInset > 0 && viewport.factor > 0
+        ? -(rightInset / 2) / viewport.factor
+        : 0;
+    g.position.x += (targetX - g.position.x) * 0.06;
   });
 
   // Scroll-wheel zoom that pulls the point under the cursor toward the view centre as it
@@ -395,7 +438,11 @@ export function GlobeScene({
       <hemisphereLight args={["#7d9bd6", "#0a0d12", 0.7]} />
       <ambientLight intensity={0.25} />
       <directionalLight position={[5, 4, 6]} intensity={1.5} />
-      <pointLight position={[-6, -3, -4]} intensity={0.8} color={colors.accent} />
+      <pointLight
+        position={[-6, -3, -4]}
+        intensity={0.8}
+        color={colors.accent}
+      />
       <group ref={group}>
         {/* Atmosphere: a back-faced additive shell gives a soft rim glow / halo. */}
         <mesh scale={1.08}>
@@ -413,19 +460,27 @@ export function GlobeScene({
             Also the scroll-zoom target: it's always under the cursor (behind the land). */}
         <mesh onWheel={onWheel}>
           <icosahedronGeometry args={[PLANET_RADIUS, 5]} />
-          <meshStandardMaterial color="#173049" metalness={0.55} roughness={0.32} />
+          <meshStandardMaterial
+            color="#173049"
+            metalness={0.55}
+            roughness={0.32}
+          />
         </mesh>
         {/* Real country shapes on top of the ocean (radius 1.0 > ocean 0.94): the
             current level's are interactive, the rest are dim background land. */}
         <Countries
-          data={regions.length > 0 ? countries.filter((c) => !c.current) : countries}
+          data={
+            regions.length > 0 ? countries.filter((c) => !c.current) : countries
+          }
           focusedId={focusedId}
           onFocus={onFocus}
           onActivate={onActivate}
           onHoverMove={onHoverMove}
         />
         {/* Subtle country separators, always on — faint borders/coastlines like an atlas. */}
-        {countryOutline && <Outline positions={countryOutline} color="#9fb4c9" opacity={0.18} />}
+        {countryOutline && (
+          <Outline positions={countryOutline} color="#9fb4c9" opacity={0.18} />
+        )}
         {/* Streamed province shapes for the country in focus, sitting just above the
             country fill, with crisp boundary lines so they read like a printed map. */}
         {regions.length > 0 && (
@@ -438,7 +493,9 @@ export function GlobeScene({
           />
         )}
         {/* Stronger region separators, drawn once a country is in focus. */}
-        {outline && <Outline positions={outline} color="#0c1a27" opacity={0.85} />}
+        {outline && (
+          <Outline positions={outline} color="#0c1a27" opacity={0.85} />
+        )}
         {/* Gizmos: small markers for places with no border shape (localities). */}
         {gizmos.map((d) => (
           <GlobeEntity
