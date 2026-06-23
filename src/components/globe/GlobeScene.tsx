@@ -43,9 +43,6 @@ export interface GlobeViewRefs {
   /** When set, the globe eases to face + zoom this orientation (drill-in focus);
    *  cleared the moment the reader drags so manual control always wins. */
   target: MutableRefObject<{ yaw: number; pitch: number; zoom: number } | null>;
-  /** While a place is SELECTED, panning is clamped to within `range` radians of this
-   *  centre, so the reader can't drag out of the selection (null = free at the world). */
-  focus: MutableRefObject<{ yaw: number; pitch: number; range: number } | null>;
 }
 
 const PLANET_RADIUS = 0.975; // ocean sphere — a small gap below the land (1.0) so the flat triangles don't clip through, while still hugging
@@ -67,11 +64,13 @@ function GlobeEntity({
   focused,
   onFocus,
   onActivate,
+  onHoverMove,
 }: {
   data: GlobeEntityData;
   focused: boolean;
   onFocus: (id: string | null) => void;
   onActivate: (id: string) => void;
+  onHoverMove?: (x: number, y: number) => void;
 }) {
   const ref = useRef<Mesh>(null);
   const highlight = focused || data.active;
@@ -96,6 +95,7 @@ function GlobeEntity({
         e.stopPropagation();
         onFocus(data.id);
       }}
+      onPointerMove={(e: ThreeEvent<PointerEvent>) => onHoverMove?.(e.pointer.x, e.pointer.y)}
       onPointerOut={() => onFocus(null)}
     >
       <icosahedronGeometry args={[0.045, 1]} />
@@ -142,11 +142,13 @@ const CountryMesh = memo(function CountryMesh({
   focused,
   onFocus,
   onActivate,
+  onHoverMove,
 }: {
   c: GlobeCountry;
   focused: boolean;
   onFocus: (id: string | null) => void;
   onActivate: (id: string) => void;
+  onHoverMove?: (x: number, y: number) => void;
 }) {
   const meshRef = useRef<Mesh>(null);
   const interactive = c.entityId !== null;
@@ -173,6 +175,11 @@ const CountryMesh = memo(function CountryMesh({
               e.stopPropagation();
               onFocus(c.entityId);
             }
+          : undefined
+      }
+      onPointerMove={
+        interactive
+          ? (e: ThreeEvent<PointerEvent>) => onHoverMove?.(e.pointer.x, e.pointer.y)
           : undefined
       }
       onPointerOut={interactive ? () => onFocus(null) : undefined}
@@ -228,11 +235,13 @@ function Countries({
   focusedId,
   onFocus,
   onActivate,
+  onHoverMove,
 }: {
   data: GlobeCountry[];
   focusedId: string | null;
   onFocus: (id: string | null) => void;
   onActivate: (id: string) => void;
+  onHoverMove?: (x: number, y: number) => void;
 }) {
   return (
     <>
@@ -243,6 +252,7 @@ function Countries({
           focused={focusedId !== null && focusedId === c.entityId}
           onFocus={onFocus}
           onActivate={onActivate}
+          onHoverMove={onHoverMove}
         />
       ))}
     </>
@@ -357,20 +367,6 @@ export function GlobeScene({
     } else if (autoSpin && focusedId === null && !refs.dragging.current) {
       refs.rot.current.yaw += delta * 0.05; // idle auto-spin (landing only)
     }
-    // While a place is selected (and the reader is PANNING, not mid-flight to it), keep
-    // the view within the selection's bounds — you can't drag away to other regions.
-    if (refs.focus.current && !refs.target.current) {
-      const f = refs.focus.current;
-      const dy = Math.atan2(
-        Math.sin(refs.rot.current.yaw - f.yaw),
-        Math.cos(refs.rot.current.yaw - f.yaw),
-      );
-      refs.rot.current.yaw = f.yaw + Math.max(-f.range, Math.min(f.range, dy));
-      refs.rot.current.pitch = Math.max(
-        f.pitch - f.range,
-        Math.min(f.pitch + f.range, refs.rot.current.pitch),
-      );
-    }
     g.rotation.y = refs.rot.current.yaw;
     g.rotation.x = Math.max(-1.2, Math.min(1.2, refs.rot.current.pitch));
     const s = g.scale.x + (refs.zoom.current - g.scale.x) * 0.2;
@@ -424,14 +420,7 @@ export function GlobeScene({
         </mesh>
         {/* The planet — a faceted icosahedron, deep ocean blue with a metallic sheen.
             Also the scroll-zoom target: it's always under the cursor (behind the land). */}
-        <mesh
-          onWheel={onWheel}
-          onPointerMove={(e: ThreeEvent<PointerEvent>) => {
-            // Report the cursor (NDC) so the host can float a pin+label at it — only while
-            // a place is hovered, so it doesn't churn over empty ocean.
-            if (focusedId !== null) onHoverMove?.(e.pointer.x, e.pointer.y);
-          }}
-        >
+        <mesh onWheel={onWheel}>
           <icosahedronGeometry args={[PLANET_RADIUS, 5]} />
           <meshStandardMaterial color="#173049" metalness={0.55} roughness={0.32} />
         </mesh>
@@ -442,6 +431,7 @@ export function GlobeScene({
           focusedId={focusedId}
           onFocus={onFocus}
           onActivate={onActivate}
+          onHoverMove={onHoverMove}
         />
         {/* Subtle country separators, always on — faint borders/coastlines like an atlas. */}
         {countryOutline && <Outline positions={countryOutline} color="#9fb4c9" opacity={0.18} />}
@@ -453,6 +443,7 @@ export function GlobeScene({
             focusedId={focusedId}
             onFocus={onFocus}
             onActivate={onActivate}
+            onHoverMove={onHoverMove}
           />
         )}
         {/* Stronger region separators, drawn once a country is in focus. */}
@@ -465,6 +456,7 @@ export function GlobeScene({
             focused={focusedId === d.id}
             onFocus={onFocus}
             onActivate={onActivate}
+            onHoverMove={onHoverMove}
           />
         ))}
         {/* Worldview: category-coloured, gravity-sized event markers (tap to open). */}

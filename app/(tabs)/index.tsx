@@ -22,7 +22,7 @@ import { BriefingCard } from "../../src/components/BriefingCard";
 import { AnalysisProgress } from "../../src/components/AnalysisProgress";
 import { WorldSwitcher } from "../../src/components/WorldSwitcher";
 import { Globe } from "../../src/components/globe/Globe";
-import { ArticlesPanel, type PanelState } from "../../src/components/ArticlesPanel";
+import { ArticlesPanel, PEEK_H, type PanelState } from "../../src/components/ArticlesPanel";
 import { GEO_ROOT_ID, geoNodeIdOf, poolIdForNode } from "../../src/data/geo";
 import { DEFAULT_WORLD_ID } from "../../src/data/worlds";
 import { fetchStories } from "../../src/lib/api";
@@ -350,6 +350,9 @@ export default function FeedScreen() {
         // Desktop: while the side panel is open it covers the right; tell the globe so it
         // recenters into the visible area (and recenters back when the panel closes).
         rightInset={isWide && panelState === "open" ? panelW : 0}
+        // Mobile: the bottom sheet's peek covers the lower strip; lift the globe's bottom
+        // controls above it AND the home-indicator safe area so they stay tappable.
+        bottomInset={insets.bottom + (!isWide && panelState !== "hidden" ? PEEK_H : 0)}
         status={status}
         onAlertPress={(id) => openStory(id)}
         onPlace={setPlaceTitle}

@@ -26,7 +26,7 @@ import { colors, font, radius, spacing } from "../theme";
 
 export type PanelState = "hidden" | "peek" | "open";
 
-const PEEK_H = 80;
+export const PEEK_H = 80;
 
 export function ArticlesPanel({
   state,

@@ -155,6 +155,7 @@ export function Globe({
   onAlertPress,
   rightInset = 0,
   topInset = 0,
+  bottomInset = 0,
   height = 320,
 }: {
   activePoolId?: string;
@@ -184,6 +185,9 @@ export function Globe({
   rightInset?: number;
   /** Safe-area top inset (px) so the hero search clears the status bar/notch. */
   topInset?: number;
+  /** Obstruction at the BOTTOM (px): home-indicator safe area + any bottom-sheet peek,
+   *  so the zoom/World controls + status pill lift clear of it. */
+  bottomInset?: number;
   /** Canvas height in px (it sits inside a scroll view). */
   height?: number;
 }) {
@@ -207,7 +211,6 @@ export function Globe({
     zoom: useRef(1),
     dragging: useRef(false),
     target: useRef<{ yaw: number; pitch: number; zoom: number } | null>(null),
-    focus: useRef<{ yaw: number; pitch: number; range: number } | null>(null),
   };
   const lastDrag = useRef({ x: 0, y: 0 });
   const pinchDist = useRef(0);
@@ -550,15 +553,12 @@ export function Globe({
       // World landing / no place selected: spin freely (no orientation target), pan is
       // unbounded, and ease OUT so the WHOLE world shows, undoing any prior zoom-in.
       refs.target.current = null;
-      refs.focus.current = null;
       refs.zoom.current = WORLD_ZOOM;
       return;
     }
     const fy = Math.atan2(-dir.x, dir.z);
     const fp = Math.max(-1.2, Math.min(1.2, Math.atan2(dir.y, Math.hypot(dir.x, dir.z))));
     refs.target.current = { yaw: fy, pitch: fp, zoom };
-    // Bound panning around the selection — tighter the more we're zoomed in.
-    refs.focus.current = { yaw: fy, pitch: fp, range: 0.7 / zoom };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, worldGeo]);
 
@@ -578,9 +578,16 @@ export function Globe({
   // Float the place pin AT the cursor. The position is pushed IMPERATIVELY to the pin
   // (NDC -1..1 → px in the measured canvas) so per-move updates re-render only the pin,
   // never the globe scene + its hundreds of country meshes.
-  const onHoverMove = useCallback((ndcX: number, ndcY: number) => {
-    pinRef.current?.move(((ndcX + 1) / 2) * canvasW.current, ((1 - ndcY) / 2) * canvasH.current);
-  }, []);
+  const onHoverMove = useCallback(
+    (ndcX: number, ndcY: number) => {
+      const x = ((ndcX + 1) / 2) * canvasW.current;
+      const y = ((1 - ndcY) / 2) * canvasH.current;
+      // Keep the pin inside the canvas, and (desktop) left of the side panel.
+      const maxX = Math.max(0, canvasW.current - rightInset);
+      pinRef.current?.move(clamp(x, 0, maxX), clamp(y, 0, canvasH.current));
+    },
+    [rightInset],
+  );
 
   const childById = (id: string): CoverageNode | undefined =>
     (view?.children ?? []).find((c) => c.nodeId === id);
@@ -711,7 +718,7 @@ export function Globe({
 
         {/* Centered place finder (hero only): one box for continent / country. */}
         {variant === "hero" && (
-          <View style={[styles.searchWrap, { top: topInset + spacing.sm }]} pointerEvents="box-none">
+          <View style={[styles.searchWrap, { top: topInset + spacing.sm, right: rightInset }]} pointerEvents="box-none">
             <View style={styles.searchBox}>
               <Ionicons name="search" size={16} color={colors.textDim} />
               <TextInput
@@ -771,7 +778,7 @@ export function Globe({
         {/* Top bar: where we are + up-one-level + pin home. In hero it sits BELOW the
             search box so the two never overlap. */}
         <View
-          style={[styles.topBar, hero && { top: topInset + 78 }]}
+          style={[styles.topBar, hero && { top: topInset + 78 }, { paddingRight: rightInset }]}
           pointerEvents="box-none"
         >
           {!atRoot && (
@@ -806,7 +813,10 @@ export function Globe({
 
         {/* Bottom bar: world/international + zoom (the hovered place now shows on the
             cursor-following pin instead of a fixed label here). */}
-        <View style={styles.bottomBar} pointerEvents="box-none">
+        <View
+          style={[styles.bottomBar, { bottom: spacing.sm + bottomInset, paddingRight: rightInset }]}
+          pointerEvents="box-none"
+        >
           {atRoot && onSelectWorld ? (
             <Pressable
               onPress={onSelectWorld}
@@ -831,7 +841,10 @@ export function Globe({
 
         {/* Compact "what's updating" pill so backend work is visible over the globe too. */}
         {hero && status?.active && (
-          <View style={styles.statusWrap} pointerEvents="none">
+          <View
+            style={[styles.statusWrap, { bottom: 56 + bottomInset, right: rightInset }]}
+            pointerEvents="none"
+          >
             <View style={styles.statusPill}>
               <ActivityIndicator size="small" color={colors.accent} />
               <Text style={styles.statusText} numberOfLines={1}>
@@ -843,7 +856,10 @@ export function Globe({
 
         {/* Worldview legend: which event categories are coloured on the map right now. */}
         {hero && legendCats.length > 0 && (
-          <View style={styles.legend} pointerEvents="none">
+          <View
+            style={[styles.legend, { bottom: 98 + bottomInset, right: rightInset + spacing.lg }]}
+            pointerEvents="none"
+          >
             {legendCats.map((cat) => (
               <View key={cat} style={styles.legendItem}>
                 <View style={[styles.legendDot, { backgroundColor: EVENT_CATEGORIES[cat].color }]} />
@@ -892,6 +908,9 @@ const styles = StyleSheet.create({
     right: 0,
     alignItems: "center",
     paddingHorizontal: spacing.lg,
+    // Above the top bar so the results dropdown overlays it instead of being hidden
+    // (and stealing its taps) while searching.
+    zIndex: 20,
   },
   searchBox: {
     flexDirection: "row",
@@ -995,6 +1014,7 @@ const styles = StyleSheet.create({
   levelPill: {
     flexDirection: "row",
     alignItems: "center",
+    flexShrink: 1,
     gap: 4,
     paddingHorizontal: spacing.sm,
     paddingVertical: 4,
@@ -1004,7 +1024,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     maxWidth: 200,
   },
-  levelText: { color: colors.text, fontSize: font.small, fontWeight: "800" },
+  levelText: { color: colors.text, fontSize: font.small, fontWeight: "800", flexShrink: 1 },
   iconBtn: {
     width: 30,
     height: 30,
