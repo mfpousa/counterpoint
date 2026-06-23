@@ -157,13 +157,25 @@ async function resolveMediaCloudFor(
   key: string,
   queryName: string,
 ): Promise<Candidate[]> {
+  // Resolve ONE collection, tolerating a flaky directory: Media Cloud occasionally
+  // 500s on a single collection, and that must NOT abort the whole country. (It used
+  // to throw out of Promise.all → the run failed and no <cc>.json was ever written.)
+  const safeResolve = async (id: string): Promise<Candidate[]> => {
+    try {
+      return await resolveMediaCloudOutlets({ collection: id, key, limit: args.limit });
+    } catch (e) {
+      console.error(
+        `[place:${cc}] skipping Media Cloud collection ${id}: ${e instanceof Error ? e.message : e}`,
+      );
+      return [];
+    }
+  };
+
   // Explicit ids bypass search + AI selection entirely.
   if (args.mcCollection) {
     const ids = args.mcCollection.split(",").map((s) => s.trim()).filter(Boolean);
     console.error(`[place:${cc}] using explicit Media Cloud collection(s): ${ids.join(", ")}`);
-    const lists = await Promise.all(
-      ids.map((id) => resolveMediaCloudOutlets({ collection: id, key, limit: args.limit })),
-    );
+    const lists = await Promise.all(ids.map(safeResolve));
     return lists.flat();
   }
   // Otherwise: search the directory and let the model pick.
@@ -176,9 +188,7 @@ async function resolveMediaCloudFor(
   }
   const chosenNames = cols.filter((c) => picked.includes(c.id)).map((c) => `${c.id}:${c.name}`);
   console.error(`[place:${cc}] selected ${picked.length} collection(s): ${chosenNames.join(", ")}`);
-  const lists = await Promise.all(
-    picked.map((id) => resolveMediaCloudOutlets({ collection: String(id), key, limit: args.limit })),
-  );
+  const lists = await Promise.all(picked.map((id) => safeResolve(String(id))));
   return lists.flat();
 }
 

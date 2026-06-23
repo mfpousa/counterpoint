@@ -73,6 +73,8 @@ export default function FeedScreen() {
   } = useApp();
   const t = useT();
   const [selected, setSelected] = useState<Topic | "all">("all");
+  // Feed sort order (persisted): relevance (the AI score, default) or recency.
+  const sort = prefs.feedSort ?? "relevance";
 
   // Synthesized stories (developing issues + deduped multi-source events) are
   // interest-independent and built from the full pool, so we fetch them
@@ -226,16 +228,29 @@ export default function FeedScreen() {
   // standalone articles that no story absorbed, ordered by recency (read articles
   // sink to the bottom). Stories sort by their latest update.
   type Entry =
-    | { kind: "story"; story: Story; topic: Topic; at: number; done: false }
-    | { kind: "item"; item: FeedItem; topic: Topic; at: number; done: boolean };
+    | { kind: "story"; story: Story; topic: Topic; at: number; score: number; done: false }
+    | { kind: "item"; item: FeedItem; topic: Topic; at: number; score: number; done: boolean };
   const sections = useMemo(() => {
     const absorbed = new Set<string>();
     for (const s of synthStories) for (const src of s.sources) absorbed.add(src.id);
     const standalone = feed.filter((it) => !absorbed.has(it.id));
 
+    // Relevance score per entry: items carry the AI relevance; a synthesized story
+    // inherits the highest relevance among its member articles (it stands in for them).
+    const relById = new Map(feed.map((it) => [it.id, it.relevance ?? 0.5]));
+    const storyScore = (s: Story) =>
+      s.sources.reduce((m, src) => Math.max(m, relById.get(src.id) ?? 0.5), 0.5);
+
     const entries: Entry[] = [
       ...synthStories.map(
-        (story): Entry => ({ kind: "story", story, topic: story.topic, at: story.updatedAt, done: false }),
+        (story): Entry => ({
+          kind: "story",
+          story,
+          topic: story.topic,
+          at: story.updatedAt,
+          score: storyScore(story),
+          done: false,
+        }),
       ),
       ...standalone.map(
         (item): Entry => ({
@@ -243,6 +258,7 @@ export default function FeedScreen() {
           item,
           topic: item.topic,
           at: item.publishedAt,
+          score: item.relevance ?? 0.5,
           done: completedSet.has(item.id),
         }),
       ),
@@ -254,18 +270,20 @@ export default function FeedScreen() {
       if (arr) arr.push(e);
       else byTopic.set(e.topic, [e]);
     }
-    // Read items sink; otherwise newest first (stories use their latest update).
+    // Read items always sink. Otherwise sort by the chosen mode: relevance (the AI
+    // score, default) or recency (newest first); each falls back to the other.
     const order = (a: Entry, b: Entry) => {
       const da = a.done ? 1 : 0;
       const db = b.done ? 1 : 0;
       if (da !== db) return da - db;
+      if (sort === "relevance" && b.score !== a.score) return b.score - a.score;
       return b.at - a.at;
     };
     return TOPIC_ORDER.filter((t) => byTopic.has(t)).map((t) => ({
       topic: t,
       entries: (byTopic.get(t) as Entry[]).slice().sort(order),
     }));
-  }, [feed, synthStories, completedSet]);
+  }, [feed, synthStories, completedSet, sort]);
 
   const unreadCount = useMemo(
     () =>
@@ -331,6 +349,7 @@ export default function FeedScreen() {
         <GeoBrowser
           activePoolId={prefs.geoPool}
           home={prefs.geoHome}
+          stories={stories}
           worldActive={worldId === DEFAULT_WORLD_ID && !prefs.geoPool}
           onSelectWorld={() => setWorld(DEFAULT_WORLD_ID)}
           onSelect={(poolId) => {
@@ -423,6 +442,40 @@ export default function FeedScreen() {
             <Text style={styles.errorText}>{feedError}</Text>
             <Pressable onPress={() => refreshFeed({ force: true })} hitSlop={8}>
               <Text style={styles.retry}>Retry</Text>
+            </Pressable>
+          </View>
+        )}
+
+        {/* Sort toggle: relevance (default) vs recency — applies within each topic. */}
+        {sections.length > 0 && (
+          <View style={styles.sortRow}>
+            <Pressable
+              onPress={() => {
+                if (sort !== "relevance") void updatePrefs({ feedSort: "relevance" });
+              }}
+              style={[styles.sortBtn, sort === "relevance" && styles.sortBtnActive]}
+              accessibilityRole="button"
+            >
+              <Ionicons
+                name="flame"
+                size={12}
+                color={sort === "relevance" ? colors.bg : colors.textDim}
+              />
+              <Text style={[styles.sortText, sort === "relevance" && styles.sortTextActive]}>
+                {t("feed.sortRelevant")}
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                if (sort !== "recency") void updatePrefs({ feedSort: "recency" });
+              }}
+              style={[styles.sortBtn, sort === "recency" && styles.sortBtnActive]}
+              accessibilityRole="button"
+            >
+              <Ionicons name="time" size={12} color={sort === "recency" ? colors.bg : colors.textDim} />
+              <Text style={[styles.sortText, sort === "recency" && styles.sortTextActive]}>
+                {t("feed.sortRecent")}
+              </Text>
             </Pressable>
           </View>
         )}
@@ -639,6 +692,21 @@ const styles = StyleSheet.create({
     backgroundColor: colors.warn + "14",
   },
   busyText: { color: colors.textDim, fontSize: font.small, flex: 1, lineHeight: 18 },
+  sortRow: { flexDirection: "row", justifyContent: "flex-end", gap: spacing.xs },
+  sortBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  sortBtnActive: { backgroundColor: colors.accent, borderColor: colors.accent },
+  sortText: { color: colors.textDim, fontSize: font.small, fontWeight: "700" },
+  sortTextActive: { color: colors.bg },
   filterRow: { gap: spacing.sm, paddingVertical: spacing.xs, paddingRight: spacing.lg },
   filterChip: {
     flexDirection: "row",

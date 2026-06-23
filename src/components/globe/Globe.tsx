@@ -16,25 +16,38 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Keyboard,
   PanResponder,
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   View,
   type GestureResponderEvent,
   type PanResponderGestureState,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Canvas } from "@react-three/fiber";
-import { fetchCoverage, type CoverageNode, type CoverageView } from "../../lib/api";
-import { geoNodeIdOf, GEO_ROOT_ID } from "../../data/geo";
+import {
+  fetchCoverage,
+  fetchRegions,
+  type CoverageNode,
+  type CoverageView,
+  type RegionFeature,
+} from "../../lib/api";
+import { geoNodeIdOf, GEO_ROOT_ID, poolIdForNode } from "../../data/geo";
 import { layoutLevel, tangentRing, type Vec3 } from "../../lib/globeLayout";
 import {
   buildCountryShapes,
+  buildOutline,
+  buildRegionShapes,
   computeCentroids,
   type CountryShape,
   type GeoCentroids,
 } from "../../lib/geoShapes";
+import { buildAlerts, type GeoAlert } from "../../lib/geoAlerts";
+import { searchPlaces, type PlaceHit } from "../../lib/placeSearch";
+import type { Story } from "../../types";
 import countries110m from "../../data/world/countries-110m.json";
 import { useT } from "../../store/AppContext";
 import { colors, font, radius, spacing } from "../../theme";
@@ -49,6 +62,25 @@ const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v
 const ZOOM_MIN = 0.6;
 const ZOOM_MAX = 2.6;
 const LAND_RADIUS = 1.0;
+const REGION_RADIUS = 1.004; // province fills sit just above the country fill (1.0)
+const OUTLINE_RADIUS = 1.006; // region borders just above the province fills
+const COUNTRY_OUTLINE_RADIUS = 1.003; // faint country borders just above the country fill
+
+// Affiliation zone (src/data/zones.ts) → ISO-2, so a zoned story drops a marker on the
+// right country. Broad zones (latam/africa) are omitted — those fall back to name match.
+const ZONE_ISO2: Record<string, string> = {
+  ukraine: "ua",
+  russia: "ru",
+  china: "cn",
+  israel: "il",
+  palestine: "ps",
+  iran: "ir",
+  india: "in",
+  pakistan: "pk",
+  turkey: "tr",
+  japan: "jp",
+  korea: "kr",
+};
 
 export function Globe({
   activePoolId,
@@ -57,6 +89,9 @@ export function Globe({
   onSelectWorld,
   worldActive,
   onSetHome,
+  stories = [],
+  variant = "card",
+  onOpenArticles,
   height = 320,
 }: {
   activePoolId?: string;
@@ -65,6 +100,12 @@ export function Globe({
   onSelectWorld?: () => void;
   worldActive?: boolean;
   onSetHome?: (nodeId: string) => void;
+  /** Ongoing synthesized stories — drives the pulsing severity alert markers. */
+  stories?: Story[];
+  /** "hero" = full-bleed landing with the centered place search; "card" = embedded. */
+  variant?: "card" | "hero";
+  /** Called when a place is chosen, so the host can reveal the articles panel. */
+  onOpenArticles?: () => void;
   /** Canvas height in px (it sits inside a scroll view). */
   height?: number;
 }) {
@@ -82,6 +123,7 @@ export function Globe({
     rot: useRef({ yaw: 0, pitch: 0 }),
     zoom: useRef(1),
     dragging: useRef(false),
+    target: useRef<{ yaw: number; pitch: number; zoom: number } | null>(null),
   };
   const lastDrag = useRef({ x: 0, y: 0 });
   const pinchDist = useRef(0);
@@ -115,15 +157,68 @@ export function Globe({
 
   // Build the merged land mesh + per-country/continent pin anchors from the bundled
   // world borders. Done once (memoised) and only when the globe is actually mounted.
-  const worldGeo = useMemo<{ shapes: CountryShape[]; centroids: GeoCentroids } | null>(() => {
+  const worldGeo = useMemo<{
+    shapes: CountryShape[];
+    centroids: GeoCentroids;
+    countryOutline: Float32Array;
+  } | null>(() => {
     try {
       const geo = countries110m as unknown as Parameters<typeof buildCountryShapes>[0];
-      return { shapes: buildCountryShapes(geo, LAND_RADIUS), centroids: computeCentroids(geo) };
+      return {
+        shapes: buildCountryShapes(geo, LAND_RADIUS),
+        centroids: computeCentroids(geo),
+        countryOutline: buildOutline(geo.features, COUNTRY_OUTLINE_RADIUS),
+      };
     } catch (e) {
       console.warn("[globe] world borders unavailable:", e);
       return null;
     }
   }, []);
+
+  // Ongoing-story alerts: locate developing stories on the globe by detected zone or
+  // a country name in the headline, sized/coloured by gravity (Story.severity).
+  const alerts = useMemo<GeoAlert[]>(() => {
+    if (!worldGeo || stories.length === 0) return [];
+    const centroidByName = new Map(
+      worldGeo.centroids.countries.map((c) => [c.name.toLowerCase(), c.dir] as const),
+    );
+    return buildAlerts(
+      stories,
+      { centroidByIso2: worldGeo.centroids.byIso2, centroidByName, zoneToIso2: ZONE_ISO2 },
+      { max: 40 },
+    );
+  }, [worldGeo, stories]);
+
+  // Unified place search (continents + countries) over the bundled centroids. Picking
+  // a result flies the globe there, commits it as the feed pool, and opens articles.
+  const placeIndex = useMemo<PlaceHit[]>(() => {
+    if (!worldGeo) return [];
+    const c = worldGeo.centroids;
+    return [
+      ...c.continents.map(
+        (x): PlaceHit => ({ nodeId: x.slug, label: x.label, level: "continent", dir: x.dir }),
+      ),
+      ...c.countries.map(
+        (x): PlaceHit => ({ nodeId: x.iso2, label: x.name, level: "country", dir: x.dir }),
+      ),
+    ];
+  }, [worldGeo]);
+  const [placeQuery, setPlaceQuery] = useState("");
+  const placeResults = useMemo(() => searchPlaces(placeIndex, placeQuery, 7), [placeIndex, placeQuery]);
+
+  const selectPlace = (hit: PlaceHit) => {
+    setPlaceQuery("");
+    Keyboard.dismiss();
+    const d = hit.dir;
+    refs.target.current = {
+      yaw: Math.atan2(-d.x, d.z),
+      pitch: clamp(Math.atan2(d.y, Math.hypot(d.x, d.z)), -1.2, 1.2),
+      zoom: hit.level === "country" ? 1.9 : 1.4,
+    };
+    setBrowse(hit.nodeId);
+    onSelect(poolIdForNode(hit.nodeId));
+    onOpenArticles?.();
+  };
 
   // The drill-down options (covered places + anything drillable), placed on the
   // sphere by the deterministic procedural layout (seeded by the parent id).
@@ -201,10 +296,98 @@ export function Globe({
     });
   }, [worldGeo, view, activePoolId]);
 
-  // Children with no border shape (regions/localities) fall back to small gizmos.
+  // Stream the province/state borders for the country in focus (ONLY that country),
+  // build their shapes + boundary outline, and bind each to its coverage region node.
+  const regionCc = useMemo(() => {
+    const n = view?.node;
+    if (!n) return null;
+    if (n.level === "country") return n.nodeId;
+    if (n.level === "region" || n.level === "province" || n.level === "locality") {
+      return n.nodeId.split("-")[0];
+    }
+    return null;
+  }, [view]);
+
+  const [regionData, setRegionData] = useState<{ cc: string; features: RegionFeature[] } | null>(
+    null,
+  );
+  useEffect(() => {
+    if (!regionCc) {
+      setRegionData(null);
+      return;
+    }
+    let cancelled = false;
+    fetchRegions(regionCc).then((features) => {
+      if (!cancelled) setRegionData({ cc: regionCc, features });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [regionCc]);
+
+  const { regions, regionOutline } = useMemo<{
+    regions: GlobeCountry[];
+    regionOutline: Float32Array | null;
+  }>(() => {
+    if (!regionData || regionData.cc !== regionCc) return { regions: [], regionOutline: null };
+    const byRegionId = new Map<string, CoverageNode>();
+    for (const c of view?.children ?? []) {
+      if (c.level === "region" || c.level === "province") byRegionId.set(c.nodeId, c);
+    }
+    const currentRegion =
+      view?.node.level === "region" || view?.node.level === "province" ? view.node.nodeId : null;
+    const regions: GlobeCountry[] = buildRegionShapes(regionData.features, REGION_RADIUS).map(
+      (s, i) => {
+        const child = s.regionId ? byRegionId.get(s.regionId) : undefined;
+        return {
+          key: `r-${s.regionId || i}`,
+          positions: s.positions,
+          normals: s.normals,
+          entityId: child ? child.nodeId : null,
+          selectable: child ? child.state === "ready" : false,
+          active: !!child && !!activePoolId && child.poolId === activePoolId,
+          current: !!currentRegion && s.regionId === currentRegion,
+        };
+      },
+    );
+    return { regions, regionOutline: buildOutline(regionData.features, OUTLINE_RADIUS) };
+  }, [regionData, regionCc, view, activePoolId]);
+
+  // Children with no border shape (provinces/localities) fall back to small gizmos.
   const childLevel = view?.children?.[0]?.level ?? null;
   const gizmos: GlobeEntityData[] =
-    childLevel === "continent" || childLevel === "country" ? [] : entities;
+    childLevel === "province" || childLevel === "locality" ? entities : [];
+
+  // Ease the globe to FACE + zoom into the focused node (continent/country/region).
+  useEffect(() => {
+    if (!view || !worldGeo) {
+      refs.target.current = null;
+      return;
+    }
+    const n = view.node;
+    let dir: Vec3 | undefined;
+    let zoom = 1;
+    if (n.level === "continent") {
+      dir = worldGeo.centroids.byContinent.get(n.nodeId);
+      zoom = 1.4;
+    } else if (n.level === "country") {
+      dir = worldGeo.centroids.byIso2.get(n.nodeId);
+      zoom = 1.9;
+    } else if (n.level === "region" || n.level === "province" || n.level === "locality") {
+      dir = worldGeo.centroids.byIso2.get(n.nodeId.split("-")[0]);
+      zoom = 2.2;
+    }
+    if (!dir || n.level === "world") {
+      refs.target.current = null;
+      return;
+    }
+    refs.target.current = {
+      yaw: Math.atan2(-dir.x, dir.z),
+      pitch: Math.max(-1.2, Math.min(1.2, Math.atan2(dir.y, Math.hypot(dir.x, dir.z)))),
+      zoom,
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, worldGeo]);
 
   const focused = entities.find((e) => e.id === focusedId) ?? null;
   const atRoot = browse === GEO_ROOT_ID;
@@ -282,13 +465,63 @@ export function Globe({
         >
           <GlobeScene
             countries={countries}
+            regions={regions}
+            countryOutline={worldGeo?.countryOutline ?? null}
+            outline={regionOutline}
             gizmos={gizmos}
+            alerts={alerts}
             focusedId={focusedId}
             onFocus={setFocusedId}
             onActivate={activate}
             refs={refs}
           />
         </Canvas>
+
+        {/* Centered place finder (hero only): one box for continent / country. */}
+        {variant === "hero" && (
+          <View style={styles.searchWrap} pointerEvents="box-none">
+            <View style={styles.searchBox}>
+              <Ionicons name="search" size={16} color={colors.textDim} />
+              <TextInput
+                style={styles.searchInput}
+                value={placeQuery}
+                onChangeText={setPlaceQuery}
+                placeholder={t("globe.searchPlaceholder")}
+                placeholderTextColor={colors.textFaint}
+                autoCapitalize="none"
+                autoCorrect={false}
+                returnKeyType="search"
+                onSubmitEditing={() => placeResults[0] && selectPlace(placeResults[0])}
+              />
+              {placeQuery.length > 0 && (
+                <Pressable onPress={() => setPlaceQuery("")} hitSlop={8}>
+                  <Ionicons name="close-circle" size={16} color={colors.textFaint} />
+                </Pressable>
+              )}
+            </View>
+            {placeResults.length > 0 && (
+              <View style={styles.searchResults}>
+                {placeResults.map((r) => (
+                  <Pressable
+                    key={`${r.level}-${r.nodeId}`}
+                    style={styles.searchResult}
+                    onPress={() => selectPlace(r)}
+                    accessibilityRole="button"
+                  >
+                    <Ionicons
+                      name={r.level === "continent" ? "earth" : "flag-outline"}
+                      size={14}
+                      color={colors.accent}
+                    />
+                    <Text style={styles.searchResultText} numberOfLines={1}>
+                      {r.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            )}
+          </View>
+        )}
 
         {/* Top bar: where we are + up-one-level + pin home. */}
         <View style={styles.topBar} pointerEvents="box-none">
@@ -373,6 +606,46 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.bg,
   },
+  searchWrap: {
+    position: "absolute",
+    top: spacing.xl,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    paddingHorizontal: spacing.lg,
+  },
+  searchBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    width: "100%",
+    maxWidth: 460,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface + "E6",
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  searchInput: { flex: 1, color: colors.text, fontSize: font.body },
+  searchResults: {
+    width: "100%",
+    maxWidth: 460,
+    marginTop: spacing.xs,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface + "F2",
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: "hidden",
+  },
+  searchResult: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  searchResultText: { flex: 1, color: colors.text, fontSize: font.small, fontWeight: "700" },
   topBar: {
     position: "absolute",
     top: spacing.sm,

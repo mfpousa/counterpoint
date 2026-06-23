@@ -11,16 +11,22 @@ import { Ionicons } from "@expo/vector-icons";
 import { GeoNavigator } from "./GeoNavigator";
 import { Globe } from "./globe/Globe";
 import { colors, radius, spacing } from "../theme";
+import type { Story } from "../types";
 
 type Mode = "list" | "globe";
 
-export function GeoBrowser(props: {
+export function GeoBrowser({
+  stories,
+  ...props
+}: {
   activePoolId?: string;
   home?: string;
   onSelect: (poolId?: string) => void;
   onSelectWorld?: () => void;
   worldActive?: boolean;
   onSetHome?: (nodeId: string) => void;
+  /** Ongoing stories — only the globe uses them (for the alert markers). */
+  stories?: Story[];
 }) {
   const [mode, setMode] = useState<Mode>("list");
 
@@ -47,7 +53,7 @@ export function GeoBrowser(props: {
         </Pressable>
       </View>
 
-      {mode === "globe" ? <Globe {...props} /> : <GeoNavigator {...props} />}
+      {mode === "globe" ? <Globe {...props} stories={stories} /> : <GeoNavigator {...props} />}
     </View>
   );
 }

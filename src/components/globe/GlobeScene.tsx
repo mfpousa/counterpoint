@@ -14,9 +14,10 @@ import React, { memo, useRef } from "react";
 import type { MutableRefObject } from "react";
 import { useFrame, type ThreeEvent } from "@react-three/fiber";
 import { AdditiveBlending, BackSide, DoubleSide } from "three";
-import type { Group, Mesh } from "three";
+import type { Group, Mesh, MeshBasicMaterial } from "three";
 import { colors } from "../../theme";
-import type { Vec3 } from "../../lib/globeLayout";
+import { hashId, type Vec3 } from "../../lib/globeLayout";
+import type { GeoAlert } from "../../lib/geoAlerts";
 
 /** One geographic entity to render on the globe (a continent/country/region). */
 export interface GlobeEntityData {
@@ -39,10 +40,14 @@ export interface GlobeViewRefs {
   rot: MutableRefObject<{ yaw: number; pitch: number }>;
   zoom: MutableRefObject<number>;
   dragging: MutableRefObject<boolean>;
+  /** When set, the globe eases to face + zoom this orientation (drill-in focus);
+   *  cleared the moment the reader drags so manual control always wins. */
+  target: MutableRefObject<{ yaw: number; pitch: number; zoom: number } | null>;
 }
 
 const PLANET_RADIUS = 0.94; // ocean sphere — sits BELOW the land shell (radius 1.0)
 const ENTITY_RADIUS = 1.05;
+const ALERT_RADIUS = 1.06; // alert pings sit just above everything else
 const OFF = "#000000";
 
 function entityColor(d: GlobeEntityData): string {
@@ -174,6 +179,27 @@ const CountryMesh = memo(function CountryMesh({
   );
 });
 
+/** Country/region boundaries as crisp line segments, so the map reads like a printed
+ *  atlas. Used twice: faint always-on country borders + stronger region borders. */
+function Outline({
+  positions,
+  color,
+  opacity,
+}: {
+  positions: Float32Array;
+  color: string;
+  opacity: number;
+}) {
+  return (
+    <lineSegments frustumCulled={false}>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+      </bufferGeometry>
+      <lineBasicMaterial color={color} transparent opacity={opacity} />
+    </lineSegments>
+  );
+}
+
 /** All country shapes; the current level's are interactive, the rest are dim land. */
 function Countries({
   data,
@@ -201,16 +227,70 @@ function Countries({
   );
 }
 
+/** Severity → colour ramp (calm amber → urgent red). Bigger stories pull more eye. */
+function severityColor(sev: number): string {
+  if (sev >= 0.66) return "#E8654E";
+  if (sev >= 0.33) return "#E0A94B";
+  return "#E6B86B";
+}
+
+/** One ongoing-story alert: a solid core + an outward "sonar" ping that loops, sized
+ *  and coloured by the story's gravity. The phase is desynced per id so they shimmer. */
+function AlertMarker({ alert }: { alert: GeoAlert }) {
+  const ping = useRef<Mesh>(null);
+  const mat = useRef<MeshBasicMaterial>(null);
+  const r = 0.01 + alert.severity * 0.018;
+  const color = severityColor(alert.severity);
+  const phase = (hashId(alert.id) % 1000) / 1000;
+  useFrame((state) => {
+    const tt = (state.clock.elapsedTime * 0.7 + phase) % 1;
+    if (ping.current) ping.current.scale.setScalar(1 + tt * 3.5);
+    if (mat.current) mat.current.opacity = (1 - tt) * 0.45;
+  });
+  return (
+    <group
+      position={[alert.dir.x * ALERT_RADIUS, alert.dir.y * ALERT_RADIUS, alert.dir.z * ALERT_RADIUS]}
+    >
+      <mesh>
+        <sphereGeometry args={[r, 10, 10]} />
+        <meshBasicMaterial color={color} />
+      </mesh>
+      <mesh ref={ping}>
+        <sphereGeometry args={[r, 10, 10]} />
+        <meshBasicMaterial ref={mat} color={color} transparent opacity={0.4} depthWrite={false} />
+      </mesh>
+    </group>
+  );
+}
+
+function Alerts({ alerts }: { alerts: GeoAlert[] }) {
+  return (
+    <>
+      {alerts.map((a) => (
+        <AlertMarker key={a.id} alert={a} />
+      ))}
+    </>
+  );
+}
+
 export function GlobeScene({
   countries,
+  regions,
+  countryOutline,
+  outline,
   gizmos,
+  alerts,
   focusedId,
   onFocus,
   onActivate,
   refs,
 }: {
   countries: GlobeCountry[];
+  regions: GlobeCountry[];
+  countryOutline: Float32Array | null;
+  outline: Float32Array | null;
   gizmos: GlobeEntityData[];
+  alerts: GeoAlert[];
   focusedId: string | null;
   onFocus: (id: string | null) => void;
   onActivate: (id: string) => void;
@@ -220,12 +300,24 @@ export function GlobeScene({
   useFrame((_, delta) => {
     const g = group.current;
     if (!g) return;
-    // Idle auto-spin; halted while the reader is dragging so control feels direct.
-    if (!refs.dragging.current) refs.rot.current.yaw += delta * 0.05;
+    if (refs.dragging.current) refs.target.current = null; // manual control cancels focus
+    const tgt = refs.target.current;
+    if (tgt) {
+      // Ease to the focus orientation along the SHORTEST yaw path (the globe may have
+      // spun many turns), and zoom in — gives the "fly to the country" feel.
+      const dy = Math.atan2(
+        Math.sin(tgt.yaw - refs.rot.current.yaw),
+        Math.cos(tgt.yaw - refs.rot.current.yaw),
+      );
+      refs.rot.current.yaw += dy * 0.12;
+      refs.rot.current.pitch += (tgt.pitch - refs.rot.current.pitch) * 0.12;
+      refs.zoom.current += (tgt.zoom - refs.zoom.current) * 0.12;
+    } else if (!refs.dragging.current) {
+      refs.rot.current.yaw += delta * 0.05; // idle auto-spin
+    }
     g.rotation.y = refs.rot.current.yaw;
     g.rotation.x = Math.max(-1.2, Math.min(1.2, refs.rot.current.pitch));
-    const z = refs.zoom.current;
-    const s = g.scale.x + (z - g.scale.x) * 0.2;
+    const s = g.scale.x + (refs.zoom.current - g.scale.x) * 0.2;
     g.scale.setScalar(s);
   });
 
@@ -264,7 +356,21 @@ export function GlobeScene({
           onFocus={onFocus}
           onActivate={onActivate}
         />
-        {/* Gizmos: small markers for places with no border shape (regions/localities). */}
+        {/* Subtle country separators, always on — faint borders/coastlines like an atlas. */}
+        {countryOutline && <Outline positions={countryOutline} color="#9fb4c9" opacity={0.18} />}
+        {/* Streamed province shapes for the country in focus, sitting just above the
+            country fill, with crisp boundary lines so they read like a printed map. */}
+        {regions.length > 0 && (
+          <Countries
+            data={regions}
+            focusedId={focusedId}
+            onFocus={onFocus}
+            onActivate={onActivate}
+          />
+        )}
+        {/* Stronger region separators, drawn once a country is in focus. */}
+        {outline && <Outline positions={outline} color="#0c1a27" opacity={0.85} />}
+        {/* Gizmos: small markers for places with no border shape (localities). */}
         {gizmos.map((d) => (
           <GlobeEntity
             key={d.id}
@@ -274,6 +380,8 @@ export function GlobeScene({
             onActivate={onActivate}
           />
         ))}
+        {/* Pulsing severity alerts where ongoing stories are happening. */}
+        <Alerts alerts={alerts} />
       </group>
     </>
   );

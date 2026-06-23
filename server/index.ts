@@ -23,6 +23,7 @@ import {
   getStory,
 } from "./feedService";
 import { gradeSummary } from "./grade";
+import { getRegions } from "./regions";
 import { readLang } from "./lang";
 import { runStartupHealthcheck } from "./healthcheck";
 import { generateKnowledgeInsight, type KnowledgeCandidate } from "./knowledge";
@@ -90,6 +91,21 @@ app.get("/api/coverage", (req, res) => {
     res.status(500).json({ error: e instanceof Error ? e.message : "coverage failed" });
   }
 });
+// Province/state border polygons for one country (streamed on demand, never bundled).
+app.get("/api/regions", (req, res) => {
+  const cc = typeof req.query.cc === "string" ? req.query.cc : "";
+  if (!/^[A-Za-z]{2}$/.test(cc)) {
+    res.status(400).json({ error: "cc (ISO 3166-1 alpha-2) required" });
+    return;
+  }
+  try {
+    res.json(getRegions(cc));
+  } catch (e) {
+    console.error("[api] /api/regions failed:", e);
+    res.status(500).json({ error: e instanceof Error ? e.message : "regions failed" });
+  }
+});
+
 
 app.get("/api/status", (req, res) => {
   res.json(getStatus(readWorld(req.query.world)));

@@ -32,10 +32,28 @@ export interface LandGeometry {
   normals: Float32Array;
 }
 
-/** Where to anchor a pin for each country (by ISO alpha-2) and continent (slug). */
+/** A country in the flat search/geolocation list. */
+export interface CountryCentroid {
+  iso2: string;
+  name: string;
+  continent: string;
+  dir: Vec3;
+}
+
+/** A continent in the flat search list. */
+export interface ContinentCentroid {
+  slug: string;
+  label: string;
+  dir: Vec3;
+}
+
+/** Where to anchor a pin for each country (by ISO alpha-2) and continent (slug),
+ *  plus flat lists used by place search and name-based alert geolocation. */
 export interface GeoCentroids {
   byIso2: Map<string, Vec3>;
   byContinent: Map<string, Vec3>;
+  countries: CountryCentroid[];
+  continents: ContinentCentroid[];
 }
 
 /** Accent/space-insensitive slug ("North America" → "north-america"). */
@@ -137,6 +155,67 @@ export function buildCountryShapes(geo: GeoJson, radius = 1): CountryShape[] {
   return out;
 }
 
+/** One province/state shape: its own non-indexed mesh + the slug(ISO 3166-2) the
+ *  coverage tree keys region nodes by ("ES-GA" → "es-ga"), so we can bind hover/click. */
+export interface RegionShape {
+  regionId: string;
+  country: string;
+  name: string;
+  positions: Float32Array;
+  normals: Float32Array;
+}
+
+/** Build a separate sphere-wrapped mesh per streamed Admin-1 feature (properties:
+ *  { iso2, code, name }). Mirrors buildCountryShapes but keys by the ISO 3166-2 code. */
+export function buildRegionShapes(features: GeoFeature[], radius = 1): RegionShape[] {
+  const out: RegionShape[] = [];
+  for (const f of features) {
+    const g = f.geometry;
+    if (!g) continue;
+    const pos: number[] = [];
+    const norm: number[] = [];
+    if (g.type === "Polygon") {
+      addPolygon(g.coordinates as Ring[], radius, pos, norm);
+    } else if (g.type === "MultiPolygon") {
+      for (const poly of g.coordinates as Ring[][]) addPolygon(poly, radius, pos, norm);
+    }
+    if (pos.length === 0) continue;
+    const code = typeof f.properties.code === "string" ? f.properties.code : "";
+    out.push({
+      regionId: code ? continentSlug(code) : "",
+      country: String(f.properties.iso2 ?? "").toLowerCase(),
+      name: typeof f.properties.name === "string" ? f.properties.name : "",
+      positions: new Float32Array(pos),
+      normals: new Float32Array(norm),
+    });
+  }
+  return out;
+}
+
+/** Boundary line segments for ALL the given features' rings, projected to the sphere
+ *  (pairs of consecutive vertices) — drawn as <lineSegments> to delimit COUNTRIES or
+ *  REGIONS like a printed map. Returns a flat [x,y,z, x,y,z, ...] array (2 verts/seg). */
+export function buildOutline(features: GeoFeature[], radius = 1): Float32Array {
+  const seg: number[] = [];
+  const addRing = (ring: Ring) => {
+    for (let i = 0; i + 1 < ring.length; i++) {
+      const a = latLonToVec3(ring[i][1], ring[i][0]);
+      const b = latLonToVec3(ring[i + 1][1], ring[i + 1][0]);
+      seg.push(a.x * radius, a.y * radius, a.z * radius, b.x * radius, b.y * radius, b.z * radius);
+    }
+  };
+  for (const f of features) {
+    const g = f.geometry;
+    if (!g) continue;
+    if (g.type === "Polygon") {
+      for (const ring of g.coordinates as Ring[]) addRing(ring);
+    } else if (g.type === "MultiPolygon") {
+      for (const poly of g.coordinates as Ring[][]) for (const ring of poly) addRing(ring);
+    }
+  }
+  return new Float32Array(seg);
+}
+
 /** Average direction of every vertex in a feature (good enough to anchor a pin). */
 function featureCentroidDir(f: GeoFeature): Vec3 | null {
   const g = f.geometry;
@@ -165,15 +244,23 @@ function featureCentroidDir(f: GeoFeature): Vec3 | null {
 /** Per-country + per-continent pin anchors (unit directions on the sphere). */
 export function computeCentroids(geo: GeoJson): GeoCentroids {
   const byIso2 = new Map<string, Vec3>();
-  const contAcc = new Map<string, { x: number; y: number; z: number }>();
+  const contAcc = new Map<string, { x: number; y: number; z: number; label: string }>();
+  const countries: CountryCentroid[] = [];
   for (const f of geo.features) {
     const dir = featureCentroidDir(f);
     if (!dir) continue;
     const iso = iso2Of(f.properties);
-    if (iso) byIso2.set(iso, dir);
-    const cont = continentSlug(String(f.properties.CONTINENT ?? ""));
+    const contLabel = String(f.properties.CONTINENT ?? "");
+    const cont = continentSlug(contLabel);
+    if (iso) {
+      byIso2.set(iso, dir);
+      const name = String(
+        f.properties.NAME ?? f.properties.NAME_LONG ?? f.properties.ADMIN ?? iso.toUpperCase(),
+      );
+      countries.push({ iso2: iso, name, continent: cont, dir });
+    }
     if (cont) {
-      const a = contAcc.get(cont) ?? { x: 0, y: 0, z: 0 };
+      const a = contAcc.get(cont) ?? { x: 0, y: 0, z: 0, label: contLabel };
       a.x += dir.x;
       a.y += dir.y;
       a.z += dir.z;
@@ -181,6 +268,11 @@ export function computeCentroids(geo: GeoJson): GeoCentroids {
     }
   }
   const byContinent = new Map<string, Vec3>();
-  for (const [k, a] of contAcc) byContinent.set(k, normalize(a));
-  return { byIso2, byContinent };
+  const continents: ContinentCentroid[] = [];
+  for (const [slug, a] of contAcc) {
+    const dir = normalize({ x: a.x, y: a.y, z: a.z });
+    byContinent.set(slug, dir);
+    continents.push({ slug, label: a.label || slug, dir });
+  }
+  return { byIso2, byContinent, countries, continents };
 }

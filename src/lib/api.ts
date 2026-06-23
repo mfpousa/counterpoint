@@ -132,6 +132,30 @@ export async function fetchCoverage(node?: string): Promise<CoverageView> {
   return (await res.json()) as CoverageView;
 }
 
+/** One province/state border polygon (mirrors the server's slim RegionFeature). */
+export interface RegionFeature {
+  properties: { iso2: string; code: string; name: string };
+  geometry: { type: "Polygon" | "MultiPolygon"; coordinates: unknown } | null;
+}
+
+/**
+ * Stream one country's province/state border polygons (ISO-2). The backend serves
+ * these on demand from its Admin-1 dataset so the app never bundles the full world.
+ * Returns an empty list on any failure — region shapes are supplementary.
+ */
+export async function fetchRegions(cc: string): Promise<RegionFeature[]> {
+  try {
+    const res = await fetch(`${apiBaseUrl()}/api/regions?cc=${encodeURIComponent(cc)}`, {
+      method: "GET",
+    });
+    if (!res.ok) return [];
+    const data = (await res.json()) as { features?: RegionFeature[] };
+    return Array.isArray(data.features) ? data.features : [];
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Ask the backend to fetch + AI-rewrite an item into a clean, readable article
  * for in-app reading. Throws with a clear message on failure so the reader UI

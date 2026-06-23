@@ -491,6 +491,8 @@ export interface Preferences {
   geoHome?: string;
   /** UI + AI-output language (the app is shown in this; AI writes in it too). */
   language: Lang;
+  /** How the feed's topic sections are ordered. Defaults to relevance. */
+  feedSort?: "relevance" | "recency";
 }
 
 /** Today's consumption progress, persisted locally and reset per day. */

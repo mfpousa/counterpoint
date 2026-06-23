@@ -1,11 +1,32 @@
 import {
   buildCountryShapes,
   buildLandGeometry,
+  buildOutline,
+  buildRegionShapes,
   computeCentroids,
   continentSlug,
   iso2Of,
   type GeoJson,
 } from "../src/lib/geoShapes";
+
+// One streamed Admin-1 feature (province), shaped like /api/regions returns.
+const REGION_FEATURES = [
+  {
+    properties: { iso2: "es", code: "ES-GA", name: "Galicia" },
+    geometry: {
+      type: "Polygon",
+      coordinates: [
+        [
+          [-8, 42],
+          [-7, 42],
+          [-7, 43],
+          [-8, 43],
+          [-8, 42],
+        ],
+      ],
+    },
+  },
+];
 import { latLonToVec3, lengthOf } from "../src/lib/globeLayout";
 
 // A 10°×10° square near (lon 0, lat 0) plus a two-square MultiPolygon country.
@@ -96,6 +117,22 @@ describe("geoShapes (GeoJSON → sphere geometry)", () => {
     expect(eu.iso2).toBeNull();
   });
 
+  it("buildRegionShapes keys provinces by slug(ISO 3166-2)", () => {
+    const shapes = buildRegionShapes(REGION_FEATURES, 1);
+    expect(shapes).toHaveLength(1);
+    expect(shapes[0].regionId).toBe("es-ga"); // matches the coverage region nodeId
+    expect(shapes[0].country).toBe("es");
+    expect(shapes[0].positions.length % 9).toBe(0);
+    expect(shapes[0].normals.length).toBe(shapes[0].positions.length);
+  });
+
+  it("buildOutline returns sphere-projected segment pairs", () => {
+    const out = buildOutline(REGION_FEATURES, 1);
+    expect(out.length % 6).toBe(0); // 2 vertices (xyz each) per segment
+    expect(out.length).toBeGreaterThan(0);
+    expect(lengthOf({ x: out[0], y: out[1], z: out[2] })).toBeCloseTo(1, 6);
+  });
+
   it("radius scales the projected vertices", () => {
     const { positions } = buildLandGeometry(FIXTURE, 2);
     const len = lengthOf({ x: positions[0], y: positions[1], z: positions[2] });
@@ -103,7 +140,7 @@ describe("geoShapes (GeoJSON → sphere geometry)", () => {
   });
 
   it("computeCentroids anchors countries and continents", () => {
-    const { byIso2, byContinent } = computeCentroids(FIXTURE);
+    const { byIso2, byContinent, countries, continents } = computeCentroids(FIXTURE);
     expect(byIso2.has("zz")).toBe(true);
     const got = byIso2.get("zz")!;
     // It's a unit direction in the +x/+y/+z octant (lon/lat 0..10), landing loosely
@@ -121,5 +158,8 @@ describe("geoShapes (GeoJSON → sphere geometry)", () => {
     expect(byContinent.has("europe")).toBe(true);
     // Continent centroid is a unit direction.
     expect(lengthOf(byContinent.get("europe")!)).toBeCloseTo(1, 6);
+    // Flat lists power place search + name-based alert geolocation.
+    expect(countries.find((c) => c.iso2 === "zz")?.name).toBe("Squareland");
+    expect(continents.find((c) => c.slug === "europe")?.label).toBe("Europe");
   });
 });

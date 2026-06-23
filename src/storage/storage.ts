@@ -44,6 +44,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   onboarded: false,
   worldId: DEFAULT_WORLD_ID,
   language: "en",
+  feedSort: "relevance",
 };
 
 /** Local YYYY-MM-DD for "today". */
