@@ -99,7 +99,7 @@ describe("geoShapes (GeoJSON → sphere geometry)", () => {
     expect(lengthOf(got)).toBeCloseTo(1, 6);
     expect(got.x).toBeGreaterThan(0);
     expect(got.y).toBeGreaterThan(0);
-    expect(got.z).toBeGreaterThan(0);
+    expect(got.z).toBeLessThan(0); // longitude is negated, so east (+lon) maps to -z
     const want = latLonToVec3(5, 5);
     expect(got.x).toBeCloseTo(want.x, 1);
     expect(got.y).toBeCloseTo(want.y, 1);

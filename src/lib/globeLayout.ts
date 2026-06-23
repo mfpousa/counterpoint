@@ -126,10 +126,13 @@ export function tangentRing(center: Vec3, count: number, spread = 0.18): Vec3[] 
  * Geographic latitude/longitude (degrees) → unit vector on the sphere, Y-up:
  * lat +90° → north pole (0,1,0); (0°,0°) → (1,0,0). Used by Stage 4 to place
  * entities at their TRUE positions; lives here so the sphere math is tested once.
+ *
+ * Longitude is NEGATED so that east increases toward screen-right when the globe
+ * is viewed from +Z (the camera). Without it the world renders mirrored east-west.
  */
 export function latLonToVec3(latDeg: number, lonDeg: number): Vec3 {
   const lat = latDeg * DEG2RAD;
-  const lon = lonDeg * DEG2RAD;
+  const lon = -lonDeg * DEG2RAD;
   const cosLat = Math.cos(lat);
   return {
     x: cosLat * Math.cos(lon),
