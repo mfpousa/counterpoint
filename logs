@@ -18,3 +18,13 @@
 [feed:geo-north-america] prescreen(geo) flagged 38 junk of 40
 [feed:geo-north-america] prescreened 40; 848 still queued
 [feed:geo-north-america] prescreen(geo): 40 headline(s) in 1 batch(es)…
+
+// This is weird: it says there are 13 developing, but none appear in the UI
+[stories:frontpage] eligible=1112 clusters=985 issues=637 developing=13 kept=13 rankedOut=0 (failed gates — events:538 span:619 sources:573 active:0)
+[stories:frontpage] 1112 eligible -> 985 clusters, 637 issues; 13 developing + 72 event spec(s)
+[storyStore:frontpage__es] loaded 293 synthesized stories
+[stories:frontpage] 35 reused, 50 (re)synthesizing…
+[feed:frontpage] catch-up resumed — pool watched again
+[feed:frontpage] view "" (general) -> 704 items from 704 eligible (+15 provisional) in 39ms
+[feed:frontpage] briefing(es): streaming "general" from 40 item(s)…
+[feed:frontpage] deep analysis: 15 of 15 pending in 2 batch(es) (concurrency 2)…
