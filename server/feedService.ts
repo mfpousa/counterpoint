@@ -118,6 +118,10 @@ interface WorldState {
   /** Per-zone last fetch time (epoch ms), for the reactive-load TTL. */
   zoneFetchedAt: Map<string, number>;
   catchUpTimer: ReturnType<typeof setTimeout> | null;
+  /** Epoch ms of this pool's last status poll — its "is anyone looking?" signal. */
+  lastWatchedAt: number;
+  /** True when the catch-up loop stopped for lack of a viewer (resumes on return). */
+  catchUpPaused: boolean;
 }
 
 const worldStates = new Map<string, WorldState>();
@@ -141,6 +145,8 @@ function ws(worldId: string): WorldState {
       augmentInFlight: null,
       zoneFetchedAt: new Map(),
       catchUpTimer: null,
+      lastWatchedAt: 0,
+      catchUpPaused: false,
     };
     worldStates.set(worldId, s);
   }
@@ -169,8 +175,30 @@ function setPhase(state: WorldState, phase: BuildPhase, done = 0, total = 0): vo
   state.status = { phase, done, total };
 }
 
+/** A pool is WATCHED while the client keeps polling its status (every ~3s). The
+ *  background catch-up loop only advances watched pools, so we never burn the
+ *  model on a pool nobody's looking at. */
+function isWatched(worldId: string): boolean {
+  return Date.now() - ws(worldId).lastWatchedAt < config.feed.watchedTtlMs;
+}
+
+/** Heartbeat: record that the reader is looking at this pool (called on every
+ *  status poll). If its catch-up loop had PAUSED for lack of a viewer, resume it. */
+function markWatched(worldId: string): void {
+  const state = ws(worldId);
+  state.lastWatchedAt = Date.now();
+  if (state.catchUpPaused) {
+    state.catchUpPaused = false;
+    console.log(`[feed:${worldId}] catch-up resumed — pool watched again`);
+    scheduleCatchUp(worldId);
+  }
+}
+
 /** Snapshot of build/analysis progress for a world, for the UI. */
 export function getStatus(worldId: string = DEFAULT_WORLD_ID): AnalysisStatus {
+  // Every status poll is a heartbeat that this pool is being watched — and the
+  // trigger that resumes a catch-up loop paused while the reader was away.
+  markWatched(worldId);
   const state = ws(worldId);
   const st = getStore(worldId);
   const cutoff = analyzeCutoff();
@@ -1254,6 +1282,14 @@ function scheduleCatchUp(worldId: string): void {
   if (state.catchUpTimer) return;
   state.catchUpTimer = setTimeout(() => {
     state.catchUpTimer = null;
+    // PRESENCE GATE: never START a new chunk for a pool nobody's watching. An
+    // in-flight chunk is never interrupted — we only ever check at this boundary,
+    // and a returning reader's status poll (markWatched) restarts the loop.
+    if (!isWatched(worldId)) {
+      state.catchUpPaused = true;
+      console.log(`[feed:${worldId}] catch-up paused — pool unwatched (resumes when viewed)`);
+      return;
+    }
     void (async () => {
       try {
         // Drain a chunk of the prescreen queue first so more provisional items keep
@@ -1267,7 +1303,17 @@ function scheduleCatchUp(worldId: string): void {
           (a.remaining > 0 && a.progressed > 0) ||
           (e.remaining > 0 && e.progressed > 0);
         if (moreWork) {
-          scheduleCatchUp(worldId);
+          // The chunk we just ran finished uninterrupted; only queue the NEXT one
+          // if the reader is still here, else pause (resumes on their return).
+          if (isWatched(worldId)) {
+            scheduleCatchUp(worldId);
+          } else {
+            state.catchUpPaused = true;
+            console.log(
+              `[feed:${worldId}] catch-up paused — pool unwatched ` +
+                `(${p.remaining + a.remaining} pending, resumes when viewed)`,
+            );
+          }
         } else {
           const stuck = p.remaining + a.remaining;
           if (stuck > 0) console.warn(`[feed:${worldId}] catch-up stalled with ${stuck} pending`);

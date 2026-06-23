@@ -143,6 +143,11 @@ export const config = {
     // triage batch so the first paint is a single model round. 0 = prescreen
     // everything up front (one big, blocking pass).
     prescreenChunk: numOrZero("FEED_PRESCREEN_CHUNK", 40),
+    // How long after a pool's last status poll we still consider it WATCHED. The
+    // client polls /api/status for the viewed pool every ~3s, so this allows a few
+    // missed polls of grace. While UNWATCHED, the background catch-up loop pauses
+    // at the next chunk boundary (never mid-chunk) and resumes when viewed again.
+    watchedTtlMs: num("FEED_WATCHED_TTL_MS", 10_000),
     // REACTIVE LOADING. Serve fetched + cheaply-triaged items that haven't been
     // deep-analyzed yet ("provisional") so the feed is usable in seconds instead
     // of waiting for the model to chew through the whole corpus. They carry the
