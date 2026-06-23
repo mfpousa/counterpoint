@@ -85,6 +85,43 @@ export function layoutLevel(ids: string[], seedKey = ""): Map<string, Vec3> {
   return out;
 }
 
+/** Cross product of two vectors. */
+export function cross(a: Vec3, b: Vec3): Vec3 {
+  return {
+    x: a.y * b.z - a.z * b.y,
+    y: a.z * b.x - a.x * b.z,
+    z: a.x * b.y - a.y * b.x,
+  };
+}
+
+/**
+ * `count` unit directions arranged in a small ring around `center` on the sphere's
+ * tangent plane. Used to fan a country's REGION pins out around the country's
+ * centroid (we have no real region coordinates) so they don't stack on one point.
+ */
+export function tangentRing(center: Vec3, count: number, spread = 0.18): Vec3[] {
+  const c = normalize(center);
+  if (count <= 1) return [c];
+  // A reference axis not parallel to c, so the tangent basis is well-defined.
+  const ref: Vec3 = Math.abs(c.y) < 0.9 ? { x: 0, y: 1, z: 0 } : { x: 1, y: 0, z: 0 };
+  const u = normalize(cross(c, ref));
+  const v = normalize(cross(c, u));
+  const out: Vec3[] = [];
+  for (let i = 0; i < count; i++) {
+    const a = (i / count) * Math.PI * 2;
+    const cosA = Math.cos(a) * spread;
+    const sinA = Math.sin(a) * spread;
+    out.push(
+      normalize({
+        x: c.x + u.x * cosA + v.x * sinA,
+        y: c.y + u.y * cosA + v.y * sinA,
+        z: c.z + u.z * cosA + v.z * sinA,
+      }),
+    );
+  }
+  return out;
+}
+
 /**
  * Geographic latitude/longitude (degrees) → unit vector on the sphere, Y-up:
  * lat +90° → north pole (0,1,0); (0°,0°) → (1,0,0). Used by Stage 4 to place

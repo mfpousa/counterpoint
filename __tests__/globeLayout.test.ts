@@ -1,10 +1,12 @@
 import {
+  cross,
   fibonacciSphere,
   hashId,
   latLonToVec3,
   layoutLevel,
   lengthOf,
   normalize,
+  tangentRing,
   type Vec3,
 } from "../src/lib/globeLayout";
 
@@ -66,5 +68,26 @@ describe("globeLayout (pure procedural placement)", () => {
   it("normalize returns a unit vector", () => {
     expectUnit(normalize({ x: 3, y: 0, z: 4 }));
     expect(normalize({ x: 0, y: 0, z: 0 })).toEqual({ x: 0, y: 0, z: 0 });
+  });
+
+  it("cross follows the right-hand rule", () => {
+    const z = cross({ x: 1, y: 0, z: 0 }, { x: 0, y: 1, z: 0 });
+    expect(z.x).toBeCloseTo(0, 9);
+    expect(z.y).toBeCloseTo(0, 9);
+    expect(z.z).toBeCloseTo(1, 9);
+  });
+
+  it("tangentRing fans unit dirs in a tight ring around the centre", () => {
+    const center: Vec3 = latLonToVec3(40, -3); // somewhere over Spain-ish
+    expect(tangentRing(center, 1)).toEqual([normalize(center)]);
+    const ring = tangentRing(center, 6);
+    expect(ring).toHaveLength(6);
+    const c = normalize(center);
+    for (const p of ring) {
+      expectUnit(p);
+      // Each stays close to the centre (small angular spread → high dot product).
+      const dot = p.x * c.x + p.y * c.y + p.z * c.z;
+      expect(dot).toBeGreaterThan(0.9);
+    }
   });
 });

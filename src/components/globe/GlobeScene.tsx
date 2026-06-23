@@ -10,12 +10,14 @@
 // zoom are driven by refs the wrapper mutates from gestures, applied here in the
 // per-frame loop so the gesture layer never has to re-render React.
 
-import React, { useRef } from "react";
+import React, { useMemo, useRef } from "react";
 import type { MutableRefObject } from "react";
 import { useFrame, type ThreeEvent } from "@react-three/fiber";
+import { AdditiveBlending, BackSide, BufferAttribute, BufferGeometry, DoubleSide } from "three";
 import type { Group, Mesh } from "three";
 import { colors } from "../../theme";
 import type { Vec3 } from "../../lib/globeLayout";
+import type { LandGeometry } from "../../lib/geoShapes";
 
 /** One geographic entity to render on the globe (a continent/country/region). */
 export interface GlobeEntityData {
@@ -40,8 +42,8 @@ export interface GlobeViewRefs {
   dragging: MutableRefObject<boolean>;
 }
 
-const PLANET_RADIUS = 0.96;
-const ENTITY_RADIUS = 1.0;
+const PLANET_RADIUS = 0.98;
+const ENTITY_RADIUS = 1.04;
 const OFF = "#000000";
 
 function entityColor(d: GlobeEntityData): string {
@@ -89,11 +91,28 @@ function GlobeEntity({
       <icosahedronGeometry args={[0.075, 1]} />
       <meshStandardMaterial
         color={color}
-        metalness={0.85}
+        metalness={0.5}
         roughness={0.25}
         emissive={highlight ? color : OFF}
         emissiveIntensity={focused ? 0.95 : data.active ? 0.6 : 0}
       />
+    </mesh>
+  );
+}
+
+/** The real landmasses: one merged, sphere-wrapped mesh built from the GeoJSON
+ *  borders, with a metallic "land" material distinct from the ocean beneath. */
+function Land({ data }: { data: LandGeometry }) {
+  const geom = useMemo(() => {
+    const g = new BufferGeometry();
+    g.setAttribute("position", new BufferAttribute(data.positions, 3));
+    g.setIndex(new BufferAttribute(data.indices, 1));
+    g.computeVertexNormals();
+    return g;
+  }, [data]);
+  return (
+    <mesh geometry={geom}>
+      <meshStandardMaterial color="#5d7184" metalness={0.6} roughness={0.45} side={DoubleSide} />
     </mesh>
   );
 }
@@ -103,12 +122,14 @@ export function GlobeScene({
   focusedId,
   onFocus,
   onActivate,
+  land,
   refs,
 }: {
   entities: GlobeEntityData[];
   focusedId: string | null;
   onFocus: (id: string | null) => void;
   onActivate: (id: string) => void;
+  land: LandGeometry | null;
   refs: GlobeViewRefs;
 }) {
   const group = useRef<Group>(null);
@@ -126,14 +147,30 @@ export function GlobeScene({
 
   return (
     <>
-      <ambientLight intensity={0.55} />
-      <directionalLight position={[5, 4, 6]} intensity={1.3} />
-      <pointLight position={[-6, -3, -4]} intensity={0.5} />
+      {/* A hemisphere + key/rim lights so the metal reads as a lit, COLOURED sphere
+          rather than a black ball: pure metalness with no environment map renders
+          black, so we light it generously and lower metalness so its colour shows. */}
+      <hemisphereLight args={["#7d9bd6", "#0a0d12", 0.7]} />
+      <ambientLight intensity={0.25} />
+      <directionalLight position={[5, 4, 6]} intensity={1.5} />
+      <pointLight position={[-6, -3, -4]} intensity={0.8} color={colors.accent} />
       <group ref={group}>
-        {/* The metallic planet — a low-poly icosahedron for a faceted, stylized look. */}
+        {/* Atmosphere: a back-faced additive shell gives a soft rim glow / halo. */}
+        <mesh scale={1.08}>
+          <icosahedronGeometry args={[PLANET_RADIUS, 3]} />
+          <meshBasicMaterial
+            color={colors.accent}
+            side={BackSide}
+            transparent
+            opacity={0.1}
+            blending={AdditiveBlending}
+            depthWrite={false}
+          />
+        </mesh>
+        {/* The planet — a faceted icosahedron, deep ocean blue with a metallic sheen. */}
         <mesh>
-          <icosahedronGeometry args={[PLANET_RADIUS, 4]} />
-          <meshStandardMaterial color={colors.surface} metalness={0.9} roughness={0.4} />
+          <icosahedronGeometry args={[PLANET_RADIUS, 5]} />
+          <meshStandardMaterial color="#173049" metalness={0.55} roughness={0.32} />
         </mesh>
         {entities.map((d) => (
           <GlobeEntity

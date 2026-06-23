@@ -27,6 +27,7 @@
     "@react-native-async-storage/async-storage": "1.23.1",
     "@react-three/fiber": "^8.18.0",
     "cors": "^2.8.5",
+    "earcut": "^3.0.2",
     "expo": "~51.0.28",
     "expo-constants": "~16.0.2",
     "expo-font": "~12.0.10",
@@ -47,6 +48,7 @@
   "devDependencies": {
     "@babel/core": "^7.24.0",
     "@types/cors": "^2.8.17",
+    "@types/earcut": "^3.0.0",
     "@types/express": "^4.17.21",
     "@types/jest": "^29.5.12",
     "@types/node": "^20.14.0",
@@ -61,7 +63,7 @@
   "jest": {
     "preset": "jest-expo",
     "transformIgnorePatterns": [
-      "node_modules/(?!((jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@unimodules/.*|unimodules|sentry-expo|native-base|react-native-svg))"
+      "node_modules/(?!((jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@unimodules/.*|unimodules|sentry-expo|native-base|react-native-svg|earcut))"
     ],
     "testMatch": [
       "**/__tests__/**/*.test.ts"

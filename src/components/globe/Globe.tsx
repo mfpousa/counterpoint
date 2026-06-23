@@ -28,7 +28,14 @@ import { Ionicons } from "@expo/vector-icons";
 import { Canvas } from "@react-three/fiber";
 import { fetchCoverage, type CoverageNode, type CoverageView } from "../../lib/api";
 import { geoNodeIdOf, GEO_ROOT_ID } from "../../data/geo";
-import { layoutLevel } from "../../lib/globeLayout";
+import { layoutLevel, tangentRing, type Vec3 } from "../../lib/globeLayout";
+import {
+  buildLandGeometry,
+  computeCentroids,
+  type GeoCentroids,
+  type LandGeometry,
+} from "../../lib/geoShapes";
+import countries110m from "../../data/world/countries-110m.json";
 import { useT } from "../../store/AppContext";
 import { colors, font, radius, spacing } from "../../theme";
 import { GlobeScene, type GlobeEntityData, type GlobeViewRefs } from "./GlobeScene";
@@ -36,6 +43,7 @@ import { GlobeScene, type GlobeEntityData, type GlobeViewRefs } from "./GlobeSce
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 const ZOOM_MIN = 0.6;
 const ZOOM_MAX = 2.6;
+const LAND_RADIUS = 1.0;
 
 export function Globe({
   activePoolId,
@@ -100,24 +108,55 @@ export function Globe({
     };
   }, [browse]);
 
+  // Build the merged land mesh + per-country/continent pin anchors from the bundled
+  // world borders. Done once (memoised) and only when the globe is actually mounted.
+  const worldGeo = useMemo<{ land: LandGeometry; centroids: GeoCentroids } | null>(() => {
+    try {
+      const geo = countries110m as unknown as Parameters<typeof buildLandGeometry>[0];
+      return { land: buildLandGeometry(geo, LAND_RADIUS), centroids: computeCentroids(geo) };
+    } catch (e) {
+      console.warn("[globe] world borders unavailable:", e);
+      return null;
+    }
+  }, []);
+
   // The drill-down options (covered places + anything drillable), placed on the
   // sphere by the deterministic procedural layout (seeded by the parent id).
   const entities: GlobeEntityData[] = useMemo(() => {
     const children = (view?.children ?? []).filter((n) => n.state === "ready" || n.hasChildren);
-    const pos = layoutLevel(
+    const proc = layoutLevel(
       children.map((c) => c.nodeId),
       browse,
     );
+    const centroids = worldGeo?.centroids ?? null;
+    // Region pins have no real coordinates, so fan them in a ring around their
+    // country's centroid instead of stacking them on one point.
+    let regionRing: Map<string, Vec3> | null = null;
+    if (centroids && view?.node.level === "country") {
+      const base = centroids.byIso2.get(view.node.nodeId);
+      if (base) {
+        const ids = children.map((c) => c.nodeId).sort();
+        const ring = tangentRing(base, ids.length);
+        regionRing = new Map(ids.map((id, i) => [id, ring[i]]));
+      }
+    }
+    const realDir = (c: CoverageNode): Vec3 | undefined => {
+      if (!centroids) return undefined;
+      if (c.level === "country") return centroids.byIso2.get(c.nodeId);
+      if (c.level === "continent") return centroids.byContinent.get(c.nodeId);
+      if (c.level === "region") return centroids.byIso2.get(c.nodeId.split("-")[0]);
+      return undefined;
+    };
     return children.map((c) => ({
       id: c.nodeId,
       poolId: c.poolId,
       label: c.label,
-      dir: pos.get(c.nodeId) ?? { x: 0, y: 0, z: 1 },
+      dir: regionRing?.get(c.nodeId) ?? realDir(c) ?? proc.get(c.nodeId) ?? { x: 0, y: 0, z: 1 },
       selectable: c.state === "ready",
       active: !!activePoolId && c.poolId === activePoolId,
       hasChildren: c.hasChildren,
     }));
-  }, [view, browse, activePoolId]);
+  }, [view, browse, activePoolId, worldGeo]);
 
   const focused = entities.find((e) => e.id === focusedId) ?? null;
   const atRoot = browse === GEO_ROOT_ID;
@@ -198,6 +237,7 @@ export function Globe({
             focusedId={focusedId}
             onFocus={setFocusedId}
             onActivate={activate}
+            land={worldGeo?.land ?? null}
             refs={refs}
           />
         </Canvas>
