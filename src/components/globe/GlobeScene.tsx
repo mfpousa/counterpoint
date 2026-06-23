@@ -114,15 +114,10 @@ function Land({ data }: { data: LandGeometry }) {
         <bufferAttribute attach="attributes-position" args={[data.positions, 3]} />
         <bufferAttribute attach="index" args={[data.indices, 1]} />
       </bufferGeometry>
-      <meshStandardMaterial
-        color="#9bb1c7"
-        metalness={0.45}
-        roughness={0.5}
-        emissive="#33445a"
-        emissiveIntensity={0.55}
-        side={DoubleSide}
-        flatShading
-      />
+      {/* DIAGNOSTIC: unlit basic material — always visible regardless of normals,
+          lighting, or GL derivative support. If continents show with this, the
+          geometry renders fine and the earlier invisibility was the lit material. */}
+      <meshBasicMaterial color="#9fb4c9" side={DoubleSide} />
     </mesh>
   );
 }
