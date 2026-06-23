@@ -21,7 +21,7 @@ import { FadeInView } from "../../src/components/anim";
 import { BriefingCard } from "../../src/components/BriefingCard";
 import { AnalysisProgress } from "../../src/components/AnalysisProgress";
 import { WorldSwitcher } from "../../src/components/WorldSwitcher";
-import { GeoNavigator } from "../../src/components/GeoNavigator";
+import { GeoBrowser } from "../../src/components/GeoBrowser";
 import { GEO_ROOT_ID, poolIdForNode } from "../../src/data/geo";
 import { DEFAULT_WORLD_ID } from "../../src/data/worlds";
 import { fetchStories } from "../../src/lib/api";
@@ -328,7 +328,7 @@ export default function FeedScreen() {
 
         {/* Coverage drill-down: browse by source geography (World → … → council).
             The World root means "no geographic override" — i.e. the chosen world. */}
-        <GeoNavigator
+        <GeoBrowser
           activePoolId={prefs.geoPool}
           home={prefs.geoHome}
           worldActive={worldId === DEFAULT_WORLD_ID && !prefs.geoPool}

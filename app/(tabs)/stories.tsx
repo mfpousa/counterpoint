@@ -16,7 +16,7 @@ import { fetchStories } from "../../src/lib/api";
 import { StoryCard } from "../../src/components/StoryCard";
 import { lastMinuteStories } from "../../src/lib/storyUpdates";
 import { WorldSwitcher } from "../../src/components/WorldSwitcher";
-import { GeoNavigator } from "../../src/components/GeoNavigator";
+import { GeoBrowser } from "../../src/components/GeoBrowser";
 import { GEO_ROOT_ID, isGeoPoolId, poolIdForNode } from "../../src/data/geo";
 import { openStory } from "../../src/lib/nav";
 import { AnalysisProgress } from "../../src/components/AnalysisProgress";
@@ -109,7 +109,7 @@ export default function StoriesScreen() {
         <View style={{ width: contentW, gap: spacing.md }}>
           <WorldSwitcher worldId={worldId} busyWorld={busyWorld} onSelect={setWorld} />
 
-          <GeoNavigator
+          <GeoBrowser
             activePoolId={prefs.geoPool}
             home={prefs.geoHome}
             worldActive={worldId === DEFAULT_WORLD_ID && !prefs.geoPool}

@@ -1,0 +1,150 @@
+// The 3D CONTENT of the globe navigator (everything INSIDE the r3f <Canvas>).
+// Kept separate from the React Native wrapper (Globe.tsx) so this file only ever
+// deals with three.js / react-three-fiber primitives. Cross-platform: the same
+// JSX renders on web (WebGL) and native (expo-gl) because @react-three/fiber
+// resolves its native build automatically.
+//
+// Look: a faceted metallic planet with one simple icosahedron per geographic
+// entity sitting on its surface, placed by the pure procedural layout. A focused
+// or active entity glows and scales up (the "nice hover effect"). Rotation +
+// zoom are driven by refs the wrapper mutates from gestures, applied here in the
+// per-frame loop so the gesture layer never has to re-render React.
+
+import React, { useRef } from "react";
+import type { MutableRefObject } from "react";
+import { useFrame, type ThreeEvent } from "@react-three/fiber";
+import type { Group, Mesh } from "three";
+import { colors } from "../../theme";
+import type { Vec3 } from "../../lib/globeLayout";
+
+/** One geographic entity to render on the globe (a continent/country/region). */
+export interface GlobeEntityData {
+  id: string;
+  poolId: string;
+  label: string;
+  /** Unit direction on the sphere (from the procedural layout). */
+  dir: Vec3;
+  /** True when this node has its own feed (coverage "ready"). */
+  selectable: boolean;
+  /** True when this node is the committed pool. */
+  active: boolean;
+  /** True when the reader can drill further down from here. */
+  hasChildren: boolean;
+}
+
+/** Shared, mutation-friendly view state the gesture layer writes and the frame
+ *  loop reads — kept in refs so dragging never triggers a React re-render. */
+export interface GlobeViewRefs {
+  rot: MutableRefObject<{ yaw: number; pitch: number }>;
+  zoom: MutableRefObject<number>;
+  dragging: MutableRefObject<boolean>;
+}
+
+const PLANET_RADIUS = 0.96;
+const ENTITY_RADIUS = 1.0;
+const OFF = "#000000";
+
+function entityColor(d: GlobeEntityData): string {
+  if (d.active) return colors.accent;
+  if (d.selectable) return colors.accent;
+  return colors.textDim;
+}
+
+function GlobeEntity({
+  data,
+  focused,
+  onFocus,
+  onActivate,
+}: {
+  data: GlobeEntityData;
+  focused: boolean;
+  onFocus: (id: string | null) => void;
+  onActivate: (id: string) => void;
+}) {
+  const ref = useRef<Mesh>(null);
+  const highlight = focused || data.active;
+  const target = highlight ? 1.7 : 1;
+  // Ease the scale toward its target each frame for a smooth hover/select pop.
+  useFrame(() => {
+    const m = ref.current;
+    if (!m) return;
+    const s = m.scale.x + (target - m.scale.x) * 0.2;
+    m.scale.setScalar(s);
+  });
+  const color = entityColor(data);
+  return (
+    <mesh
+      ref={ref}
+      position={[data.dir.x * ENTITY_RADIUS, data.dir.y * ENTITY_RADIUS, data.dir.z * ENTITY_RADIUS]}
+      onClick={(e: ThreeEvent<MouseEvent>) => {
+        e.stopPropagation();
+        onActivate(data.id);
+      }}
+      onPointerOver={(e: ThreeEvent<PointerEvent>) => {
+        e.stopPropagation();
+        onFocus(data.id);
+      }}
+      onPointerOut={() => onFocus(null)}
+    >
+      <icosahedronGeometry args={[0.075, 1]} />
+      <meshStandardMaterial
+        color={color}
+        metalness={0.85}
+        roughness={0.25}
+        emissive={highlight ? color : OFF}
+        emissiveIntensity={focused ? 0.95 : data.active ? 0.6 : 0}
+      />
+    </mesh>
+  );
+}
+
+export function GlobeScene({
+  entities,
+  focusedId,
+  onFocus,
+  onActivate,
+  refs,
+}: {
+  entities: GlobeEntityData[];
+  focusedId: string | null;
+  onFocus: (id: string | null) => void;
+  onActivate: (id: string) => void;
+  refs: GlobeViewRefs;
+}) {
+  const group = useRef<Group>(null);
+  useFrame((_, delta) => {
+    const g = group.current;
+    if (!g) return;
+    // Idle auto-spin; halted while the reader is dragging so control feels direct.
+    if (!refs.dragging.current) refs.rot.current.yaw += delta * 0.05;
+    g.rotation.y = refs.rot.current.yaw;
+    g.rotation.x = Math.max(-1.2, Math.min(1.2, refs.rot.current.pitch));
+    const z = refs.zoom.current;
+    const s = g.scale.x + (z - g.scale.x) * 0.2;
+    g.scale.setScalar(s);
+  });
+
+  return (
+    <>
+      <ambientLight intensity={0.55} />
+      <directionalLight position={[5, 4, 6]} intensity={1.3} />
+      <pointLight position={[-6, -3, -4]} intensity={0.5} />
+      <group ref={group}>
+        {/* The metallic planet — a low-poly icosahedron for a faceted, stylized look. */}
+        <mesh>
+          <icosahedronGeometry args={[PLANET_RADIUS, 4]} />
+          <meshStandardMaterial color={colors.surface} metalness={0.9} roughness={0.4} />
+        </mesh>
+        {entities.map((d) => (
+          <GlobeEntity
+            key={d.id}
+            data={d}
+            focused={focusedId === d.id}
+            onFocus={onFocus}
+            onActivate={onActivate}
+          />
+        ))}
+      </group>
+    </>
+  );
+}
