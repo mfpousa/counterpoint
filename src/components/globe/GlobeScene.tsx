@@ -121,9 +121,14 @@ export interface GlobeCountry {
   selectable: boolean;
   active: boolean;
   current: boolean;
+  /** True for a streamed REGION/province shape (vs a whole country). Region fills get a
+   *  distinct base tone so a selected country reads as a cohesive highlighted area even
+   *  where individual provinces have no coverage. */
+  isRegion?: boolean;
 }
 
 const LAND_INERT = "#3b4a5e"; // the rest of the world (not selectable at this level)
+const LAND_REGION = "#52688a"; // a selected country's province w/o coverage — lifted above the dim neighbours
 const LAND_DRILL = "#5d7b9c"; // a child you can drill into
 const LAND_READY = "#6f93c4"; // a child that has its own feed
 const LAND_HERE = "#88a6cc"; // the place we're currently inside — clearly lighter
@@ -391,7 +396,7 @@ export function GlobeScene({
         {/* Real country shapes on top of the ocean (radius 1.0 > ocean 0.94): the
             current level's are interactive, the rest are dim background land. */}
         <Countries
-          data={countries}
+          data={regions.length > 0 ? countries.filter((c) => !c.current) : countries}
           focusedId={focusedId}
           onFocus={onFocus}
           onActivate={onActivate}
