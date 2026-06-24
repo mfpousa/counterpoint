@@ -436,9 +436,14 @@ function AlertMarker({
         />
       </mesh>
       <PingRing inner={r * 1.3} outer={r * 1.75} color={color} ringRef={ring} matRef={ringMat} />
-      {/* Only when the story's PROTAGONIST is a nation: a flag gizmo anchored AT the pin
-          (the pole rises within its own billboard so there's no diagonal offset). */}
-      {alert.iso2 && <FlagModel iso2={alert.iso2} />}
+      {/* Only when the story's PROTAGONIST is a nation: a flag gizmo anchored on the
+          marker's CORE (same point as the visible shape) so it never drifts relative to
+          the pin as the globe turns; the pole then rises within its billboard. */}
+      {alert.iso2 && (
+        <group position={[0, r * 1.2, 0]}>
+          <FlagModel iso2={alert.iso2} />
+        </group>
+      )}
       <MarkerHit id={alert.id} radius={Math.max(r * 2.6, 0.04)} y={r} onPress={onPress} onHover={onHover} />
     </group>
   );
@@ -489,9 +494,10 @@ export interface AskMarkerData {
 const _flagTextures = new Map<string, Texture>();
 const FLAG_W = 0.038;
 const FLAG_H = 0.024;
-// How far up the BILLBOARD's own (screen-up) axis the pole starts, so it clears the pin
-// without lifting the flag's ANCHOR radially (which would offset it diagonally on screen).
-const FLAG_BASE = 0.016;
+// How far up the BILLBOARD's own (screen-up) axis the pole starts. The flag is anchored
+// on the marker core, so this is just enough for the pole to emerge from the pin rather
+// than a radial lift (which would offset it diagonally on screen, varying with angle).
+const FLAG_BASE = 0.006;
 
 /** A little 3D FLAG-on-a-pole gizmo, textured with the country's flag image
  *  (flagcdn.com). It BILLBOARDS to the camera so the cloth is always readable, and the
