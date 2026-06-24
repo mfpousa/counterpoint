@@ -563,14 +563,14 @@ function FlagModel({ iso2 }: { iso2: string }) {
   if (!tex) return null;
   return (
     <group ref={grp}>
-      {/* Pole: rises straight UP (screen-up) from just above the pin — the anchor sits AT
-          the pin, so there's no diagonal radial offset. */}
-      <mesh position={[-FLAG_W / 2, FLAG_BASE + FLAG_H, 0]}>
+      {/* Pole: ON the group origin (x=0) so it lands exactly on the pin, rising up. */}
+      <mesh position={[0, FLAG_BASE + FLAG_H, 0]}>
         <cylinderGeometry args={[0.001, 0.001, FLAG_H * 2, 6]} />
         <meshBasicMaterial color="#e2e8f0" />
       </mesh>
-      {/* Cloth: hangs off the pole's top edge (left edge at the pole) and waves. */}
-      <mesh ref={cloth} position={[0, FLAG_BASE + FLAG_H * 1.55, 0]}>
+      {/* Cloth: flies OUT from the pole (its near edge at the pole/pin), and waves —
+          so the pin aligns with the POLE, not the flag's centre. */}
+      <mesh ref={cloth} position={[FLAG_W / 2, FLAG_BASE + FLAG_H * 1.55, 0]}>
         <planeGeometry args={[FLAG_W, FLAG_H, 14, 2]} />
         <meshBasicMaterial map={tex} side={DoubleSide} toneMapped={false} />
       </mesh>
