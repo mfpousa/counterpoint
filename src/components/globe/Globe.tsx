@@ -211,6 +211,25 @@ const MarkerLayer = forwardRef<
     { translateX: p.x },
     { translateY: p.y },
   ];
+  // Move a marker's node imperatively (no React render, no commit lag). Cross-platform: on
+  // native the ref exposes setNativeProps; on web (react-native-web) the ref IS the DOM node,
+  // so we write style.transform straight to it (translate3d → its own GPU layer, smooth).
+  const moveNode = (
+    node: React.ElementRef<typeof View> | null | undefined,
+    x: number,
+    y: number,
+  ) => {
+    if (!node) return;
+    const n = node as unknown as {
+      setNativeProps?: (props: { style: object }) => void;
+      style?: { transform: string };
+    };
+    if (typeof n.setNativeProps === "function") {
+      n.setNativeProps({ style: { transform: transformOf({ x, y }) } });
+    } else if (n.style) {
+      n.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+    }
+  };
   useImperativeHandle(
     ref,
     () => ({
@@ -219,10 +238,7 @@ const MarkerLayer = forwardRef<
         for (const it of next) {
           seen.add(it.id);
           pos.current.set(it.id, { x: it.x, y: it.y });
-          // Move the chip imperatively — no React render, no commit lag.
-          nodes.current
-            .get(it.id)
-            ?.setNativeProps({ style: { transform: transformOf(it) } });
+          moveNode(nodes.current.get(it.id), it.x, it.y);
         }
         for (const id of [...pos.current.keys()]) if (!seen.has(id)) pos.current.delete(id);
         // Re-render ONLY when the set, a chip's static content, or its hovered flag changes
