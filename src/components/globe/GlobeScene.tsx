@@ -290,7 +290,7 @@ const ARC_SEGMENTS = 56; // polyline resolution along the great circle
 const ARC_BASE_RADIUS = 1.012; // hugs just above the land at the endpoints
 const ARC_LIFT = 0.22; // how high the arc bows out at its midpoint (scaled by span)
 const ARC_COLOR = "#ff7a5c"; // default (conflict tension) hue; per-arc `color` overrides it
-const ARC_FLOW_SPEED = 0.4; // flow speed in RAD/sec along the great circle; the per-arc
+const ARC_FLOW_SPEED = 0.2; // flow speed in RAD/sec along the great circle; the per-arc
 // t-rate is ARC_FLOW_SPEED / arc-angle, so EVERY arc flows at the same on-screen speed
 // (a long arc no longer whips its marker faster than a short one).
 
