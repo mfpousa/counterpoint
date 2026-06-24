@@ -140,3 +140,51 @@ export function latLonToVec3(latDeg: number, lonDeg: number): Vec3 {
     z: cosLat * Math.sin(lon),
   };
 }
+
+/** Dot product of two vectors. */
+export function dot(a: Vec3, b: Vec3): number {
+  return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+/**
+ * Sample `segments + 1` points along the great circle from unit direction `a` to
+ * `b` (the shortest surface path between two places), as a flat [x,y,z, …] buffer.
+ *
+ * Each point is SLERP-interpolated on the unit sphere then pushed to `baseRadius`,
+ * with an extra outward BOW that peaks at the midpoint (`sin πt`) and scales with
+ * the angular span — so a tie arches off the surface like a flight path, taller for
+ * far-apart endpoints and nearly flat for neighbours. Pure (no three.js) so the
+ * sphere math is unit-tested once and reused by the 3D arc renderer.
+ */
+export function greatCircleArc(
+  a: Vec3,
+  b: Vec3,
+  segments: number,
+  baseRadius = 1,
+  lift = 0,
+): Float32Array {
+  const va = normalize(a);
+  const vb = normalize(b);
+  const omega = Math.acos(Math.max(-1, Math.min(1, dot(va, vb))));
+  const sinO = Math.sin(omega) || 1e-6;
+  const span = omega / Math.PI; // 0..1 fraction of a half-turn → bow scale
+  const out = new Float32Array((segments + 1) * 3);
+  for (let i = 0; i <= segments; i++) {
+    const t = i / segments;
+    const s0 = Math.sin((1 - t) * omega) / sinO;
+    const s1 = Math.sin(t * omega) / sinO;
+    let x = va.x * s0 + vb.x * s1;
+    let y = va.y * s0 + vb.y * s1;
+    let z = va.z * s0 + vb.z * s1;
+    const len = Math.hypot(x, y, z) || 1;
+    const r = baseRadius * (1 + lift * span * Math.sin(Math.PI * t));
+    const k = r / len;
+    x *= k;
+    y *= k;
+    z *= k;
+    out[i * 3] = x;
+    out[i * 3 + 1] = y;
+    out[i * 3 + 2] = z;
+  }
+  return out;
+}

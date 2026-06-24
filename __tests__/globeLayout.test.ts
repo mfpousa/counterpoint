@@ -1,6 +1,8 @@
 import {
   cross,
+  dot,
   fibonacciSphere,
+  greatCircleArc,
   hashId,
   latLonToVec3,
   layoutLevel,
@@ -86,8 +88,59 @@ describe("globeLayout (pure procedural placement)", () => {
     for (const p of ring) {
       expectUnit(p);
       // Each stays close to the centre (small angular spread → high dot product).
-      const dot = p.x * c.x + p.y * c.y + p.z * c.z;
-      expect(dot).toBeGreaterThan(0.9);
+      const d = p.x * c.x + p.y * c.y + p.z * c.z;
+      expect(d).toBeGreaterThan(0.9);
     }
+  });
+
+  it("dot matches the algebraic definition", () => {
+    expect(dot({ x: 1, y: 2, z: 3 }, { x: 4, y: 5, z: 6 })).toBe(32);
+    expect(dot({ x: 1, y: 0, z: 0 }, { x: 0, y: 1, z: 0 })).toBe(0);
+  });
+});
+
+describe("greatCircleArc (tension-tie geometry)", () => {
+  const pt = (buf: Float32Array, i: number): Vec3 => ({
+    x: buf[i * 3],
+    y: buf[i * 3 + 1],
+    z: buf[i * 3 + 2],
+  });
+
+  it("returns segments+1 points and lands ON each endpoint at baseRadius", () => {
+    const a = latLonToVec3(50, 30); // Ukraine-ish
+    const b = latLonToVec3(35, 38); // far enough to bow
+    const seg = 32;
+    const buf = greatCircleArc(a, b, seg, 1.05, 0.2);
+    expect(buf).toHaveLength((seg + 1) * 3);
+    // Endpoints sit on the base sphere, in the endpoint DIRECTIONS (lift is 0 at t=0,1).
+    const first = pt(buf, 0);
+    const last = pt(buf, seg);
+    expect(lengthOf(first)).toBeCloseTo(1.05, 5);
+    expect(lengthOf(last)).toBeCloseTo(1.05, 5);
+    expect(dot(normalize(first), normalize(a))).toBeCloseTo(1, 5);
+    expect(dot(normalize(last), normalize(b))).toBeCloseTo(1, 5);
+  });
+
+  it("bows OUTWARD at the midpoint (mid radius exceeds the endpoints)", () => {
+    const a = latLonToVec3(0, -80);
+    const b = latLonToVec3(0, 80); // wide span → tall bow
+    const seg = 40;
+    const buf = greatCircleArc(a, b, seg, 1.0, 0.3);
+    const mid = lengthOf(pt(buf, seg / 2));
+    expect(mid).toBeGreaterThan(1.0);
+    expect(lengthOf(pt(buf, 0))).toBeCloseTo(1.0, 5);
+  });
+
+  it("with zero lift, every sample stays on the base sphere", () => {
+    const a = latLonToVec3(10, 10);
+    const b = latLonToVec3(-20, 60);
+    const buf = greatCircleArc(a, b, 24, 1.0, 0);
+    for (let i = 0; i <= 24; i++) expect(lengthOf(pt(buf, i))).toBeCloseTo(1.0, 5);
+  });
+
+  it("handles (near-)identical endpoints without NaNs", () => {
+    const a = latLonToVec3(12, 34);
+    const buf = greatCircleArc(a, a, 8, 1.02, 0.2);
+    for (let i = 0; i < buf.length; i++) expect(Number.isFinite(buf[i])).toBe(true);
   });
 });

@@ -23,7 +23,7 @@ import {
 } from "three";
 import type { Group, Mesh, MeshBasicMaterial, PerspectiveCamera } from "three";
 import { colors } from "../../theme";
-import { hashId, type Vec3 } from "../../lib/globeLayout";
+import { greatCircleArc, hashId, type Vec3 } from "../../lib/globeLayout";
 import { EVENT_CATEGORIES, type EventCategory, type GeoAlert } from "../../lib/geoAlerts";
 
 /** One geographic entity to render on the globe (a continent/country/region). */
@@ -257,6 +257,106 @@ function Outline({
       </bufferGeometry>
       <lineBasicMaterial color={color} transparent opacity={opacity} />
     </lineSegments>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RELATIONSHIP ARCS — the third pillar: who is pulling against whom. A multi-side
+// conflict (Story.sides) becomes great-circle arcs between the sides' home zones,
+// each with a comet flowing along it so the tie reads as a live, directional link.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** One tension tie to draw on the globe: a great circle from `a` to `b` (unit dirs). */
+export interface ArcData {
+  id: string;
+  a: Vec3;
+  b: Vec3;
+  /** 0..1 — drives the arc's brightness, thickness-feel and comet size. */
+  severity: number;
+}
+
+const ARC_SEGMENTS = 56; // polyline resolution along the great circle
+const ARC_BASE_RADIUS = 1.012; // hugs just above the land at the endpoints
+const ARC_LIFT = 0.22; // how high the arc bows out at its midpoint (scaled by span)
+const ARC_COLOR = "#ff7a5c"; // warm "tension" hue, additively blended → energy line
+const ARC_FLOW_SPEED = 0.32; // comet loops per second along each arc
+
+/** Build the bowed great-circle geometry between two unit directions: the continuous
+ *  point list (for sampling the comet) plus the segment-pair buffer (for <lineSegments>).
+ *  The sphere math lives in the pure, unit-tested `greatCircleArc`. */
+function arcGeometry(a: Vec3, b: Vec3): { path: Float32Array; line: Float32Array } {
+  const path = greatCircleArc(a, b, ARC_SEGMENTS, ARC_BASE_RADIUS, ARC_LIFT);
+  // Expand the (N+1)-point polyline into N segment PAIRS for <lineSegments>.
+  const line = new Float32Array(ARC_SEGMENTS * 2 * 3);
+  for (let i = 0; i < ARC_SEGMENTS; i++) {
+    line.set(path.subarray(i * 3, i * 3 + 3), i * 6);
+    line.set(path.subarray((i + 1) * 3, (i + 1) * 3 + 3), i * 6 + 3);
+  }
+  return { path, line };
+}
+
+/** The tension web: a glowing arc per tie with a comet flowing A→B along it. Rendered
+ *  inside the rotating group so the ties spin with the globe. The comets advance in a
+ *  single useFrame (the governor keeps the loop alive while any arc is present). */
+function Arcs({ arcs }: { arcs: ArcData[] }) {
+  const geoms = useMemo(
+    () => arcs.map((arc) => ({ ...arc, ...arcGeometry(arc.a, arc.b) })),
+    [arcs],
+  );
+  const comets = useRef<(Mesh | null)[]>([]);
+  useFrame((state) => {
+    const base = state.clock.elapsedTime * ARC_FLOW_SPEED;
+    for (let i = 0; i < geoms.length; i++) {
+      const m = comets.current[i];
+      if (!m) continue;
+      const { path } = geoms[i];
+      const segs = path.length / 3 - 1;
+      // stagger each comet's phase so a hub of ties doesn't pulse in lockstep.
+      const t = (base + i * 0.13) % 1;
+      const f = t * segs;
+      const k = Math.min(segs - 1, Math.floor(f));
+      const r = f - k;
+      const o = k * 3;
+      m.position.set(
+        path[o] + (path[o + 3] - path[o]) * r,
+        path[o + 1] + (path[o + 4] - path[o + 1]) * r,
+        path[o + 2] + (path[o + 5] - path[o + 2]) * r,
+      );
+    }
+  });
+  return (
+    <group>
+      {geoms.map((g, i) => (
+        <group key={g.id}>
+          <lineSegments frustumCulled={false}>
+            <bufferGeometry>
+              <bufferAttribute attach="attributes-position" args={[g.line, 3]} />
+            </bufferGeometry>
+            <lineBasicMaterial
+              color={ARC_COLOR}
+              transparent
+              opacity={0.22 + 0.4 * g.severity}
+              blending={AdditiveBlending}
+              depthWrite={false}
+            />
+          </lineSegments>
+          <mesh
+            ref={(el) => {
+              comets.current[i] = el;
+            }}
+          >
+            <sphereGeometry args={[0.011 + 0.012 * g.severity, 12, 12]} />
+            <meshBasicMaterial
+              color={ARC_COLOR}
+              transparent
+              opacity={0.95}
+              blending={AdditiveBlending}
+              depthWrite={false}
+            />
+          </mesh>
+        </group>
+      ))}
+    </group>
   );
 }
 
@@ -519,6 +619,7 @@ export const GlobeScene = memo(function GlobeScene({
   outline,
   gizmos,
   alerts,
+  arcs = [],
   askMarkers = [],
   onAskMarkerPress,
   hoveredMarkerId = null,
@@ -539,6 +640,9 @@ export const GlobeScene = memo(function GlobeScene({
   outline: Float32Array | null;
   gizmos: GlobeEntityData[];
   alerts: GeoAlert[];
+  /** Relationship/tension ties between conflict zones (empty = none). Drawn as flowing
+   *  great-circle arcs; their presence keeps the on-demand loop alive for the flow. */
+  arcs?: ArcData[];
   /** Located results from an AI news search to mark on the globe (empty = none). */
   askMarkers?: AskMarkerData[];
   /** Tap an ask marker → recenter the globe on it. */
@@ -597,6 +701,12 @@ export const GlobeScene = memo(function GlobeScene({
       refs.wake.current = () => {};
     };
   }, [invalidate, refs]);
+
+  // The tension arcs flow continuously, so when the set of ties CHANGES (incl. first
+  // appearing) kick the loop — otherwise a sleeping globe wouldn't start animating them.
+  useEffect(() => {
+    refs.wake.current?.();
+  }, [arcs, refs]);
 
   // Pause rendering while the app is backgrounded — no GPU/CPU burn off-screen.
   useEffect(() => {
@@ -804,10 +914,11 @@ export const GlobeScene = memo(function GlobeScene({
       focusedMarkerId === null &&
       !refs.dragging.current &&
       !zoomAnchor.current;
-    // Only ASK pins still animate in 3D (pulsing). Worldview events are now static 2D icon
-    // chips in the overlay, so they DON'T need the loop awake while idle — the globe sleeps
-    // (0fps) with events on screen and only re-projects them on a gesture/data change.
-    const markersLive = askMarkers.length > 0;
+    // ASK pins pulse AND the tension arcs flow → both keep the loop awake (at 30fps; these
+    // are steady-state, not gestures, so no full-rate burst). Worldview EVENT chips are now
+    // static 2D overlay icons, so they alone never keep it awake — the globe sleeps (0fps)
+    // with events on screen and only re-projects them on a gesture/data change.
+    const markersLive = askMarkers.length > 0 || arcs.length > 0;
     const locking = zoomAnchor.current !== null; // cursor-lock needs full-rate steering
     // Transient camera EASES move the whole globe and are loop-driven (no per-event driver
     // once kicked): the fly-to (auto focus/zoom), the scroll/pinch ZOOM ease (a wheel notch
@@ -956,6 +1067,10 @@ export const GlobeScene = memo(function GlobeScene({
         {/* Worldview EVENTS are no longer drawn in 3D — they're projected (above) to legible
             2D icon CHIPS in the wrapper's overlay (crisp, constant on-screen size, tappable),
             which reads far better than abstract shapes and lets the globe sleep when idle. */}
+        {/* RELATIONSHIPS: flowing great-circle ties between the zones of multi-side conflicts —
+            the tension web. In the rotating group so the arcs ride the globe; drawn over the
+            land but depth-tested, so ties on the far hemisphere are hidden behind the planet. */}
+        {arcs.length > 0 && <Arcs arcs={arcs} />}
         {/* AI news-search results: accent pins on the places the answer is about. */}
         <AskMarkers
           markers={askMarkers}

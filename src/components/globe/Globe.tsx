@@ -81,6 +81,7 @@ import { colors, font, radius, spacing } from "../../theme";
 import { AskPanel, renderCited } from "./AskPanel";
 import {
   GlobeScene,
+  type ArcData,
   type AskMarkerData,
   type GlobeCountry,
   type GlobeEntityData,
@@ -99,6 +100,9 @@ const ZOOM_MAX = 2.6;
 // encoded passively on each chip: fresh ones pulse, stale ones fade); the rest NARROW the
 // map to events seen within that span, answering "what's happening right now?".
 const TIME_WINDOWS: TimeWindow[] = ["all", "week", "day", "now"];
+// Stable empty arcs reference — passed while an AI search owns the globe (so the tension
+// web hides), avoiding a fresh [] each render that would defeat React.memo(GlobeScene).
+const EMPTY_ARCS: ArcData[] = [];
 const WORLD_ZOOM = 0.9; // zoomed-OUT scale for the world landing (whole globe in view)
 // Pixels→radians drag gain: 2·cameraZ·tan(fov/2) = the world height the viewport spans
 // at the globe's distance. Dividing by (zoom·canvasHeightPx) makes a drag STICK to the
@@ -712,6 +716,46 @@ export function Globe({
     }
     return [...byLoc.values()].slice(0, 40);
   }, [worldGeo, stories]);
+
+  // RELATIONSHIPS (the tension web): the most severe MULTI-SIDE conflicts become flowing
+  // great-circle arcs between their sides' home zones — who is pulling against whom. Capped
+  // to the top few so the globe reads as a clear instrument, not a hairball, and tied to the
+  // time window so the scrubber narrows the web too. Independent of the category lenses (the
+  // ties are their own layer). A side's anchor is the centroid of its first resolvable zone.
+  const relationshipArcs = useMemo<ArcData[]>(() => {
+    if (!worldGeo) return [];
+    const byIso2 = worldGeo.centroids.byIso2;
+    const now = Date.now();
+    const sideDir = (zones: string[]) => {
+      for (const z of zones) {
+        const iso = ZONE_ISO2[z];
+        const dir = iso ? byIso2.get(iso) : undefined;
+        if (dir) return dir;
+      }
+      return undefined;
+    };
+    const top = stories
+      .filter(
+        (s) => (s.sides?.length ?? 0) >= 2 && withinWindow(s.updatedAt, timeWindow, now),
+      )
+      .sort((a, b) => (b.severity ?? 0) - (a.severity ?? 0))
+      .slice(0, 8);
+    const out: ArcData[] = [];
+    for (const s of top) {
+      const dirs = (s.sides ?? [])
+        .map((side) => sideDir(side.zones))
+        .filter((d): d is NonNullable<typeof d> => !!d);
+      for (let i = 0; i < dirs.length; i++) {
+        for (let j = i + 1; j < dirs.length; j++) {
+          const a = dirs[i];
+          const b = dirs[j];
+          if (a.x * b.x + a.y * b.y + a.z * b.z > 0.9999) continue; // same country → skip
+          out.push({ id: `${s.id}:${i}-${j}`, a, b, severity: s.severity ?? 0.6 });
+        }
+      }
+    }
+    return out;
+  }, [worldGeo, stories, timeWindow]);
 
   // id → alert, so a focused chip's card can look up its full record (incl. the `stacked`
   // events it aggregates) without threading that whole list through the projected markers.
@@ -1509,6 +1553,7 @@ export function Globe({
             outline={regionOutline}
             gizmos={gizmos}
             alerts={visibleAlerts}
+            arcs={askMarkers.length > 0 ? EMPTY_ARCS : relationshipArcs}
             askMarkers={askMarkers}
             onAskMarkerPress={onMarkerSelect}
             hoveredMarkerId={hoveredMarkerId}
