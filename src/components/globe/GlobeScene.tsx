@@ -60,6 +60,10 @@ const ZOOM_MIN = 0.6; // matches the wrapper's gesture/button clamp
 const ZOOM_MAX = 2.6;
 const WHEEL_PULL = 0.14; // how strongly scroll-zoom-in pulls the cursor's point to centre
 const OFF = "#000000";
+// Markers (pins + flags) ride on the globe group, which scales with zoom — so without
+// this they'd balloon when zoomed in. Counter-scale a marker by min(1, CAP/zoom) so its
+// on-screen size grows with zoom only until the group hits CAP, then plateaus.
+const MARKER_SIZE_CAP = 1.35;
 
 function entityColor(d: GlobeEntityData): string {
   if (d.active) return colors.accent;
@@ -401,6 +405,7 @@ function AlertMarker({
   onHover?: (id: string | null) => void;
   hovered: boolean;
 }) {
+  const root = useRef<Group>(null);
   const core = useRef<Mesh>(null);
   const ring = useRef<Mesh>(null);
   const ringMat = useRef<MeshBasicMaterial>(null);
@@ -419,9 +424,15 @@ function AlertMarker({
       const target = hovered ? 1.5 : 1;
       core.current.scale.setScalar(core.current.scale.x + (target - core.current.scale.x) * 0.2);
     }
+    // Cap the marker's screen size: undo the globe-zoom scaling beyond MARKER_SIZE_CAP.
+    if (root.current) {
+      const z = root.current.parent?.scale.x ?? 1;
+      root.current.scale.setScalar(Math.min(1, MARKER_SIZE_CAP / z));
+    }
   });
   return (
     <group
+      ref={root}
       position={[alert.dir.x * ALERT_RADIUS, alert.dir.y * ALERT_RADIUS, alert.dir.z * ALERT_RADIUS]}
       quaternion={quat}
     >
@@ -508,6 +519,7 @@ const FLAG_BASE = 0.006;
 function FlagModel({ iso2 }: { iso2: string }) {
   const grp = useRef<Group>(null);
   const cloth = useRef<Mesh>(null);
+  const base = useRef<Float32Array | null>(null); // the cloth's rest vertices, for the wave
   const camera = useThree((s) => s.camera);
   const [tex, setTex] = useState<Texture | null>(() => _flagTextures.get(iso2) ?? null);
 
@@ -545,16 +557,22 @@ function FlagModel({ iso2 }: { iso2: string }) {
       grp.current.lookAt(camera.position);
       grp.current.rotateY(Math.PI);
     }
-    // Ripple the cloth: vertices at the pole (local x = -FLAG_W/2) stay put; the free edge
-    // waves most. Generous amplitude so the motion still reads when the flag is far/small.
+    // Wave the cloth: vertices at the pole (rest x = -FLAG_W/2) stay put; the free edge
+    // moves most. A depth RIPPLE plus an exaggerated UP/DOWN flap so the motion reads even
+    // when the flag is small. Computed from the captured REST positions so it never drifts.
     const geo = cloth.current?.geometry;
     if (geo) {
       const pos = geo.attributes.position;
+      if (!base.current) base.current = (pos.array as Float32Array).slice();
+      const b = base.current;
       const t = state.clock.elapsedTime * 2.6;
       for (let i = 0; i < pos.count; i++) {
-        const x = pos.getX(i);
-        const f = (x + FLAG_W / 2) / FLAG_W;
-        pos.setZ(i, Math.sin(x * 70 + t) * 0.011 * f);
+        const bx = b[i * 3];
+        const by = b[i * 3 + 1];
+        const f = (bx + FLAG_W / 2) / FLAG_W; // 0 at the pole edge → 1 at the free edge
+        const phase = bx * 70 + t;
+        pos.setZ(i, Math.sin(phase) * 0.01 * f); // ripple toward/away (depth)
+        pos.setY(i, by + Math.sin(phase + 1.3) * 0.013 * f); // exaggerated up/down flap
       }
       pos.needsUpdate = true;
     }
@@ -589,6 +607,7 @@ function AskMarker({
   onHover?: (id: string | null) => void;
   hovered: boolean;
 }) {
+  const root = useRef<Group>(null);
   const head = useRef<Mesh>(null);
   const ring = useRef<Mesh>(null);
   const ringMat = useRef<MeshBasicMaterial>(null);
@@ -606,9 +625,14 @@ function AskMarker({
       const target = hovered ? 1.45 : 1;
       head.current.scale.setScalar(head.current.scale.x + (target - head.current.scale.x) * 0.2);
     }
+    if (root.current) {
+      const z = root.current.parent?.scale.x ?? 1;
+      root.current.scale.setScalar(Math.min(1, MARKER_SIZE_CAP / z)); // cap screen size
+    }
   });
   return (
     <group
+      ref={root}
       position={[data.dir.x * ALERT_RADIUS, data.dir.y * ALERT_RADIUS, data.dir.z * ALERT_RADIUS]}
       quaternion={quat}
     >
