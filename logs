@@ -1,1 +1,11 @@
-Los artículos proporcionados no mencionan ningún país nuevo que se esté uniendo a la OTAN en este momento; las noticias se centran en preparativos para una cumbre de la OTAN, tensiones internas sobre el gasto en defensa y amenazas de seguridad. Alemania (DE): Las tropas neerlandesas realizan ejercicios militares para prepararse ante posibles invasiones rusas. Turquía (TR): Las autoridades realizaron arrestos masivos en Ankara para asegurar la capital antes de una cumbre de la OTAN.
+{
+    "phase": "idle",
+    "active": true,
+    "done": 0,
+    "total": 0,
+    "pending": 2651,
+    "analyzed": 1588,
+    "world": "geo-es",
+    "label": "Spain",
+    "busyWith": null
+}
