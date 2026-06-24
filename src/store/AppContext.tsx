@@ -324,22 +324,32 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Poll backend analysis progress. While the build advances, surface it via
-  // `status`; when the analyzed count grows (a chunk finished), refresh the feed
-  // so new items appear live without a manual reload.
-  const prevAnalyzed = useRef(0);
+  // Poll backend analysis progress. While the build advances, surface it via `status`; when
+  // the analyzed count grows (a chunk finished), silently reload so newly-analyzed items
+  // appear live without a manual refresh. The analyzed count is PER-WORLD, so we anchor the
+  // baseline to the world it came from and re-baseline on a pool switch — otherwise, after
+  // viewing a high-count pool, a freshly opened (lower-count) pool would never trip
+  // `analyzed > prev` and would only update on a manual refresh.
+  const prevAnalyzed = useRef<{ world: string | null; count: number }>({
+    world: null,
+    count: 0,
+  });
   useEffect(() => {
     if (!ready || !prefs.onboarded) return;
     let cancelled = false;
     const tick = async () => {
-      const s = await fetchStatus(worldRef.current);
-      if (cancelled || !s) return;
+      const w = worldRef.current;
+      const s = await fetchStatus(w);
+      // Ignore a result for a pool we've since left (don't apply its status or baseline).
+      if (cancelled || !s || worldRef.current !== w) return;
       setStatus(s);
       setBusyWorld(s.busyWith ?? null);
-      if (prevAnalyzed.current === 0) {
-        prevAnalyzed.current = s.analyzed;
-      } else if (s.analyzed > prevAnalyzed.current) {
-        prevAnalyzed.current = s.analyzed;
+      const prev = prevAnalyzed.current;
+      if (prev.world !== w) {
+        // New pool — establish a baseline; don't reload off a stale cross-world delta.
+        prevAnalyzed.current = { world: w, count: s.analyzed };
+      } else if (s.analyzed > prev.count) {
+        prevAnalyzed.current = { world: w, count: s.analyzed };
         if (!loadingFeedRef.current) void reloadPool();
       }
     };
