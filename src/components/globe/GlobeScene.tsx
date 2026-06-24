@@ -571,8 +571,8 @@ function FlagModel({ iso2 }: { iso2: string }) {
         const by = b[i * 3 + 1];
         const f = (bx + FLAG_W / 2) / FLAG_W; // 0 at the pole edge → 1 at the free edge
         const phase = bx * 70 + t;
-        pos.setZ(i, Math.sin(phase) * 0.01 * f); // ripple toward/away (depth)
-        pos.setY(i, by + Math.sin(phase + 1.3) * 0.013 * f); // exaggerated up/down flap
+        pos.setZ(i, Math.sin(phase) * 0.006 * f); // ripple toward/away (depth)
+        pos.setY(i, by + Math.sin(phase + 1.3) * 0.006 * f); // gentle up/down flap
       }
       pos.needsUpdate = true;
     }
