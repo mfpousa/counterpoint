@@ -436,13 +436,9 @@ function AlertMarker({
         />
       </mesh>
       <PingRing inner={r * 1.3} outer={r * 1.75} color={color} ringRef={ring} matRef={ringMat} />
-      {/* Only when the story's PROTAGONIST is a nation: a flag gizmo lifted ABOVE the
-          pin (so its pole clears the marker instead of sinking into it). */}
-      {alert.iso2 && (
-        <group position={[0, 0.05, 0]}>
-          <FlagModel iso2={alert.iso2} />
-        </group>
-      )}
+      {/* Only when the story's PROTAGONIST is a nation: a flag gizmo anchored AT the pin
+          (the pole rises within its own billboard so there's no diagonal offset). */}
+      {alert.iso2 && <FlagModel iso2={alert.iso2} />}
       <MarkerHit id={alert.id} radius={Math.max(r * 2.6, 0.04)} y={r} onPress={onPress} onHover={onHover} />
     </group>
   );
@@ -493,10 +489,14 @@ export interface AskMarkerData {
 const _flagTextures = new Map<string, Texture>();
 const FLAG_W = 0.038;
 const FLAG_H = 0.024;
+// How far up the BILLBOARD's own (screen-up) axis the pole starts, so it clears the pin
+// without lifting the flag's ANCHOR radially (which would offset it diagonally on screen).
+const FLAG_BASE = 0.016;
 
 /** A little 3D FLAG-on-a-pole gizmo, textured with the country's flag image
  *  (flagcdn.com). It BILLBOARDS to the camera so the cloth is always readable, and the
- *  cloth WAVES. Its parent lifts it ABOVE the pin so the pole isn't buried in the marker.
+ *  cloth WAVES. Its ANCHOR sits AT the pin (so it never drifts off diagonally); the pole
+ *  is raised along the billboard's screen-up axis (FLAG_BASE) to clear the marker.
  *  Rendered only for a pin whose story protagonist is a nation. Degrades to nothing if
  *  the texture can't load (offline / no remote loader). */
 function FlagModel({ iso2 }: { iso2: string }) {
@@ -557,13 +557,14 @@ function FlagModel({ iso2 }: { iso2: string }) {
   if (!tex) return null;
   return (
     <group ref={grp}>
-      {/* Pole: base at the group origin (the parent lifts it above the pin), extends up. */}
-      <mesh position={[-FLAG_W / 2, FLAG_H, 0]}>
+      {/* Pole: rises straight UP (screen-up) from just above the pin — the anchor sits AT
+          the pin, so there's no diagonal radial offset. */}
+      <mesh position={[-FLAG_W / 2, FLAG_BASE + FLAG_H, 0]}>
         <cylinderGeometry args={[0.001, 0.001, FLAG_H * 2, 6]} />
         <meshBasicMaterial color="#e2e8f0" />
       </mesh>
       {/* Cloth: hangs off the pole's top edge (left edge at the pole) and waves. */}
-      <mesh ref={cloth} position={[0, FLAG_H * 1.55, 0]}>
+      <mesh ref={cloth} position={[0, FLAG_BASE + FLAG_H * 1.55, 0]}>
         <planeGeometry args={[FLAG_W, FLAG_H, 14, 2]} />
         <meshBasicMaterial map={tex} side={DoubleSide} toneMapped={false} />
       </mesh>
