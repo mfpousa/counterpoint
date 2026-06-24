@@ -182,20 +182,26 @@ const MarkerLayer = forwardRef<
     focusedId: string | null;
     /** Tap outside the focused card → release focus. */
     onDismiss: () => void;
-    /** Tap an event chip → focus it (opens its card). */
+    /** Tap an event chip → open/focus it. */
     onPressMarker: (id: string) => void;
     /** Pointer entered (id) / left (null) a chip — pauses/resumes the globe's auto-spin. */
     onHoverMarker: (id: string | null) => void;
+    /** A wheel over the overlay (i.e. over a chip) — forwarded to the globe so scroll-zoom
+     *  still works when the pointer sits on a chip (the chip would otherwise eat the event). */
+    onWheel: (deltaY: number) => void;
     /** Rich, interactive content for the focused card (links + selectable text). */
     renderFocused: (it: ProjectedMarker) => React.ReactNode;
   }
 >(function MarkerLayer(
-  { focusedId, onDismiss, onPressMarker, onHoverMarker, renderFocused },
+  { focusedId, onDismiss, onPressMarker, onHoverMarker, onWheel, renderFocused },
   ref,
 ) {
   const [items, setItems] = useState<ProjectedMarker[]>([]);
   // Which event chip the pointer is over (web) — shows its headline bubble.
   const [hoverId, setHoverId] = useState<string | null>(null);
+  // Root overlay node — on web we attach a wheel listener so a scroll over a chip (which
+  // sits on top of the canvas and would swallow the event) still zooms the globe.
+  const rootRef = useRef<React.ElementRef<typeof View> | null>(null);
   // Each marker's host node + its last screen position. The frame loop writes the transform
   // STRAIGHT to the node (setNativeProps) — synchronously, in the SAME frame the globe
   // renders, with no React commit in between — which is what keeps a chip glued to the
@@ -259,11 +265,37 @@ const MarkerLayer = forwardRef<
     }),
     [],
   );
+  // WEB: a wheel over a chip targets the chip (on top of the canvas), so r3f's canvas wheel
+  // never fires and you can't zoom while hovering a marker. Listen on the overlay root —
+  // wheels bubble up from the chips (pointer-events:auto) through this box-none root — and
+  // forward the delta to the globe's zoom. Wheels over EMPTY overlay (no chip) target the
+  // canvas directly and are handled by r3f as before, so this only covers the chip case.
+  useEffect(() => {
+    const root = rootRef.current as unknown as HTMLElement | null;
+    if (!root || typeof root.addEventListener !== "function") return; // native: no-op
+    const handler = (e: Event) => {
+      const we = e as WheelEvent;
+      // If the wheel lands inside a scrollable region (the fan-out card's list), let THAT
+      // scroll — don't hijack it to zoom the globe.
+      let el = we.target as HTMLElement | null;
+      while (el && el !== root) {
+        if (el.scrollHeight > el.clientHeight) {
+          const oy = getComputedStyle(el).overflowY;
+          if (oy === "auto" || oy === "scroll") return;
+        }
+        el = el.parentElement;
+      }
+      e.preventDefault(); // stop the page from scrolling under the globe
+      onWheel(we.deltaY);
+    };
+    root.addEventListener("wheel", handler, { passive: false });
+    return () => root.removeEventListener("wheel", handler);
+  }, [onWheel]);
   // Only show the backdrop when the focused pin is actually on screen (front hemisphere),
   // so a stale/occluded focus never traps the globe behind an invisible catcher.
   const focusedShown = focusedId !== null && items.some((i) => i.id === focusedId);
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+    <View ref={rootRef} style={StyleSheet.absoluteFill} pointerEvents="box-none">
       {focusedShown && (
         <Pressable
           style={[StyleSheet.absoluteFill, styles.markerBackdrop]}
@@ -276,28 +308,32 @@ const MarkerLayer = forwardRef<
         // imperatively each frame); content positions relative to that point, so it tracks
         // the spinning globe. Initial transform = last known position (fresh on re-render).
         const transform = transformOf(pos.current.get(it.id) ?? { x: it.x, y: it.y });
-        // FOCUSED pin (ask or event): its interactive card, anchored just above the point.
-        if (it.id === focusedId) {
-          return (
-            <View key={it.id} ref={setNode(it.id)} style={[styles.markerAnchor, { transform }]} pointerEvents="box-none">
-              <View style={[styles.markerStack, styles.markerFocusedWrap]} pointerEvents="box-none">
-                <View style={[styles.markerCard, { borderColor: it.color }]} pointerEvents="auto">
-                  {renderFocused(it)}
-                </View>
-              </View>
-            </View>
-          );
-        }
-        // WORLDVIEW EVENT: a legible, category-coloured ICON chip sitting on the point.
-        // Size scales with severity; a "+N" badge marks stacked events; tap → focus card;
-        // hover → headline bubble AND pauses the spin. Constant on-screen size at any zoom.
+        const isFocused = it.id === focusedId;
+        // The focused anchor jumps to the TOP: every anchor's `transform` makes its own
+        // stacking context, so an inner zIndex can't lift the card above sibling chips — the
+        // anchor itself must out-rank them (and the dismiss backdrop).
+        const anchorStyle = [
+          styles.markerAnchor,
+          { transform },
+          isFocused && styles.markerAnchorTop,
+        ];
+        // WORLDVIEW EVENT: a legible, category-coloured ICON chip sitting on the point. The
+        // chip STAYS visible when focused; its card (aggregated fan-out) floats just above it.
+        // Size scales with severity; a "+N" badge marks stacked events; hover → headline
+        // bubble AND pauses the spin. Constant on-screen size at any zoom.
         if (it.kind === "alert" && it.category) {
           const cr = Math.round(11 + (it.severity ?? 0.4) * 7); // chip RADIUS (px)
-          const showBubble = hoverId === it.id && !!it.detail;
+          const showBubble = !isFocused && hoverId === it.id && !!it.detail;
           const more = (it.count ?? 1) - 1;
           return (
-            <View key={it.id} ref={setNode(it.id)} style={[styles.markerAnchor, { transform }]} pointerEvents="box-none">
-              {showBubble && (
+            <View key={it.id} ref={setNode(it.id)} style={anchorStyle} pointerEvents="box-none">
+              {isFocused ? (
+                <View style={[styles.markerStack, styles.markerFocusedWrap]} pointerEvents="box-none">
+                  <View style={[styles.markerCard, { borderColor: it.color }]} pointerEvents="auto">
+                    {renderFocused(it)}
+                  </View>
+                </View>
+              ) : showBubble ? (
                 <View style={[styles.markerStack, { bottom: cr + 6 }]} pointerEvents="none">
                   <View style={[styles.markerBubble, { borderColor: it.color }]}>
                     <Text style={styles.markerBubbleText} numberOfLines={3}>
@@ -305,7 +341,7 @@ const MarkerLayer = forwardRef<
                     </Text>
                   </View>
                 </View>
-              )}
+              ) : null}
               <Pressable
                 style={[
                   styles.eventChip,
@@ -344,23 +380,36 @@ const MarkerLayer = forwardRef<
             </View>
           );
         }
-        // AI-SEARCH pin: an always-on place label, plus a blurb bubble on hover.
+        // AI-SEARCH pin: an always-on place label (or its interactive card when focused).
         return (
-          <View key={it.id} ref={setNode(it.id)} style={[styles.markerAnchor, { transform }]} pointerEvents="none">
-            <View style={styles.markerStack} pointerEvents="none">
-              {it.hovered && it.detail ? (
-                <View style={[styles.markerBubble, { borderColor: it.color }]}>
-                  <Text style={styles.markerBubbleText}>{it.detail}</Text>
+          <View
+            key={it.id}
+            ref={setNode(it.id)}
+            style={anchorStyle}
+            pointerEvents={isFocused ? "box-none" : "none"}
+          >
+            {isFocused ? (
+              <View style={[styles.markerStack, styles.markerFocusedWrap]} pointerEvents="box-none">
+                <View style={[styles.markerCard, { borderColor: it.color }]} pointerEvents="auto">
+                  {renderFocused(it)}
                 </View>
-              ) : null}
-              {it.kind === "ask" && it.label ? (
-                <View style={[styles.markerChip, { borderColor: it.color }]}>
-                  <Text style={styles.markerChipText} numberOfLines={1}>
-                    {it.label}
-                  </Text>
-                </View>
-              ) : null}
-            </View>
+              </View>
+            ) : (
+              <View style={styles.markerStack} pointerEvents="none">
+                {it.hovered && it.detail ? (
+                  <View style={[styles.markerBubble, { borderColor: it.color }]}>
+                    <Text style={styles.markerBubbleText}>{it.detail}</Text>
+                  </View>
+                ) : null}
+                {it.kind === "ask" && it.label ? (
+                  <View style={[styles.markerChip, { borderColor: it.color }]}>
+                    <Text style={styles.markerChipText} numberOfLines={1}>
+                      {it.label}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+            )}
           </View>
         );
       })}
@@ -803,11 +852,33 @@ export function Globe({
     if (didDrag.current) return;
     setFocusedMarkerId(id);
   }, []);
-  // Tapping a 2D event CHIP focuses it. Unlike the 3D pins above, a chip tap doesn't go
-  // through the globe's PanResponder, so `didDrag` is never reset for it — gating on the
-  // stale flag would swallow the tap. The chip's own Pressable already distinguishes a tap.
-  const onChipPress = useCallback((id: string) => setFocusedMarkerId(id), []);
+  // Tapping a 2D event CHIP. A lone event opens its STORY PANEL straight away (no detour
+  // through a summary card); an aggregated chip (many stories on one spot) opens the fan-out
+  // card so the reader can pick which one. (No `didDrag` guard: a chip tap doesn't go through
+  // the globe's PanResponder, so the flag is never reset for it; the Pressable handles taps.)
+  const onChipPress = useCallback(
+    (id: string) => {
+      const a = alertById.get(id);
+      if (a && (a.stacked?.length ?? 1) > 1) setFocusedMarkerId(id);
+      else onAlertPress?.(id);
+    },
+    [alertById, onAlertPress],
+  );
   const clearFocus = useCallback(() => setFocusedMarkerId(null), []);
+  // Scroll-zoom forwarded from the overlay when the pointer is over a chip (the chip would
+  // otherwise eat the wheel). Centred zoom mirroring r3f's wheel step; cancels any fly-to.
+  const onOverlayWheel = useCallback(
+    (deltaY: number) => {
+      refs.zoom.current = clamp(
+        refs.zoom.current * (deltaY < 0 ? 1.12 : 1 / 1.12),
+        ZOOM_MIN,
+        ZOOM_MAX,
+      );
+      refs.target.current = null;
+      refs.wake.current?.();
+    },
+    [refs],
+  );
 
   // The interactive content of a focused pin's card: selectable text + clickable links.
   // Ask pins show the place + its blurb with inline citation links (and a locate action);
@@ -1676,6 +1747,7 @@ export function Globe({
           onDismiss={clearFocus}
           onPressMarker={onChipPress}
           onHoverMarker={onMarkerHover}
+          onWheel={onOverlayWheel}
           renderFocused={renderFocused}
         />
 
@@ -1965,6 +2037,10 @@ const styles = StyleSheet.create({
   },
   // Zero-size anchor pinned to a marker's projected point (transform written imperatively).
   markerAnchor: { position: "absolute", left: 0, top: 0 },
+  // The FOCUSED marker's anchor lifts above every sibling chip AND the dismiss backdrop —
+  // each anchor's transform is its own stacking context, so the card needs the anchor (not
+  // just an inner zIndex) to out-rank them. Keeps the card on top and its rows clickable.
+  markerAnchorTop: { zIndex: 50 },
   // A centred column floating just ABOVE the anchor point (labels / bubbles / focused card).
   markerStack: {
     position: "absolute",
