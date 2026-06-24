@@ -851,9 +851,18 @@ export const GlobeScene = memo(function GlobeScene({
         Math.sin(tgt.yaw - refs.rot.current.yaw),
         Math.cos(tgt.yaw - refs.rot.current.yaw),
       );
+      const dpitch = tgt.pitch - refs.rot.current.pitch;
+      const dzoom = tgt.zoom - refs.zoom.current;
       refs.rot.current.yaw += dy * 0.12;
-      refs.rot.current.pitch += (tgt.pitch - refs.rot.current.pitch) * 0.12;
-      refs.zoom.current += (tgt.zoom - refs.zoom.current) * 0.12;
+      refs.rot.current.pitch += dpitch * 0.12;
+      refs.zoom.current += dzoom * 0.12;
+      // The ease is asymptotic, so the target was previously NEVER released — leaving the
+      // loop scheduling frames forever. Once we're within a hair of the target (sub-pixel /
+      // sub-0.1°), END the fly-to: clears `needsMore` below so the full-rate burst stops and
+      // the loop can settle to 0fps. The tiny remaining error is imperceptible.
+      if (Math.abs(dy) < 2e-3 && Math.abs(dpitch) < 2e-3 && Math.abs(dzoom) < 2e-3) {
+        refs.target.current = null;
+      }
     } else if (
       autoSpin &&
       focusedId === null &&
@@ -941,9 +950,15 @@ export const GlobeScene = memo(function GlobeScene({
       focusedMarkerId === null &&
       !refs.dragging.current;
     const markersLive = alerts.length > 0 || askMarkers.length > 0;
+    // A fly-to (auto focus/zoom) is the ONE animation with no external driver: a drag is
+    // driven by pointer events and a wheel-zoom by wheel events (each calls wake→invalidate
+    // at the display's rate), but the fly-to relies solely on this loop. Throttled to 30fps
+    // via setTimeout — which isn't vsync-aligned and stalls under load (e.g. the new place's
+    // geometry building at the same moment) — a FAST camera move reads as choppy/low-fps.
+    const flyingTo = refs.target.current !== null;
     const needsMore =
       refs.dragging.current ||
-      refs.target.current !== null ||
+      flyingTo ||
       spinning ||
       easingZoom ||
       easingOffset ||
@@ -954,10 +969,17 @@ export const GlobeScene = memo(function GlobeScene({
       nextFrame.current = null;
     }
     if (needsMore && !pausedRef.current) {
-      nextFrame.current = setTimeout(() => {
-        nextFrame.current = null;
+      if (flyingTo) {
+        // Drive the fly-to at the display's FULL rate (vsync-aligned via r3f's demand loop)
+        // so the auto-zoom is smooth and quick. It's a short, self-terminating burst — the
+        // ease above clears the target on arrival, after which we fall back to the throttle.
         invalidate();
-      }, FRAME_MS);
+      } else {
+        nextFrame.current = setTimeout(() => {
+          nextFrame.current = null;
+          invalidate();
+        }, FRAME_MS);
+      }
     }
   });
 
