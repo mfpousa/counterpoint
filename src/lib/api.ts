@@ -434,6 +434,91 @@ export async function fetchStories(
   }
 }
 
+export interface StoriesStreamHandlers {
+  /** A stories set: the CACHED set arrives first (synthesizing may be true), then the FRESH
+   *  set once the background synthesis lands (synthesizing false). Replace the list each call. */
+  onStories: (stories: Story[], synthesizing: boolean) => void;
+  /** The stream finished (no more updates coming). */
+  onDone: () => void;
+  /** A failure (or that streaming is unsupported here) — caller should fall back to fetchStories. */
+  onError: (message: string) => void;
+  world?: string;
+  lang?: Lang;
+  force?: boolean;
+}
+
+/**
+ * Stream the synthesized stories over SSE: paints the cached set the instant you switch
+ * pools, then swaps in the freshly synthesized set when it's ready — no polling. Returns a
+ * handle with `cancel()`, or `null` when streaming isn't supported here (caller should fall
+ * back to the non-streaming fetchStories).
+ */
+export function streamStories(h: StoriesStreamHandlers): { cancel: () => void } | null {
+  if (typeof fetch === "undefined" || typeof ReadableStream === "undefined") return null;
+
+  const params = new URLSearchParams();
+  if (h.world) params.set("world", h.world);
+  if (h.lang) params.set("lang", h.lang);
+  if (h.force) params.set("force", "1");
+  const controller = new AbortController();
+
+  const dispatch = (frame: string) => {
+    let event = "message";
+    const dataLines: string[] = [];
+    for (const line of frame.split("\n")) {
+      if (line.startsWith("event:")) event = line.slice(6).trim();
+      else if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
+    }
+    if (dataLines.length === 0) return;
+    let payload: unknown;
+    try {
+      payload = JSON.parse(dataLines.join("\n"));
+    } catch {
+      return;
+    }
+    if (event === "stories" && payload && typeof payload === "object") {
+      const p = payload as { stories?: Story[]; synthesizing?: boolean };
+      h.onStories(Array.isArray(p.stories) ? p.stories : [], !!p.synthesizing);
+    } else if (event === "done") h.onDone();
+    else if (event === "error") h.onError(typeof payload === "string" ? payload : "stories failed");
+  };
+
+  (async () => {
+    try {
+      const qs = params.toString();
+      const res = await fetch(`${apiBaseUrl()}/api/stories/stream${qs ? `?${qs}` : ""}`, {
+        method: "GET",
+        headers: { Accept: "text/event-stream" },
+        signal: controller.signal,
+      });
+      const reader = res.body?.getReader?.();
+      if (!res.ok || !reader) {
+        h.onError("stream unavailable");
+        return;
+      }
+      const decoder = new TextDecoder();
+      let buffer = "";
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        let idx: number;
+        while ((idx = buffer.indexOf("\n\n")) !== -1) {
+          dispatch(buffer.slice(0, idx));
+          buffer = buffer.slice(idx + 2);
+        }
+      }
+      if (buffer.trim()) dispatch(buffer);
+    } catch (e) {
+      if (!controller.signal.aborted) {
+        h.onError(e instanceof Error ? e.message : "stream failed");
+      }
+    }
+  })();
+
+  return { cancel: () => controller.abort() };
+}
+
 /**
  * Fetch "related news" for an item (semantic nearest-neighbors). Returns an empty
  * list on any failure — the related section is supplementary and never blocks the

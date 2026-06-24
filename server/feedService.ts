@@ -48,17 +48,10 @@ import {
   type ItemAnalysis,
 } from "./analysis";
 import { generateBriefing, generateBriefingStream } from "./briefing";
-import {
-  clusterItems,
-  coverageOf,
-  groupIntoIssues,
-  isDevelopingIssue,
-  jaccard,
-  rankClusters,
-  titleTokens,
-  type ClusterInput,
-} from "./cluster";
+import { jaccard, titleTokens, type ClusterInput } from "./cluster";
+import { runStoryPlan } from "./clusterPool";
 import { config } from "./config";
+import type { StoryPlanConfig } from "./storyPlan";
 import { cosineSim, embedQuery, embedTexts, itemEmbedText } from "./embeddings";
 import { interestTokens, partitionByExclusion, toFeedItem, tokenize } from "./personalize";
 import { interpretQuery, type ParsedQuery } from "./query";
@@ -101,6 +94,9 @@ type BuildPhase =
   | "embedding"
   | "synthesizing";
 
+/** A concrete unit of work that's RUNNING (everything except the resting "idle"). */
+export type ActivityStage = Exclude<BuildPhase, "idle">;
+
 /** All mutable build/cache state for ONE world. */
 interface WorldState {
   worldId: string;
@@ -110,7 +106,15 @@ interface WorldState {
    *  Gates how often a NAVIGATION refresh may start a new round (config.feed.navBatchTtlMs);
    *  manual refreshes ignore it, automatic refreshes never start one. */
   lastBatchAt: number;
-  status: { phase: BuildPhase; done: number; total: number };
+  /** What's RUNNING for this world RIGHT NOW — the single source of truth behind the
+   *  status indicator. Each entry is one in-flight pass (registered for its whole duration
+   *  via withActivity); getStatus derives `active` + the dominant stage + progress from it,
+   *  so the UI can never claim work that isn't happening (or miss work that is). */
+  activities: Map<number, { stage: ActivityStage; done: number; total: number }>;
+  activitySeq: number;
+  /** Keep-alive for the backfill DRAIN chain: held across its inter-batch delays so the
+   *  indicator never blinks off between batches. Doubles as the chain's single-flight guard. */
+  draining: boolean;
   /** Assembled per-interest views (valid while builtAt matches lastBuildAt). */
   viewCache: Map<string, { builtAt: number; result: FeedResult }>;
   briefingCache: Map<string, { builtAt: number; briefing: Briefing | null }>;
@@ -129,7 +133,6 @@ interface WorldState {
   augmentInFlight: Promise<void> | null;
   /** Per-zone last fetch time (epoch ms), for the reactive-load TTL. */
   zoneFetchedAt: Map<string, number>;
-  catchUpTimer: ReturnType<typeof setTimeout> | null;
   /** Epoch ms of this pool's last status poll — a lightweight presence signal. */
   lastWatchedAt: number;
   /** Cached near-clone DEDUP for a GEO pool, keyed by survivor COUNT. The dedup is
@@ -154,7 +157,9 @@ function ws(worldId: string): WorldState {
       worldId,
       lastBuildAt: 0,
       lastBatchAt: 0,
-      status: { phase: "idle", done: 0, total: 0 },
+      activities: new Map(),
+      activitySeq: 0,
+      draining: false,
       viewCache: new Map(),
       briefingCache: new Map(),
       briefingInFlight: new Map(),
@@ -166,7 +171,6 @@ function ws(worldId: string): WorldState {
       embedInFlight: null,
       augmentInFlight: null,
       zoneFetchedAt: new Map(),
-      catchUpTimer: null,
       lastWatchedAt: 0,
       geoDedup: null,
       rotation: createRotation(),
@@ -178,14 +182,86 @@ function ws(worldId: string): WorldState {
 
 // Model concurrency is governed by the GLOBAL REQUEST GATE in ai.ts: up to
 // config.ai.maxConcurrency requests stream at once across ALL worlds (one per model
-// instance), with INTERACTIVE work prioritised over BACKGROUND catch-up drains and a
-// reserved interactive slot so bulk prescreen/embedding can never starve foreground
-// delivery. Stages just declare their priority via withModelPriority(); the default
-// (cold start, search, deep analysis) is interactive — only the catch-up drains below
-// mark themselves background.
+// instance), with INTERACTIVE work prioritised over BACKGROUND work and
+// config.ai.reserveInteractive slots HELD BACK from background so user-facing requests
+// (search/ask, briefing, reader, and the cold-start fetch + first-chunk triage) ALWAYS
+// have an instance. The ENTIRE backfill DRAIN — prescreen + deep analysis + embedding —
+// plus story synthesis and reactive augmentation run as BACKGROUND (runBackfillBatch wraps
+// the drain; getStories/augment mark themselves too), so the bulk backlog can never occupy
+// every instance and queue the reader behind it. Only the cold-start first paint stays
+// interactive. Callers declare priority via withModelPriority(); default is interactive.
 
-function setPhase(state: WorldState, phase: BuildPhase, done = 0, total = 0): void {
-  state.status = { phase, done, total };
+/** Resolve after `ms` (used to space out the backfill drain's chained batches). */
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+interface ActivityHandle {
+  /** Move this activity to a different stage (e.g. fetching → analyzing within one pass). */
+  stage: (stage: ActivityStage) => void;
+  /** Report progress for the current stage (drives the indicator's per-pass bar). */
+  progress: (done: number, total: number) => void;
+}
+
+/** Register a RUNNING pass on a world's activity registry. The handle lets the pass refine
+ *  its stage and report progress; `end()` removes it. Prefer withActivity (auto end on
+ *  completion/throw). This registry is the SINGLE source of truth for the status indicator —
+ *  no pass should do model/network work without an activity covering it, or the UI will
+ *  under-report; none should leave one dangling, or it will over-report. */
+function beginActivity(
+  worldId: string,
+  stage: ActivityStage,
+): { handle: ActivityHandle; end: () => void } {
+  const state = ws(worldId);
+  const id = ++state.activitySeq;
+  const task = { stage, done: 0, total: 0 };
+  state.activities.set(id, task);
+  return {
+    handle: {
+      stage: (s) => {
+        task.stage = s;
+      },
+      progress: (done, total) => {
+        task.done = done;
+        task.total = total;
+      },
+    },
+    end: () => {
+      state.activities.delete(id);
+    },
+  };
+}
+
+/** Run `fn` with an activity registered for its whole duration (removed on return OR throw).
+ *  The standard way to make a pass visible in the status indicator. */
+async function withActivity<T>(
+  worldId: string,
+  stage: ActivityStage,
+  fn: (h: ActivityHandle) => Promise<T>,
+): Promise<T> {
+  const { handle, end } = beginActivity(worldId, stage);
+  try {
+    return await fn(handle);
+  } finally {
+    end();
+  }
+}
+
+/** Which running activity the indicator should HEADLINE when several overlap (e.g. a feed
+ *  deep-analysis and a story synthesis at once). Ordered by how meaningful each stage is to a
+ *  reader watching progress: deep analysis first, bare fetching last. Pure (exported for tests). */
+const STAGE_PRIORITY: ActivityStage[] = [
+  "analyzing",
+  "triage",
+  "transcripts",
+  "embedding",
+  "synthesizing",
+  "fetching",
+];
+export function dominantActivity<T extends { stage: ActivityStage }>(tasks: T[]): T | null {
+  for (const stage of STAGE_PRIORITY) {
+    const t = tasks.find((x) => x.stage === stage);
+    if (t) return t;
+  }
+  return null;
 }
 
 /** Heartbeat: record that the reader is looking at this pool (called on every
@@ -232,25 +308,24 @@ export function getStatus(worldId: string = DEFAULT_WORLD_ID): AnalysisStatus {
   // drained — "N pending" stuck forever even though the server was done. Mirroring
   // pendingForAnalysis makes the indicator reach completion when the analyzer does.
   const pending = state.prescreenQueue.length + pendingForAnalysis(worldId).length;
-  // "active" must mean work is ACTUALLY running/scheduled right now — NOT merely that a
-  // backlog exists. With pull-based backfill the prescreen queue sits FULL but dormant
-  // between refreshes (nothing drains it), so keying `active` off `prescreenQueue.length`
-  // left the "Updating <place>" indicator stuck on at phase "idle" (the bug: header said
-  // "Updating" while the sub-line said "Up to date"). Only a live build/analysis/embed or
-  // a scheduled catch-up batch counts.
-  const active =
-    state.status.phase !== "idle" ||
-    state.buildInFlight !== null ||
-    state.analyzeInFlight !== null ||
-    state.embedInFlight !== null ||
-    state.catchUpTimer !== null;
-  // Worlds no longer block each other (model passes share the bounded request gate
-  // in ai.ts but each world builds independently), so nothing is ever "busy with" another world.
+  // SINGLE SOURCE OF TRUTH. `active`, the headline stage, and its progress all come straight
+  // from the activity registry (every pass registers itself for its whole duration) plus the
+  // drain keep-alive. So the indicator EXACTLY tracks what the server is doing for this pool:
+  // no stale phase, no "Updating" while idle, and no blink-off between batches or during the
+  // augmentation pass — the failure modes of the old heuristic union.
+  const tasks = [...state.activities.values()];
+  const dom = dominantActivity(tasks);
+  const active = tasks.length > 0 || state.draining;
+  // When only the drain keep-alive is up (between batches) there's no leaf stage to show, but
+  // we ARE mid deep-analysis chain — surface "analyzing" so the copy stays coherent.
+  const phase: BuildPhase = dom ? dom.stage : active ? "analyzing" : "idle";
+  // Worlds no longer block each other (model passes share the bounded request gate in ai.ts
+  // but each world builds independently), so nothing is ever "busy with" another world.
   return {
-    phase: state.status.phase,
+    phase,
     active,
-    done: state.status.done,
-    total: state.status.total,
+    done: dom?.done ?? 0,
+    total: dom?.total ?? 0,
     pending,
     analyzed,
     world: worldId,
@@ -269,11 +344,15 @@ function interestKey(interest: string): string {
  * (plus the final 100%), with elapsed time, throughput, and a rough ETA, so a
  * multi-minute analysis pass shows steady progress instead of going silent.
  */
-function progressLogger(state: WorldState, label: string): (done: number, total: number) => void {
+function progressLogger(
+  worldId: string,
+  h: ActivityHandle,
+  label: string,
+): (done: number, total: number) => void {
   const start = Date.now();
   let lastLog = 0;
   return (done, total) => {
-    setPhase(state, label === "triage" ? "triage" : "analyzing", done, total);
+    h.progress(done, total);
     const now = Date.now();
     const finished = done >= total;
     if (!finished && now - lastLog < 2500) return;
@@ -285,7 +364,7 @@ function progressLogger(state: WorldState, label: string): (done: number, total:
       ? `done in ${elapsed.toFixed(0)}s`
       : `${elapsed.toFixed(0)}s elapsed, ~${Math.round((total - done) / Math.max(rate, 0.001))}s left` +
         ` (${rate.toFixed(1)}/s)`;
-    console.log(`[feed:${state.worldId}] ${label}: ${done}/${total} (${pct}%) — ${tail}`);
+    console.log(`[feed:${worldId}] ${label}: ${done}/${total} (${pct}%) — ${tail}`);
   };
 }
 
@@ -395,7 +474,11 @@ function sourcesForWorld(worldId: string): Source[] {
  * cold-start first chunk and the background catch-up loop share one path. The
  * caller must have confirmed the model is reachable.
  */
-async function prescreenAndStore(worldId: string, items: FeedItem[]): Promise<void> {
+async function prescreenAndStore(
+  worldId: string,
+  items: FeedItem[],
+  h: ActivityHandle,
+): Promise<void> {
   if (items.length === 0) return;
   const state = ws(worldId);
   const st = getStore(worldId);
@@ -413,7 +496,7 @@ async function prescreenAndStore(worldId: string, items: FeedItem[]): Promise<vo
     const verdicts = await prescreenGeo(
       items.map((it) => ({ id: it.id, title: it.title, summary: it.summary })),
       geoLabel(geoNodeIdOf(worldId)),
-      progressLogger(state, "triage"),
+      progressLogger(worldId, h, "triage"),
     );
     for (const it of items) {
       const v = verdicts.get(it.id);
@@ -431,7 +514,7 @@ async function prescreenAndStore(worldId: string, items: FeedItem[]): Promise<vo
     const verdicts = await prescreenRegional(
       items.map((it) => ({ id: it.id, title: it.title, summary: it.summary })),
       placeLabelFor(cc),
-      progressLogger(state, "triage"),
+      progressLogger(worldId, h, "triage"),
     );
     for (const it of items) {
       const v = verdicts.get(it.id);
@@ -450,7 +533,7 @@ async function prescreenAndStore(worldId: string, items: FeedItem[]): Promise<vo
     // its analysis backlog) by newsworthiness instead of pure recency.
     const batches = Math.ceil(items.length / config.ai.triageBatchSize);
     console.log(`[feed:${worldId}] triage: ${items.length} headline(s) in ${batches} batch(es)…`);
-    const verdicts = await detectClickbait(items, progressLogger(state, "triage"));
+    const verdicts = await detectClickbait(items, progressLogger(worldId, h, "triage"));
     for (const it of items) {
       const v = verdicts.get(it.id);
       if (!v) continue; // absent → kept, neutral importance
@@ -512,12 +595,12 @@ async function refreshSources(worldId: string): Promise<{ newCount: number }> {
   const picked = ids.map((id) => byId.get(id)).filter((s): s is Source => !!s);
   const sources = picked.length > 0 ? picked : allSources;
   const started = Date.now();
-  setPhase(state, "fetching");
   console.log(
     `[feed:${worldId}] refresh — fetching ${sources.length}/${allSources.length} sources ` +
       `(rotating subset, ${state.rotation.queue.length} left this cycle)…`,
   );
-  const raw = await fetchAll(sources);
+  // The network fetch is a visible stage of its own ("Fetching sources").
+  const raw = await withActivity(worldId, "fetching", () => fetchAll(sources));
   const cutoff = analyzeCutoff();
   // Never-seen items inside the recency window are all that need triage, FRESHEST
   // first so the synchronous first chunk prescreens the most recent news.
@@ -542,14 +625,15 @@ async function refreshSources(worldId: string): Promise<{ newCount: number }> {
       );
       enqueuePrescreen(worldId, untriaged);
       state.lastBuildAt = Date.now();
-      setPhase(state, "idle");
       return { newCount };
     }
     // Only the FIRST chunk is awaited (one cheap model round) so the response isn't held by a
     // flood; the rest is MERGED into the queue (not replacing it) so older un-prescreened
     // items from earlier refreshes aren't dropped when this refresh lands mid-flush.
     const firstN = config.feed.prescreenChunk > 0 ? config.feed.prescreenChunk : untriaged.length;
-    await prescreenAndStore(worldId, untriaged.slice(0, firstN));
+    await withActivity(worldId, "triage", (h) =>
+      prescreenAndStore(worldId, untriaged.slice(0, firstN), h),
+    );
     enqueuePrescreen(worldId, untriaged.slice(firstN));
   } else {
     // Nothing new this refresh — KEEP (and re-filter) the existing backlog rather than
@@ -561,12 +645,10 @@ async function refreshSources(worldId: string): Promise<{ newCount: number }> {
   if (removed > 0) console.log(`[feed:${worldId}] pruned ${removed} stale item(s)`);
   st.save();
   state.lastBuildAt = Date.now();
-  // Fetch + first-chunk triage are done — return the phase to idle. If a backfill
-  // batch follows (cold fill / refresh), it re-sets the phase as it works; meanwhile
-  // getStatus still reports `active` via the scheduled timer / queue / in-flight pass.
-  // Without this, a refresh that does NO model work left the phase stuck non-idle and
-  // the UI showed the pool "refreshing" forever.
-  setPhase(state, "idle");
+  // Phase bookkeeping is automatic now: the fetch + triage activities above ended with their
+  // withActivity scopes, so the indicator already reflects "done with this fetch". Any backfill
+  // that follows registers its own activities; a fetch that does NO model work simply leaves
+  // the registry empty → the indicator reads idle, instead of being stuck "refreshing".
   console.log(
     `[feed:${worldId}] refresh done in ${state.lastBuildAt - started}ms ` +
       `(${state.prescreenQueue.length} queued for background prescreen)`,
@@ -624,7 +706,9 @@ function prescreenPending(worldId: string): Promise<{ remaining: number; progres
     const size =
       config.feed.prescreenChunk > 0 ? config.feed.prescreenChunk : state.prescreenQueue.length;
     const chunk = state.prescreenQueue.splice(0, size);
-    await withModelPriority("background", () => prescreenAndStore(worldId, chunk));
+    await withActivity(worldId, "triage", (h) =>
+      withModelPriority("background", () => prescreenAndStore(worldId, chunk, h)),
+    );
     getStore(worldId).save();
     // New provisional items are now servable — invalidate assembled views/briefings.
     state.lastBuildAt = Date.now();
@@ -751,16 +835,11 @@ async function analyzeGeoChunk(
   worldId: string,
   state: WorldState,
   st: ReturnType<typeof getStore>,
+  h: ActivityHandle,
 ): Promise<{ remaining: number; progressed: number }> {
   const plan = planGeoAnalysis(worldId, config.geo.deepAnalyzeKeep);
-  if (plan.length === 0) {
-    setPhase(state, "idle");
-    return { remaining: 0, progressed: 0 };
-  }
-  if (!(await aiReachable())) {
-    setPhase(state, "idle");
-    return { remaining: plan.length, progressed: 0 };
-  }
+  if (plan.length === 0) return { remaining: 0, progressed: 0 };
+  if (!(await aiReachable())) return { remaining: plan.length, progressed: 0 };
 
   // Representatives still needing a model pass, capped to one chunk.
   const repsPending = plan.filter((c) => !c.rep.analyzed);
@@ -777,7 +856,7 @@ async function analyzeGeoChunk(
       `[feed:${worldId}] geo deep analysis: ${items.length} representative(s) ` +
         `(of ${plan.length} clusters) in ${batches} batch(es)…`,
     );
-    analyses = await analyzeItems(items, new Map(), progressLogger(state, "analyze"));
+    analyses = await analyzeItems(items, new Map(), progressLogger(worldId, h, "analyze"));
   }
 
   const srcById = new Map(sourcesForWorld(worldId).map((src) => [src.id, src]));
@@ -824,7 +903,6 @@ async function analyzeGeoChunk(
   state.briefingCache.clear();
 
   const remaining = planGeoAnalysis(worldId, config.geo.deepAnalyzeKeep).length;
-  if (remaining === 0) setPhase(state, "idle");
   console.log(
     `[feed:${worldId}] geo analyzed ${progressed} item(s) ` +
       `(${fannedOut} fanned out from clones); ${remaining} cluster(s) still pending`,
@@ -841,18 +919,12 @@ function analyzePending(worldId: string): Promise<{ remaining: number; progresse
   const state = ws(worldId);
   if (state.analyzeInFlight) return state.analyzeInFlight;
   const st = getStore(worldId);
-  state.analyzeInFlight = (async () => {
+  state.analyzeInFlight = withActivity(worldId, "analyzing", async (h) => {
     // GEO pools dedup near-clones and analyze one representative per cluster.
-    if (isGeoPoolId(worldId)) return analyzeGeoChunk(worldId, state, st);
+    if (isGeoPoolId(worldId)) return analyzeGeoChunk(worldId, state, st, h);
     const pending = pendingForAnalysis(worldId);
-    if (pending.length === 0) {
-      setPhase(state, "idle");
-      return { remaining: 0, progressed: 0 };
-    }
-    if (!(await aiReachable())) {
-      setPhase(state, "idle");
-      return { remaining: pending.length, progressed: 0 };
-    }
+    if (pending.length === 0) return { remaining: 0, progressed: 0 };
+    if (!(await aiReachable())) return { remaining: pending.length, progressed: 0 };
 
     const slice = config.ai.maxItems > 0 ? pending.slice(0, config.ai.maxItems) : pending;
     const items = slice.map((s) => s.item);
@@ -866,7 +938,7 @@ function analyzePending(worldId: string): Promise<{ remaining: number; progresse
       `[feed:${worldId}] deep analysis: ${items.length} of ${pending.length} pending in ${batches} batch(es)` +
         ` (concurrency ${config.ai.concurrency})…`,
     );
-    const analyses = await analyzeItems(items, new Map(), progressLogger(state, "analyze"));
+    const analyses = await analyzeItems(items, new Map(), progressLogger(worldId, h, "analyze"));
 
     // Source-level lean rationales (the curated prior) for the "source" provenance
     // path and as a fallback when the model omits its own rationale.
@@ -908,10 +980,9 @@ function analyzePending(worldId: string): Promise<{ remaining: number; progresse
     state.briefingCache.clear();
 
     const remaining = pendingForAnalysis(worldId).length;
-    if (remaining === 0) setPhase(state, "idle");
     console.log(`[feed:${worldId}] analyzed ${progressed}/${items.length}; ${remaining} still pending`);
     return { remaining, progressed };
-  })().finally(() => {
+  }).finally(() => {
     state.analyzeInFlight = null;
   });
   return state.analyzeInFlight;
@@ -937,14 +1008,18 @@ function embedPending(worldId: string): Promise<{ remaining: number; progressed:
   const state = ws(worldId);
   if (state.embedInFlight) return state.embedInFlight;
   const st = getStore(worldId);
+  let endActivity: (() => void) | null = null;
   state.embedInFlight = (async () => {
     const pending = pendingForEmbedding(worldId);
     if (pending.length === 0) return { remaining: 0, progressed: 0 };
+    const act = beginActivity(worldId, "embedding");
+    endActivity = act.end;
+    const h = act.handle;
 
     // Reuse the analysis chunk size for the embedding chunk.
     const slice = config.ai.maxItems > 0 ? pending.slice(0, config.ai.maxItems) : pending;
     const texts = slice.map((s) => itemEmbedText(s.item.title, s.summary, s.keywords));
-    setPhase(state, "embedding", 0, slice.length);
+    h.progress(0, slice.length);
     console.log(`[feed:${worldId}] embedding ${slice.length} of ${pending.length} item(s)…`);
     const vecs = await withModelPriority("background", () => embedTexts(texts));
 
@@ -966,10 +1041,11 @@ function embedPending(worldId: string): Promise<{ remaining: number; progressed:
     }
     // If nothing embedded, embeddings are unavailable: stop the loop.
     const remaining = progressed > 0 ? pendingForEmbedding(worldId).length : 0;
-    if (state.status.phase === "embedding") setPhase(state, remaining === 0 ? "idle" : "embedding", progressed, slice.length);
+    h.progress(progressed, slice.length);
     console.log(`[feed:${worldId}] embedded ${progressed}/${slice.length}; ${remaining} still need embeddings`);
     return { remaining, progressed };
   })().finally(() => {
+    endActivity?.();
     state.embedInFlight = null;
   });
   return state.embedInFlight;
@@ -1368,7 +1444,10 @@ function augmentReactively(worldId: string): Promise<void> {
   const state = ws(worldId);
   if (state.augmentInFlight) return state.augmentInFlight;
 
-  state.augmentInFlight = (async () => {
+  // The WHOLE augmentation runs under one activity so the indicator never blinks off during
+  // it (the old `active` heuristic ignored augmentInFlight entirely — a key cause of the
+  // "disappears mid-work" bug). Its stage tracks what it's actually doing.
+  state.augmentInFlight = withActivity(worldId, "transcripts", async (h) => {
     // Deferred transcript enrichment for important video/podcast items (all pools).
     // If anything was re-analyzed, its embedding was cleared — re-embed in the bg.
     const enriched = await enrichTranscripts(worldId);
@@ -1379,9 +1458,11 @@ function augmentReactively(worldId: string): Promise<void> {
     if (isGeoPoolId(worldId)) return;
     // Regional pool: classify geo-scope (no YouTube/zones — those are international).
     if (isPlaceWorldId(worldId)) {
+      h.stage("analyzing");
       await classifyRegionalScope(worldId);
       return;
     }
+    h.stage("fetching");
     let added = 0;
     added += await addYouTubePending(worldId);
     added += await addZonePending(worldId);
@@ -1393,7 +1474,7 @@ function augmentReactively(worldId: string): Promise<void> {
     // is per-world re-entrancy-guarded and its model passes share the bounded request
     // gate (ai.ts), so this needs no cross-world lock.
     runBackfillBatch(worldId);
-  })()
+  })
     .catch((e) => {
       console.warn(`[augment:${worldId}] reactive augmentation failed:`, e);
     })
@@ -1421,15 +1502,26 @@ function augmentReactively(worldId: string): Promise<void> {
  */
 function runBackfillBatch(worldId: string): void {
   const state = ws(worldId);
-  // One batch at a time: don't stack timers or overlap an in-flight pass.
-  if (state.catchUpTimer || state.analyzeInFlight || state.embedInFlight) return;
-  state.catchUpTimer = setTimeout(() => {
-    state.catchUpTimer = null;
-    void (async () => {
-      try {
-        const p = await prescreenPending(worldId);
-        const a = await analyzePending(worldId);
-        const e = await embedPending(worldId);
+  // ONE drain chain at a time. The chain holds `draining` for its WHOLE life — including the
+  // inter-batch delays below — so the indicator stays lit between batches instead of blinking
+  // off (each pass also registers its own activity, which refines the displayed stage).
+  if (state.draining) return;
+  state.draining = true;
+  void (async () => {
+    try {
+      for (;;) {
+        // Space batches out so a provisional response can land first and the model isn't
+        // pinned; the `draining` keep-alive covers this gap in the indicator.
+        await sleep(config.feed.catchUpDelayMs);
+        // The WHOLE drain is BACKGROUND priority — deep analysis included. This is what makes
+        // the gate's reserved interactive slot (config.ai.reserveInteractive) genuinely keep an
+        // instance free for user-facing requests; otherwise the bulk backlog (which defaults to
+        // interactive) fills every instance and the reader's search/briefing waits behind it.
+        const { p, a, e } = await withModelPriority("background", async () => ({
+          p: await prescreenPending(worldId),
+          a: await analyzePending(worldId),
+          e: await embedPending(worldId),
+        }));
         const progressed = p.progressed + a.progressed + e.progressed;
         const pending = p.remaining + a.remaining + e.remaining;
         console.log(
@@ -1440,19 +1532,20 @@ function runBackfillBatch(worldId: string): void {
         // Mark a successful batch — a navigation refresh won't start a fresh round until
         // config.feed.navBatchTtlMs after this.
         if (progressed > 0) state.lastBatchAt = Date.now();
-        if (progressed > 0 && pending > 0 && isWatched(worldId)) {
-          // More to do and the reader's still here — flush the next batch.
-          runBackfillBatch(worldId);
-        } else if (a.progressed > 0 && a.remaining === 0) {
-          // Deep-analysis backlog cleared — reactively extend the stories with YouTube
-          // + per-zone coverage; the items it adds get their own (chained) batch.
-          void augmentReactively(worldId);
-        }
-      } catch (err) {
-        console.warn(`[feed:${worldId}] backfill batch failed:`, err);
+        // Keep draining while there's progress to make AND the reader is still here.
+        if (progressed > 0 && pending > 0 && isWatched(worldId)) continue;
+        // Deep-analysis backlog cleared — reactively extend the stories (YouTube + per-zone
+        // coverage); whatever it adds starts its OWN drain once this one releases `draining`.
+        if (a.progressed > 0 && a.remaining === 0)
+          void withModelPriority("background", () => augmentReactively(worldId));
+        break;
       }
-    })();
-  }, config.feed.catchUpDelayMs);
+    } catch (err) {
+      console.warn(`[feed:${worldId}] backfill drain failed:`, err);
+    } finally {
+      state.draining = false;
+    }
+  })();
 }
 
 /** How much in-window material a pool currently has to show/analyze: prescreened
@@ -1919,6 +2012,27 @@ function persistedStories(storeKey: string): Story[] {
     .slice(0, config.stories.maxStories);
 }
 
+/** Snapshot config.stories into the plain, serializable shape the (worker-run) story
+ *  planner needs — keeping computeStoryPlan pure and free of any config/env access. */
+function storyPlanConfig(): StoryPlanConfig {
+  const s = config.stories;
+  return {
+    simThreshold: s.simThreshold,
+    textSimThreshold: s.textSimThreshold,
+    windowMs: s.windowMs,
+    issueSimThreshold: s.issueSimThreshold,
+    issueTextSimThreshold: s.issueTextSimThreshold,
+    issueWindowMs: s.issueWindowMs,
+    issueMinSpanMs: s.issueMinSpanMs,
+    issueMinEvents: s.issueMinEvents,
+    issueMinSources: s.issueMinSources,
+    issueActiveMs: s.issueActiveMs,
+    maxIssues: s.maxIssues,
+    minSources: s.minSources,
+    maxStories: s.maxStories,
+  };
+}
+
 /**
  * Build (and cache) the synthesized cross-source stories for a world. Clusters
  * the recent analyzed pool by same-event similarity, keeps clusters spanning
@@ -1982,81 +2096,14 @@ export async function getStories(
       coveredBy: s.coveredBy,
     }));
 
-    // Level 1: dedupe into same-event clusters.
-    const clusters = clusterItems(inputs, {
-      simThreshold: config.stories.simThreshold,
-      textSimThreshold: config.stories.textSimThreshold,
-      windowMs: config.stories.windowMs,
-    });
-    const toStored = (members: ClusterInput[]): StoredItem[] =>
-      members.map((m) => byId.get(m.id)).filter((s): s is StoredItem => !!s);
+    // Cluster + plan OFF the event loop (worker thread). The O(n^2) clustering that used
+    // to run synchronously right here is what froze the whole server on a switch; now we
+    // await a lightweight plan (article-id groupings) and map ids back to StoredItems.
+    const { specs: planSpecs, stats } = await runStoryPlan(inputs, storyPlanConfig());
+    const toStoredIds = (ids: string[]): StoredItem[] =>
+      ids.map((id) => byId.get(id)).filter((s): s is StoredItem => !!s);
 
-    // Level 2: group event clusters into broader ongoing issues, then keep only
-    // those the heuristic flags as DEVELOPING (an LLM later confirms).
-    const issues = groupIntoIssues(clusters, {
-      simThreshold: config.stories.issueSimThreshold,
-      textSimThreshold: config.stories.issueTextSimThreshold,
-      windowMs: config.stories.issueWindowMs,
-    });
-    const developing = issues
-      .filter((iss) =>
-        isDevelopingIssue(iss, {
-          minSpanMs: config.stories.issueMinSpanMs,
-          minEvents: config.stories.issueMinEvents,
-          minSources: config.stories.issueMinSources,
-          activeMs: config.stories.issueActiveMs,
-        }),
-      )
-      .sort((a, b) => {
-        const sa = coverageOf(a.members);
-        const sb = coverageOf(b.members);
-        if (sb !== sa) return sb - sa;
-        return b.latestAt - a.latestAt;
-      })
-      .slice(0, config.stories.maxIssues);
-
-    // DIAGNOSTIC: why ongoing stories appear/vanish across rebuilds. Per build, count how
-    // many issues PASSED the developing gate, how many were RANKED OUT by maxIssues, and
-    // for the failures, WHICH gate (events/span/sources/active) rejected them.
-    {
-      const dnow = Date.now();
-      let pass = 0;
-      let fEvents = 0;
-      let fSpan = 0;
-      let fSources = 0;
-      let fActive = 0;
-      for (const iss of issues) {
-        const okEvents = iss.clusters.length >= config.stories.issueMinEvents;
-        const okSpan = iss.latestAt - iss.earliestAt >= config.stories.issueMinSpanMs;
-        const okSources = coverageOf(iss.members) >= config.stories.issueMinSources;
-        const okActive = dnow - iss.latestAt <= config.stories.issueActiveMs;
-        if (okEvents && okSpan && okSources && okActive) pass += 1;
-        else {
-          if (!okEvents) fEvents += 1;
-          if (!okSpan) fSpan += 1;
-          if (!okSources) fSources += 1;
-          if (!okActive) fActive += 1;
-        }
-      }
-      console.log(
-        `[stories:${worldId}] eligible=${eligible.length} clusters=${clusters.length} ` +
-          `issues=${issues.length} developing=${pass} kept=${developing.length} ` +
-          `rankedOut=${Math.max(0, pass - developing.length)} ` +
-          `(failed gates \u2014 events:${fEvents} span:${fSpan} sources:${fSources} active:${fActive})`,
-      );
-    }
-
-    // Every multi-source cluster becomes an event story — INCLUDING those that
-    // belong to a developing issue. We no longer hide issue members; instead the
-    // client tags each story/article with a link up to its ongoing issue. The
-    // issue itself is still emitted as its own umbrella story (with the timeline).
-    const eventCandidates = clusters.filter(
-      (c) => coverageOf(c.members) >= config.stories.minSources,
-    );
-    const remainingSlots = Math.max(0, config.stories.maxStories - developing.length);
-    const topEvents = rankClusters(eventCandidates).slice(0, remainingSlots);
-
-    // Target story specs (deterministic; no model calls yet).
+    // Target story specs (deterministic; no model calls yet) — ids mapped back to items.
     type Spec = {
       kind: StoryKind;
       members: StoredItem[];
@@ -2064,19 +2111,20 @@ export async function getStories(
       events?: StoredItem[][];
       centroid: number[] | null;
     };
-    const specs: Spec[] = [
-      ...developing.map((iss): Spec => ({
-        kind: "issue",
-        members: toStored(iss.members),
-        events: iss.clusters.map((c) => toStored(c.members)).filter((e) => e.length > 0),
-        centroid: iss.centroid,
-      })),
-      ...topEvents.map((c): Spec => ({ kind: "event", members: toStored(c.members), centroid: c.centroid })),
-    ].filter((s) => s.members.length > 0);
+    const specs: Spec[] = planSpecs
+      .map((spec): Spec => ({
+        kind: spec.kind,
+        members: toStoredIds(spec.memberIds),
+        events: spec.eventIds?.map(toStoredIds).filter((e) => e.length > 0),
+        centroid: spec.centroid,
+      }))
+      .filter((s) => s.members.length > 0);
 
     console.log(
-      `[stories:${worldId}] ${eligible.length} eligible -> ${clusters.length} clusters, ` +
-        `${issues.length} issues; ${developing.length} developing + ${topEvents.length} event spec(s)`,
+      `[stories:${worldId}] eligible=${stats.eligible} clusters=${stats.clusters} ` +
+        `issues=${stats.issues} developing=${stats.developing} events=${stats.topEvents} ` +
+        `kept=${specs.length} (failed gates events:${stats.failEvents} span:${stats.failSpan} ` +
+        `sources:${stats.failSources} active:${stats.failActive})`,
     );
     if (specs.length === 0) {
       state.storiesCache.set(lang, { builtAt: builtAtSnapshot, builtWallAt: Date.now(), stories: [] });
@@ -2107,29 +2155,37 @@ export async function getStories(
 
     const started = Date.now();
     console.log(`[stories:${worldId}] ${reused.length} reused, ${toSynth.length} (re)synthesizing…`);
-    if (toSynth.length > 0) setPhase(state, "synthesizing", 0, toSynth.length);
-    const synthed = await withConcurrency(
-      toSynth.map((t) => async (): Promise<Built> => {
-        const story =
-          t.spec.kind === "issue"
-            ? await buildDevelopingStory(t.spec.events ?? [t.spec.members], lang)
-            : await buildStory(t.spec.members, lang);
-        // Keep the development's identity across membership changes.
-        if (t.reuseId) story.id = t.reuseId;
-        store.upsert({
-          id: story.id,
-          kind: t.spec.kind,
-          memberIds: t.memberIds,
-          story,
-          builtAt: Date.now(),
-          updatedAt: story.updatedAt,
-        });
-        return { story, centroid: t.spec.centroid, tokens: storyTokens(story) };
-      }),
-      config.ai.concurrency,
-    );
+    // Story synthesis is dozens of slow LLM calls — surface it as its own stage with a live
+    // count so a reader on the Stories tab sees real progress, not a frozen spinner.
+    const synthAct = toSynth.length > 0 ? beginActivity(worldId, "synthesizing") : null;
+    synthAct?.handle.progress(0, toSynth.length);
+    let synthDone = 0;
+    // Synthesis is dozens of slow LLM calls — run it at BACKGROUND priority so it yields the
+    // gate's reserved interactive slot to user-facing requests instead of monopolizing instances.
+    const synthed = await withModelPriority("background", () =>
+      withConcurrency(
+        toSynth.map((t) => async (): Promise<Built> => {
+          const story =
+            t.spec.kind === "issue"
+              ? await buildDevelopingStory(t.spec.events ?? [t.spec.members], lang)
+              : await buildStory(t.spec.members, lang);
+          // Keep the development's identity across membership changes.
+          if (t.reuseId) story.id = t.reuseId;
+          store.upsert({
+            id: story.id,
+            kind: t.spec.kind,
+            memberIds: t.memberIds,
+            story,
+            builtAt: Date.now(),
+            updatedAt: story.updatedAt,
+          });
+          synthAct?.handle.progress(++synthDone, toSynth.length);
+          return { story, centroid: t.spec.centroid, tokens: storyTokens(story) };
+        }),
+        config.ai.concurrency,
+      ),
+    ).finally(() => synthAct?.end());
 
-    if (state.status.phase === "synthesizing") setPhase(state, "idle");
     const built = [...reused, ...synthed];
     linkRelated(built);
     store.prune(used);
@@ -2161,6 +2217,30 @@ export async function getStories(
   p.catch((e) => console.error(`[stories:${worldId}] synthesis failed:`, e));
   state.storiesInFlight.set(lang, p);
   return { stories: stale, busyWith, synthesizing: true };
+}
+
+/**
+ * STREAMING stories: push the cached/persisted set IMMEDIATELY (so the Stories tab paints
+ * the instant you switch pools), then — if a fresh build is running in the background —
+ * await it and push the fresh set when it lands. No client polling; the synthesis stays
+ * background-priority so it never steals an instance from a waiting reader. `onUpdate` is
+ * called once (cache hit) or twice (stale now, fresh later).
+ */
+export async function getStoriesStream(
+  worldId: string = DEFAULT_WORLD_ID,
+  lang: Lang = "en",
+  force = false,
+  onUpdate: (stories: Story[], synthesizing: boolean) => void = () => {},
+): Promise<void> {
+  // getStories returns the stale set immediately AND kicks off the single-flight build.
+  const first = await getStories(worldId, force, lang);
+  onUpdate(first.stories, first.synthesizing);
+  if (!first.synthesizing) return;
+  // A build is running — await THAT promise and push its fresh, sorted result.
+  const inFlight = ws(worldId).storiesInFlight.get(lang);
+  if (!inFlight) return;
+  const fresh = await inFlight.catch(() => null);
+  if (fresh) onUpdate(fresh, false);
 }
 
 /** A single synthesized story by id (builds the set if needed). Null if gone. */

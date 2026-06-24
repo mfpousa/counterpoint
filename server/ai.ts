@@ -12,11 +12,15 @@ import { config } from "./config";
 // --- Global model-request gate -------------------------------------------------
 // config.ai.maxConcurrency model instances sit behind config.ai.baseUrl, so that
 // many requests can stream AT ONCE. This gate bounds TOTAL in-flight model requests
-// to that number and lets INTERACTIVE work (deep analysis, cold start, search) jump
-// AHEAD of BACKGROUND catch-up drains (bulk prescreen / embedding) — reserving
-// config.ai.reserveInteractive slots so background can never occupy every instance
-// and starve foreground delivery. Priority rides on AsyncLocalStorage so callers
-// just wrap a scope with withModelPriority(); every request reads the ambient value.
+// to that number and lets INTERACTIVE work — a user waiting on a response: search/ask,
+// briefing, reader rewrite, and the cold-start first paint — jump AHEAD of BACKGROUND
+// work (the bulk backfill drain: prescreen + deep analysis + embedding, plus story
+// synthesis and reactive augmentation). It RESERVES config.ai.reserveInteractive slots
+// that ONLY interactive work may use, so background can never occupy every instance and
+// queue the reader behind the backlog. NOTE: the reserve only helps if the bulk work is
+// actually tagged background — see runBackfillBatch / getStories / augmentReactively, which
+// wrap themselves in withModelPriority("background"). Priority rides on AsyncLocalStorage so
+// callers just wrap a scope with withModelPriority(); every request reads the ambient value.
 
 type ModelPriority = "interactive" | "background";
 const priorityStore = new AsyncLocalStorage<ModelPriority>();
@@ -26,8 +30,9 @@ export function withModelPriority<T>(priority: ModelPriority, fn: () => Promise<
   return priorityStore.run(priority, fn);
 }
 function currentModelPriority(): ModelPriority {
-  // Default to interactive: cold start, search and direct analysis are foreground;
-  // only the background catch-up drains explicitly mark themselves "background".
+  // Default to interactive: user-facing calls (search/ask, briefing, reader, and the
+  // cold-start fetch + first-chunk triage) are foreground. The bulk backfill drain, story
+  // synthesis and augmentation explicitly mark themselves "background" so they yield to users.
   return priorityStore.getStore() ?? "interactive";
 }
 

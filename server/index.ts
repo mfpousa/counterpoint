@@ -20,6 +20,7 @@ import {
   getRelated,
   getStatus,
   getStories,
+  getStoriesStream,
   getStory,
 } from "./feedService";
 import { gradeSummary } from "./grade";
@@ -246,6 +247,43 @@ app.get("/api/stories", async (req, res) => {
   } catch (e) {
     console.error("[api] /api/stories failed:", e);
     res.status(500).json({ stories: [], error: e instanceof Error ? e.message : "failed" });
+  }
+});
+
+// Streaming stories (SSE): pushes the CACHED set immediately so the Stories tab paints the
+// instant you switch pools, then pushes the FRESH set once the background synthesis lands
+// (no client polling). Each `stories` event carries { stories, synthesizing }. Events:
+// stories, done, error.
+app.get("/api/stories/stream", async (req, res) => {
+  res.set({
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache, no-transform",
+    Connection: "keep-alive",
+    "X-Accel-Buffering": "no",
+  });
+  res.flushHeaders?.();
+  let closed = false;
+  req.on("close", () => {
+    closed = true;
+  });
+  const send = (event: string, data: unknown) => {
+    if (closed) return;
+    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  };
+  try {
+    const force = req.query.force === "1" || req.query.force === "true";
+    await getStoriesStream(
+      readWorld(req.query.world),
+      readLang(req.query.lang),
+      force,
+      (stories, synthesizing) => send("stories", { stories, synthesizing }),
+    );
+    send("done", null);
+  } catch (e) {
+    console.error("[api] /api/stories/stream failed:", e);
+    send("error", e instanceof Error ? e.message : "stories failed");
+  } finally {
+    if (!closed) res.end();
   }
 });
 

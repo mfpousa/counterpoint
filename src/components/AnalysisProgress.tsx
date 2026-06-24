@@ -17,19 +17,23 @@ export function AnalysisProgress({ status }: { status: AnalysisStatus | null }) 
   const t = useT();
   if (!status) return null;
   const { phase, active, done, total, pending, analyzed, label } = status;
-  // Show ONLY while work is actually running. With pull-based backfill a big backlog can
-  // sit dormant between refreshes (nothing drains it), so keying visibility off `pending`
-  // kept this card up forever reading "Updating …" while the pool was idle. When idle the
-  // map pill hides too, so "finished refreshing" means no indicator at all.
+  // `active` now comes straight from the backend's activity registry — true IFF a pass is
+  // genuinely running for THIS pool — so visibility tracks real work: no card stuck reading
+  // "Updating" over an idle pool, and no blink-off mid-pipeline. Idle ⇒ the card (and the map
+  // pill) simply hide.
   if (!active) return null;
 
   const place = label || t("geo.world");
   const phaseLabel = t(`analysis.${phase}`);
   const overallTotal = analyzed + pending;
-  // The model passes that report a per-chunk count drive a per-pass bar; everything
-  // else (fetching, synthesizing, idle-with-backlog) falls back to overall progress.
+  // Stages that report a per-chunk count drive a per-pass bar; the rest (fetching,
+  // transcripts) fall back to overall deep-analysis completion.
   const passBar =
-    total > 0 && (phase === "analyzing" || phase === "triage" || phase === "embedding");
+    total > 0 &&
+    (phase === "analyzing" ||
+      phase === "triage" ||
+      phase === "embedding" ||
+      phase === "synthesizing");
   const ratio = passBar ? pct(done, total) : pct(analyzed, overallTotal);
 
   return (
@@ -38,7 +42,8 @@ export function AnalysisProgress({ status }: { status: AnalysisStatus | null }) 
         <ActivityIndicator size="small" color={colors.accent} />
         {/* WHICH place is getting updates right now. */}
         <Text style={styles.label} numberOfLines={1}>
-          {active ? t("analysis.updating", { place }) : t("analysis.upToDate", { place })}
+          {/* We only render while active, so this is always the live "Updating <place>". */}
+          {t("analysis.updating", { place })}
         </Text>
         <Text style={styles.count}>
           {overallTotal > 0
@@ -54,15 +59,15 @@ export function AnalysisProgress({ status }: { status: AnalysisStatus | null }) 
         <View style={[styles.fill, { width: `${Math.round(ratio * 100)}%` }]} />
       </View>
 
-      {/* Exactly what stage it's on, the per-batch count, and what's left. */}
+      {/* Exactly what stage it's on, the per-batch count, and what's still queued. While
+          active we never print "done" — that would contradict the running spinner; the card
+          just disappears once the pool is genuinely idle. */}
       <Text style={styles.sub} numberOfLines={1}>
         {phaseLabel}
         {passBar
           ? ` · ${t("analysis.batch", { done: done.toLocaleString(), total: total.toLocaleString() })}`
           : ""}
-        {pending > 0
-          ? ` · ${t("analysis.pending", { n: pending.toLocaleString() })}`
-          : ` · ${t("analysis.done")}`}
+        {pending > 0 ? ` · ${t("analysis.pending", { n: pending.toLocaleString() })}` : ""}
       </Text>
     </View>
   );

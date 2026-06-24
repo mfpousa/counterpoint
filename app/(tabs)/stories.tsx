@@ -12,7 +12,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useApp } from "../../src/store/AppContext";
-import { fetchStories } from "../../src/lib/api";
+import { fetchStories, streamStories } from "../../src/lib/api";
 import { StoryCard } from "../../src/components/StoryCard";
 import { lastMinuteStories } from "../../src/lib/storyUpdates";
 import { WorldSwitcher } from "../../src/components/WorldSwitcher";
@@ -50,36 +50,75 @@ export default function StoriesScreen() {
   // would surface foreign stories in "Last minute").
   const currentWorldRef = useRef(feedWorldId);
   currentWorldRef.current = feedWorldId;
+  const streamRef = useRef<{ cancel: () => void } | null>(null);
+
   const load = useCallback(
-    async (force = false) => {
+    (force = false) => {
+      // Cancel any in-flight stream for the pool we're leaving.
+      streamRef.current?.cancel();
+      const reqWorld = feedWorldId;
       setLoading(true);
       setError(null);
-      try {
-        const res = await fetchStories({ world: feedWorldId, force });
-        if (currentWorldRef.current !== feedWorldId) return;
-        setStories(res.stories);
-        setBusy(res.busyWith ?? null);
-        if (res.stories.length === 0 && !res.busyWith) {
-          setError(
-            "No multi-source stories yet. Once the backend has analyzed enough overlapping " +
-              "coverage, synthesized stories will appear here.",
-          );
+
+      // Apply a stories update only if the reader is STILL on this pool (an update for the
+      // pool we just left must not overwrite the current one).
+      const apply = (list: Story[], synthesizing: boolean) => {
+        if (currentWorldRef.current !== reqWorld) return;
+        setStories(list);
+        // Stop the spinner once we have something to show, or once the build is fully done.
+        if (list.length > 0 || !synthesizing) setLoading(false);
+        setError(
+          !synthesizing && list.length === 0
+            ? "No multi-source stories yet. Once the backend has analyzed enough overlapping " +
+                "coverage, synthesized stories will appear here."
+            : null,
+        );
+      };
+
+      // Non-streaming fallback (runtimes without a readable response body, or a stream error).
+      const fallback = async () => {
+        try {
+          const res = await fetchStories({ world: reqWorld, force });
+          if (currentWorldRef.current !== reqWorld) return;
+          setBusy(res.busyWith ?? null);
+          apply(res.stories, !!res.synthesizing);
+        } catch (e) {
+          if (currentWorldRef.current === reqWorld) {
+            setError(e instanceof Error ? e.message : "Failed to load stories.");
+            setLoading(false);
+          }
         }
-      } catch (e) {
-        if (currentWorldRef.current === feedWorldId) {
-          setError(e instanceof Error ? e.message : "Failed to load stories.");
-        }
-      } finally {
-        if (currentWorldRef.current === feedWorldId) setLoading(false);
+      };
+
+      const handle = streamStories({
+        world: reqWorld,
+        lang: prefs.language,
+        force,
+        onStories: (list, synthesizing) => {
+          setBusy(null);
+          apply(list, synthesizing);
+        },
+        onDone: () => {
+          if (currentWorldRef.current === reqWorld) setLoading(false);
+        },
+        onError: () => {
+          void fallback();
+        },
+      });
+      if (!handle) {
+        void fallback();
+        return;
       }
+      streamRef.current = handle;
     },
-    [feedWorldId],
+    [feedWorldId, prefs.language],
   );
 
-  // Load on mount and whenever the world changes.
+  // Load on mount and whenever the world (or language) changes; cancel on unmount.
   useEffect(() => {
     setStories([]);
-    void load();
+    load();
+    return () => streamRef.current?.cancel();
   }, [load]);
 
   const contentW = Math.min(width, MAX_CONTENT_WIDTH) - H_PAD * 2;
