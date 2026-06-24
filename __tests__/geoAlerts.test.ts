@@ -1,4 +1,10 @@
-import { buildAlerts, classifyEvent, locateStory, type AlertPlaceIndex } from "../src/lib/geoAlerts";
+import {
+  buildAlerts,
+  classifyEvent,
+  locatePlace,
+  locateStory,
+  type AlertPlaceIndex,
+} from "../src/lib/geoAlerts";
 import { latLonToVec3 } from "../src/lib/globeLayout";
 import type { Story } from "../src/types";
 
@@ -15,6 +21,10 @@ const IDX: AlertPlaceIndex = {
     ["sudan", sdDir],
   ]),
   zoneToIso2: { ukraine: "ua", russia: "ru" },
+  iso2ByName: new Map([
+    ["ukraine", "ua"],
+    ["sudan", "sd"],
+  ]),
 };
 
 // Minimal Story factory (only the fields geoAlerts reads matter here).
@@ -49,6 +59,22 @@ describe("geoAlerts (locate ongoing stories on the globe)", () => {
 
   it("returns null when no location can be inferred", () => {
     expect(locateStory(story({ developing: true, title: "Markets wobble" }), IDX)).toBeNull();
+  });
+
+  it("locatePlace also yields the subject nation's ISO2 (zone + name paths)", () => {
+    expect(locatePlace(story({ sources: [{ zone: "ukraine" } as never] }), IDX)).toEqual({
+      dir: uaDir,
+      iso2: "ua",
+    });
+    expect(locatePlace(story({ title: "Crisis in Sudan deepens" }), IDX)).toEqual({
+      dir: sdDir,
+      iso2: "sd",
+    });
+  });
+
+  it("buildAlerts tags the located nation's iso2 on the alert", () => {
+    const [alert] = buildAlerts([story({ title: "War in Ukraine grinds on", severity: 0.9 })], IDX);
+    expect(alert.iso2).toBe("ua");
   });
 
   it("buildAlerts keeps locatable MAJOR events (developing or not), strongest first", () => {

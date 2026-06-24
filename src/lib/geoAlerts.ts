@@ -105,6 +105,9 @@ export interface GeoAlert {
   severity: number;
   /** Unit direction on the sphere for the marker. */
   dir: Vec3;
+  /** ISO-2 (lowercase) of the subject NATION, when the story is about a country —
+   *  so the UI can show its flag. Absent for sub-national / non-country subjects. */
+  iso2?: string;
 }
 
 /** Lookups used to geolocate a story (all built from the bundled country borders). */
@@ -115,10 +118,16 @@ export interface AlertPlaceIndex {
   centroidByName: Map<string, Vec3>;
   /** Affiliation zone id (e.g. "ukraine") → ISO-2 (e.g. "ua"). */
   zoneToIso2: Record<string, string>;
+  /** Lowercase country name → ISO-2, so a name-located story knows its nation (flag). */
+  iso2ByName?: Map<string, string>;
 }
 
-/** Best-effort unit position for a story, or null when it can't be located. */
-export function locateStory(story: Story, idx: AlertPlaceIndex): Vec3 | null {
+/** Best-effort location for a story: the unit direction AND (when it resolves to a
+ *  country) that nation's ISO-2 — for the flag. null when nothing can be inferred. */
+export function locatePlace(
+  story: Story,
+  idx: AlertPlaceIndex,
+): { dir: Vec3; iso2: string | null } | null {
   // 1. Zones the model tagged on the story (most reliable for conflicts).
   const zones = new Set<string>();
   for (const side of story.sides ?? []) for (const z of side.zones) zones.add(z);
@@ -126,16 +135,24 @@ export function locateStory(story: Story, idx: AlertPlaceIndex): Vec3 | null {
   for (const z of zones) {
     const iso = idx.zoneToIso2[z];
     const dir = iso ? idx.centroidByIso2.get(iso) : undefined;
-    if (dir) return dir;
+    if (dir) return { dir, iso2: iso };
   }
   // 2. Longest country name/alias appearing in the headline or dek.
   const hay = `${story.title} ${story.summary}`.toLowerCase();
-  let best: { len: number; dir: Vec3 } | null = null;
+  let best: { len: number; dir: Vec3; name: string } | null = null;
   for (const [name, dir] of idx.centroidByName) {
     if (name.length < 4) continue; // avoid spurious matches like "us"/"mali" fragments
-    if (hay.includes(name) && (!best || name.length > best.len)) best = { len: name.length, dir };
+    if (hay.includes(name) && (!best || name.length > best.len)) {
+      best = { len: name.length, dir, name };
+    }
   }
-  return best?.dir ?? null;
+  if (best) return { dir: best.dir, iso2: idx.iso2ByName?.get(best.name) ?? null };
+  return null;
+}
+
+/** Best-effort unit position for a story, or null when it can't be located. */
+export function locateStory(story: Story, idx: AlertPlaceIndex): Vec3 | null {
+  return locatePlace(story, idx)?.dir ?? null;
 }
 
 /** Locate every MAJOR locatable event (above `minSeverity`), classify it, strongest
@@ -151,8 +168,8 @@ export function buildAlerts(
   for (const s of stories) {
     const severity = typeof s.severity === "number" ? s.severity : 0.5;
     if (severity < minSeverity) continue;
-    const dir = locateStory(s, idx);
-    if (!dir) continue;
+    const loc = locatePlace(s, idx);
+    if (!loc) continue;
     out.push({
       id: s.id,
       title: s.title,
@@ -160,7 +177,8 @@ export function buildAlerts(
       category: classifyEvent(s),
       developing: !!s.developing,
       severity,
-      dir,
+      dir: loc.dir,
+      iso2: loc.iso2 ?? undefined,
     });
   }
   out.sort((a, b) => b.severity - a.severity);

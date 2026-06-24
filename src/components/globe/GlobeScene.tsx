@@ -470,6 +470,15 @@ export interface AskMarkerData {
   label: string;
   /** One-line read on what's happening there (shown on hover). */
   detail?: string;
+  /** ISO 3166-1 alpha-2 (lowercase) of the place's nation, for its flag. */
+  iso2?: string;
+}
+
+/** Emoji flag for an ISO 3166-1 alpha-2 code ("us" → 🇺🇸), or "" if not a valid code. */
+function flagEmoji(iso2: string | undefined): string {
+  const cc = (iso2 ?? "").trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(cc)) return "";
+  return String.fromCodePoint(...[...cc].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65));
 }
 
 function AskMarker({
@@ -565,6 +574,8 @@ export interface ProjectedMarker {
   detail: string;
   /** Tag/bubble accent colour. */
   color: string;
+  /** Subject nation's flag emoji ("" when not a country). */
+  flag: string;
   hovered: boolean;
 }
 
@@ -685,6 +696,7 @@ export function GlobeScene({
         label: string,
         detail: string,
         color: string,
+        iso2: string | undefined,
       ) => {
         _proj.set(dir.x * ALERT_RADIUS, dir.y * ALERT_RADIUS, dir.z * ALERT_RADIUS);
         _proj.applyMatrix4(g.matrix); // group local matrix == world matrix
@@ -699,15 +711,18 @@ export function GlobeScene({
           label,
           detail,
           color,
+          flag: flagEmoji(iso2), // subject nation's flag, when it's a country
           hovered: id === hoveredMarkerId,
         });
       };
       for (const m of askMarkers) {
-        add(m.id, "ask", m.dir, m.label, m.detail ?? "", colors.accent);
+        add(m.id, "ask", m.dir, m.label, m.detail ?? "", colors.accent, m.iso2);
       }
       if (hoveredMarkerId) {
         const ha = alerts.find((a) => a.id === hoveredMarkerId);
-        if (ha) add(ha.id, "alert", ha.dir, "", ha.title, EVENT_CATEGORIES[ha.category].color);
+        if (ha) {
+          add(ha.id, "alert", ha.dir, "", ha.title, EVENT_CATEGORIES[ha.category].color, ha.iso2);
+        }
       }
       onMarkersProject(out);
     }

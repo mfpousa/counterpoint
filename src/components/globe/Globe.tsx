@@ -204,12 +204,16 @@ const MarkerLayer = forwardRef<{ set: (items: ProjectedMarker[]) => void }, unkn
             >
               {it.hovered && it.detail ? (
                 <View style={[styles.markerBubble, { borderColor: it.color }]}>
-                  <Text style={styles.markerBubbleText}>{it.detail}</Text>
+                  <Text style={styles.markerBubbleText}>
+                    {it.flag ? `${it.flag}  ` : ""}
+                    {it.detail}
+                  </Text>
                 </View>
               ) : null}
               {it.kind === "ask" && it.label ? (
                 <View style={[styles.markerChip, { borderColor: it.color }]}>
                   <Text style={styles.markerChipText} numberOfLines={1}>
+                    {it.flag ? `${it.flag}  ` : ""}
                     {it.label}
                   </Text>
                 </View>
@@ -389,12 +393,17 @@ export function Globe({
         (c) => [c.name.toLowerCase(), c.dir] as const,
       ),
     );
+    // name → ISO-2 so a name-located alert knows its nation (for the flag).
+    const iso2ByName = new Map(
+      worldGeo.centroids.countries.map((c) => [c.name.toLowerCase(), c.iso2] as const),
+    );
     return buildAlerts(
       stories,
       {
         centroidByIso2: worldGeo.centroids.byIso2,
         centroidByName,
         zoneToIso2: ZONE_ISO2,
+        iso2ByName,
       },
       { minSeverity: 0.4, max: 40 },
     );
@@ -517,15 +526,15 @@ export function Globe({
     if (!askResult || !askIndex) return [];
     const out: AskMarkerData[] = [];
     const seen = new Set<string>();
-    const push = (id: string, dir: Vec3, label: string, detail = "") => {
+    const push = (id: string, dir: Vec3, label: string, detail = "", iso2 = "") => {
       const key = `${dir.x.toFixed(2)}|${dir.y.toFixed(2)}|${dir.z.toFixed(2)}`;
       if (seen.has(key)) return;
       seen.add(key);
-      out.push({ id, dir, label, detail });
+      out.push({ id, dir, label, detail, iso2 });
     };
     askResult.places.forEach((p, i) => {
       const dir = resolveAskPlace(p.label, p.iso2, askIndex);
-      if (dir) push(`ask-${i}-${p.iso2 || p.label}`, dir, p.label, p.blurb);
+      if (dir) push(`ask-${i}-${p.iso2 || p.label}`, dir, p.label, p.blurb, p.iso2);
     });
     if (out.length === 0 && askResult.synopsis) {
       scanCountries(askResult.synopsis, askIndex).forEach((c, i) =>
