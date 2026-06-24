@@ -10,14 +10,14 @@
 // zoom are driven by refs the wrapper mutates from gestures, applied here in the
 // per-frame loop so the gesture layer never has to re-render React.
 
-import React, { memo, useRef } from "react";
+import React, { memo, useMemo, useRef } from "react";
 import type { MutableRefObject } from "react";
 import { useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
-import { AdditiveBlending, BackSide, DoubleSide } from "three";
+import { AdditiveBlending, BackSide, DoubleSide, Quaternion, Vector3 } from "three";
 import type { Group, Mesh, MeshBasicMaterial, PerspectiveCamera } from "three";
 import { colors } from "../../theme";
 import { hashId, type Vec3 } from "../../lib/globeLayout";
-import { EVENT_CATEGORIES, type GeoAlert } from "../../lib/geoAlerts";
+import { EVENT_CATEGORIES, type EventCategory, type GeoAlert } from "../../lib/geoAlerts";
 
 /** One geographic entity to render on the globe (a continent/country/region). */
 export interface GlobeEntityData {
@@ -268,60 +268,167 @@ function Countries({
   );
 }
 
-/** One world-event marker: a solid core + an outward "sonar" ping that loops, sized by
- *  gravity and COLOURED BY EVENT CATEGORY (conflict/health/tech…). The phase is desynced
- *  per id so they shimmer, and an invisible larger hit sphere makes the tiny dot tappable
- *  (→ open the story), turning the globe into an explorable worldview. */
+// ---------------------------------------------------------------------------
+// Markers (world events + AI-search results). Both stand UP from the surface so
+// they read as objects ON the planet, are SHAPED by what they are (so a conflict
+// vs a disaster vs a search-hit is identifiable at a glance), pulse a "sonar"
+// ring, and carry an invisible hit sphere that BLOCKS hover/clicks on the country
+// behind them and reports hover so the wrapper can float a detail bubble.
+// ---------------------------------------------------------------------------
+
+const UP = new Vector3(0, 1, 0);
+const _proj = new Vector3(); // reused scratch for per-frame marker screen projection
+
+/** Quaternion (as [x,y,z,w]) orienting a marker's local +Y OUTWARD along `dir`, so
+ *  shapes sit upright on the globe like pins/spikes rather than lying flat. */
+function outwardQuat(dir: Vec3): [number, number, number, number] {
+  const q = new Quaternion().setFromUnitVectors(
+    UP,
+    new Vector3(dir.x, dir.y, dir.z).normalize(),
+  );
+  return [q.x, q.y, q.z, q.w];
+}
+
+/** Per-category CORE geometry — a distinct silhouette so the worldview is legible at
+ *  a glance: a spike for conflict, a shard for disaster, a gem for health, a ring for
+ *  diplomacy, a cube for unrest, a faceted ball for tech, a bar for economy, a dot
+ *  otherwise. Sized by `r` (gravity). Heights are tuned to sit on the surface. */
+function CategoryGeometry({ category, r }: { category: EventCategory; r: number }) {
+  switch (category) {
+    case "conflict":
+      return <coneGeometry args={[r * 1.05, r * 3, 4]} />; // 4-sided spike
+    case "disaster":
+      return <tetrahedronGeometry args={[r * 1.5]} />; // jagged shard
+    case "health":
+      return <octahedronGeometry args={[r * 1.4]} />; // gem
+    case "diplomacy":
+      return <torusGeometry args={[r * 1.1, r * 0.4, 10, 18]} />; // ring
+    case "unrest":
+      return <boxGeometry args={[r * 1.6, r * 1.6, r * 1.6]} />; // cube
+    case "tech":
+      return <icosahedronGeometry args={[r * 1.35, 0]} />; // faceted ball
+    case "economy":
+      return <cylinderGeometry args={[r * 0.85, r * 0.85, r * 2.6, 12]} />; // bar
+    default:
+      return <sphereGeometry args={[r * 1.15, 14, 14]} />; // generic dot
+  }
+}
+
+/** A flat, expanding "sonar" ring laid on the surface (local XZ plane), driving the
+ *  alive feel. Refs let the frame loop animate scale/opacity without re-rendering. */
+function PingRing({
+  inner,
+  outer,
+  color,
+  ringRef,
+  matRef,
+}: {
+  inner: number;
+  outer: number;
+  color: string;
+  ringRef: React.RefObject<Mesh>;
+  matRef: React.RefObject<MeshBasicMaterial>;
+}) {
+  return (
+    <mesh ref={ringRef} rotation={[Math.PI / 2, 0, 0]}>
+      <ringGeometry args={[inner, outer, 24]} />
+      <meshBasicMaterial
+        ref={matRef}
+        color={color}
+        transparent
+        opacity={0.45}
+        side={DoubleSide}
+        depthWrite={false}
+      />
+    </mesh>
+  );
+}
+
+/** Shared invisible hit sphere: makes a small marker tappable AND stops pointer
+ *  propagation so the country mesh behind it never hovers/selects through it. */
+function MarkerHit({
+  id,
+  radius,
+  y = 0,
+  onPress,
+  onHover,
+}: {
+  id: string;
+  radius: number;
+  y?: number;
+  onPress?: (id: string) => void;
+  onHover?: (id: string | null) => void;
+}) {
+  return (
+    <mesh
+      position={[0, y, 0]}
+      onPointerOver={(e: ThreeEvent<PointerEvent>) => {
+        e.stopPropagation();
+        onHover?.(id);
+      }}
+      onPointerMove={(e: ThreeEvent<PointerEvent>) => e.stopPropagation()}
+      onPointerOut={() => onHover?.(null)}
+      onClick={(e: ThreeEvent<MouseEvent>) => {
+        e.stopPropagation();
+        onPress?.(id);
+      }}
+    >
+      <sphereGeometry args={[radius, 8, 8]} />
+      <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+    </mesh>
+  );
+}
+
+/** One world-event marker: a category-SHAPED, category-COLOURED core standing on the
+ *  surface, a looping sonar ring, and a hit sphere (→ open the story / block country
+ *  hover). Phase is desynced per id so they shimmer; hovering pops the core. */
 function AlertMarker({
   alert,
   onPress,
+  onHover,
+  hovered,
 }: {
   alert: GeoAlert;
   onPress?: (id: string) => void;
+  onHover?: (id: string | null) => void;
+  hovered: boolean;
 }) {
-  const ping = useRef<Mesh>(null);
-  const mat = useRef<MeshBasicMaterial>(null);
-  const r = 0.012 + alert.severity * 0.02;
+  const core = useRef<Mesh>(null);
+  const ring = useRef<Mesh>(null);
+  const ringMat = useRef<MeshBasicMaterial>(null);
+  const r = 0.014 + alert.severity * 0.02;
   const color = EVENT_CATEGORIES[alert.category].color;
   const phase = (hashId(alert.id) % 1000) / 1000;
+  const quat = useMemo(
+    () => outwardQuat(alert.dir),
+    [alert.dir.x, alert.dir.y, alert.dir.z],
+  );
   useFrame((state) => {
     const tt = (state.clock.elapsedTime * 0.7 + phase) % 1;
-    if (ping.current) ping.current.scale.setScalar(1 + tt * 3.5);
-    if (mat.current) mat.current.opacity = (1 - tt) * 0.5;
+    if (ring.current) ring.current.scale.setScalar(1 + tt * 2.8);
+    if (ringMat.current) ringMat.current.opacity = (1 - tt) * 0.4;
+    if (core.current) {
+      const target = hovered ? 1.5 : 1;
+      core.current.scale.setScalar(core.current.scale.x + (target - core.current.scale.x) * 0.2);
+    }
   });
   return (
     <group
-      position={[
-        alert.dir.x * ALERT_RADIUS,
-        alert.dir.y * ALERT_RADIUS,
-        alert.dir.z * ALERT_RADIUS,
-      ]}
+      position={[alert.dir.x * ALERT_RADIUS, alert.dir.y * ALERT_RADIUS, alert.dir.z * ALERT_RADIUS]}
+      quaternion={quat}
     >
-      <mesh>
-        <sphereGeometry args={[r, 12, 12]} />
-        <meshBasicMaterial color={color} />
-      </mesh>
-      <mesh ref={ping}>
-        <sphereGeometry args={[r, 12, 12]} />
-        <meshBasicMaterial
-          ref={mat}
+      <mesh ref={core} position={[0, r * 1.2, 0]}>
+        <CategoryGeometry category={alert.category} r={r} />
+        <meshStandardMaterial
           color={color}
-          transparent
-          opacity={0.45}
-          depthWrite={false}
+          emissive={color}
+          emissiveIntensity={hovered ? 1.2 : 0.55}
+          metalness={0.3}
+          roughness={0.4}
         />
       </mesh>
-      {onPress && (
-        <mesh
-          onClick={(e: ThreeEvent<MouseEvent>) => {
-            e.stopPropagation();
-            onPress(alert.id);
-          }}
-        >
-          <sphereGeometry args={[Math.max(r * 2.6, 0.05), 8, 8]} />
-          <meshBasicMaterial transparent opacity={0} depthWrite={false} />
-        </mesh>
-      )}
+      <PingRing inner={r * 1.3} outer={r * 1.75} color={color} ringRef={ring} matRef={ringMat} />
+      <MarkerHit id={alert.id} radius={Math.max(r * 3, 0.06)} y={r} onPress={onPress} onHover={onHover} />
     </group>
   );
 }
@@ -329,66 +436,92 @@ function AlertMarker({
 function Alerts({
   alerts,
   onPress,
+  onHover,
+  hoveredId,
 }: {
   alerts: GeoAlert[];
   onPress?: (id: string) => void;
+  onHover?: (id: string | null) => void;
+  hoveredId: string | null;
 }) {
   return (
     <>
       {alerts.map((a) => (
-        <AlertMarker key={a.id} alert={a} onPress={onPress} />
+        <AlertMarker
+          key={a.id}
+          alert={a}
+          onPress={onPress}
+          onHover={onHover}
+          hovered={hoveredId === a.id}
+        />
       ))}
     </>
   );
 }
 
-/** One located result of an AI news search ("ask"): a bright accent beacon the reader
- *  can tap to recenter. Distinct from event alerts (which are category-coloured) — these
- *  answer "where is X happening". */
+/** One located result of an AI news search ("ask"): an accent "pin" — a thin stem +
+ *  glowing head standing off the surface, with a pulsing base ring — deliberately
+ *  unlike the flat category event shapes. `detail` (the one-line read) is shown in
+ *  the hover bubble; `label` (place) floats as an always-on tag (both via the
+ *  wrapper's projected overlay). */
 export interface AskMarkerData {
   id: string;
   dir: Vec3;
   label: string;
+  /** One-line read on what's happening there (shown on hover). */
+  detail?: string;
 }
 
-function AskMarker({ data, onPress }: { data: AskMarkerData; onPress?: (id: string) => void }) {
-  const ping = useRef<Mesh>(null);
-  const mat = useRef<MeshBasicMaterial>(null);
+function AskMarker({
+  data,
+  onPress,
+  onHover,
+  hovered,
+}: {
+  data: AskMarkerData;
+  onPress?: (id: string) => void;
+  onHover?: (id: string | null) => void;
+  hovered: boolean;
+}) {
+  const head = useRef<Mesh>(null);
+  const ring = useRef<Mesh>(null);
+  const ringMat = useRef<MeshBasicMaterial>(null);
   const phase = (hashId(data.id) % 1000) / 1000;
+  const c = colors.accent;
+  const quat = useMemo(
+    () => outwardQuat(data.dir),
+    [data.dir.x, data.dir.y, data.dir.z],
+  );
   useFrame((state) => {
-    const tt = (state.clock.elapsedTime * 0.8 + phase) % 1;
-    if (ping.current) ping.current.scale.setScalar(1 + tt * 4);
-    if (mat.current) mat.current.opacity = (1 - tt) * 0.6;
+    const tt = (state.clock.elapsedTime * 0.9 + phase) % 1;
+    if (ring.current) ring.current.scale.setScalar(1 + tt * 3.5);
+    if (ringMat.current) ringMat.current.opacity = (1 - tt) * 0.5;
+    if (head.current) {
+      const target = hovered ? 1.45 : 1;
+      head.current.scale.setScalar(head.current.scale.x + (target - head.current.scale.x) * 0.2);
+    }
   });
   return (
     <group
       position={[data.dir.x * ALERT_RADIUS, data.dir.y * ALERT_RADIUS, data.dir.z * ALERT_RADIUS]}
+      quaternion={quat}
     >
-      <mesh>
-        <sphereGeometry args={[0.02, 14, 14]} />
-        <meshBasicMaterial color={colors.accent} />
+      <mesh position={[0, 0.03, 0]}>
+        <cylinderGeometry args={[0.0035, 0.0035, 0.06, 6]} />
+        <meshBasicMaterial color={c} />
       </mesh>
-      <mesh ref={ping}>
-        <sphereGeometry args={[0.02, 14, 14]} />
-        <meshBasicMaterial
-          ref={mat}
-          color={colors.accent}
-          transparent
-          opacity={0.5}
-          depthWrite={false}
+      <mesh ref={head} position={[0, 0.078, 0]}>
+        <sphereGeometry args={[0.021, 16, 16]} />
+        <meshStandardMaterial
+          color={c}
+          emissive={c}
+          emissiveIntensity={hovered ? 1.4 : 0.85}
+          metalness={0.2}
+          roughness={0.3}
         />
       </mesh>
-      {onPress && (
-        <mesh
-          onClick={(e: ThreeEvent<MouseEvent>) => {
-            e.stopPropagation();
-            onPress(data.id);
-          }}
-        >
-          <sphereGeometry args={[0.06, 8, 8]} />
-          <meshBasicMaterial transparent opacity={0} depthWrite={false} />
-        </mesh>
-      )}
+      <PingRing inner={0.02} outer={0.03} color={c} ringRef={ring} matRef={ringMat} />
+      <MarkerHit id={data.id} radius={0.07} y={0.06} onPress={onPress} onHover={onHover} />
     </group>
   );
 }
@@ -396,17 +529,43 @@ function AskMarker({ data, onPress }: { data: AskMarkerData; onPress?: (id: stri
 function AskMarkers({
   markers,
   onPress,
+  onHover,
+  hoveredId,
 }: {
   markers: AskMarkerData[];
   onPress?: (id: string) => void;
+  onHover?: (id: string | null) => void;
+  hoveredId: string | null;
 }) {
   return (
     <>
       {markers.map((m) => (
-        <AskMarker key={m.id} data={m} onPress={onPress} />
+        <AskMarker
+          key={m.id}
+          data={m}
+          onPress={onPress}
+          onHover={onHover}
+          hovered={hoveredId === m.id}
+        />
       ))}
     </>
   );
+}
+
+/** A marker projected to 2D screen space, for the wrapper's overlay bubbles. */
+export interface ProjectedMarker {
+  id: string;
+  kind: "ask" | "alert";
+  /** Screen position (px) of the marker's anchor on the globe. */
+  x: number;
+  y: number;
+  /** Always-on tag text (ask place name; "" for alerts). */
+  label: string;
+  /** Detail shown while hovered (ask blurb / alert headline). */
+  detail: string;
+  /** Tag/bubble accent colour. */
+  color: string;
+  hovered: boolean;
 }
 
 export function GlobeScene({
@@ -419,6 +578,9 @@ export function GlobeScene({
   onAlertPress,
   askMarkers = [],
   onAskMarkerPress,
+  hoveredMarkerId = null,
+  onMarkerHover,
+  onMarkersProject,
   autoSpin,
   focusedId,
   onFocus,
@@ -439,6 +601,13 @@ export function GlobeScene({
   askMarkers?: AskMarkerData[];
   /** Tap an ask marker → recenter the globe on it. */
   onAskMarkerPress?: (id: string) => void;
+  /** The marker currently under the pointer (its core pops + detail bubble shows). */
+  hoveredMarkerId?: string | null;
+  /** A marker was hovered (id) or left (null) — drives `hoveredMarkerId`. */
+  onMarkerHover?: (id: string | null) => void;
+  /** Per-frame: marker anchors projected to SCREEN px, for the wrapper's overlay
+   *  label/detail bubbles. Only the front-hemisphere markers worth labelling are sent. */
+  onMarkersProject?: (items: ProjectedMarker[]) => void;
   /** Idle auto-rotate ONLY on the pristine world landing; stops once a place is chosen. */
   autoSpin: boolean;
   focusedId: string | null;
@@ -492,6 +661,50 @@ export function GlobeScene({
       cam.setViewOffset(size.width, size.height, offsetPx.current, 0, size.width, size.height);
     } else if (cam.view?.enabled) {
       cam.clearViewOffset();
+    }
+
+    // Project the markers worth labelling to SCREEN px for the wrapper's overlay
+    // bubbles: every ask result (always-on place tag) + the hovered marker (detail).
+    // Front-hemisphere only, so labels never bleed through from the far side. The
+    // overlay de-dupes identical frames, so a still globe costs zero React updates.
+    if (onMarkersProject) {
+      // Refresh ONLY this group's own matrix (cheap) — never updateMatrixWorld(), which
+      // would recurse into the hundreds of country meshes every frame. The group is a
+      // direct scene child (identity parent), so its local matrix IS its world matrix.
+      g.updateMatrix();
+      const out: ProjectedMarker[] = [];
+      const add = (
+        id: string,
+        kind: "ask" | "alert",
+        dir: Vec3,
+        label: string,
+        detail: string,
+        color: string,
+      ) => {
+        _proj.set(dir.x * ALERT_RADIUS, dir.y * ALERT_RADIUS, dir.z * ALERT_RADIUS);
+        _proj.applyMatrix4(g.matrix); // group local matrix == world matrix
+        if (_proj.z <= 0.02) return; // far hemisphere → occluded by the globe
+        _proj.project(cam);
+        if (_proj.z > 1) return; // behind the camera/far plane
+        out.push({
+          id,
+          kind,
+          x: ((_proj.x + 1) / 2) * size.width,
+          y: ((1 - _proj.y) / 2) * size.height,
+          label,
+          detail,
+          color,
+          hovered: id === hoveredMarkerId,
+        });
+      };
+      for (const m of askMarkers) {
+        add(m.id, "ask", m.dir, m.label, m.detail ?? "", colors.accent);
+      }
+      if (hoveredMarkerId) {
+        const ha = alerts.find((a) => a.id === hoveredMarkerId);
+        if (ha) add(ha.id, "alert", ha.dir, "", ha.title, EVENT_CATEGORIES[ha.category].color);
+      }
+      onMarkersProject(out);
     }
   });
 
@@ -591,10 +804,21 @@ export function GlobeScene({
             onHoverMove={onHoverMove}
           />
         ))}
-        {/* Worldview: category-coloured, gravity-sized event markers (tap to open). */}
-        <Alerts alerts={alerts} onPress={onAlertPress} />
-        {/* AI news-search results: accent beacons on the places the answer is about. */}
-        <AskMarkers markers={askMarkers} onPress={onAskMarkerPress} />
+        {/* Worldview: category-SHAPED, gravity-sized event markers (tap to open,
+            hover for the headline; hovering blocks the country behind). */}
+        <Alerts
+          alerts={alerts}
+          onPress={onAlertPress}
+          onHover={onMarkerHover}
+          hoveredId={hoveredMarkerId}
+        />
+        {/* AI news-search results: accent pins on the places the answer is about. */}
+        <AskMarkers
+          markers={askMarkers}
+          onPress={onAskMarkerPress}
+          onHover={onMarkerHover}
+          hoveredId={hoveredMarkerId}
+        />
       </group>
     </>
   );

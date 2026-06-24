@@ -78,6 +78,7 @@ import {
   type GlobeCountry,
   type GlobeEntityData,
   type GlobeViewRefs,
+  type ProjectedMarker,
 } from "./GlobeScene";
 
 const clamp = (v: number, lo: number, hi: number) =>
@@ -161,6 +162,56 @@ const CursorPin = forwardRef<
   );
 });
 
+/** 2D overlay that floats labels/detail bubbles ON the globe's markers. Positions are
+ *  pushed imperatively from GlobeScene's frame loop (projected world→screen), so the
+ *  globe never re-renders to move a label; a still globe pushes identical frames which
+ *  this de-dupes (rounded), costing zero React updates. Ask results show an always-on
+ *  place tag; the hovered marker (ask OR event) shows a detail bubble above it.
+ *  pointerEvents none so it never steals taps from the globe beneath. */
+const MarkerLayer = forwardRef<{ set: (items: ProjectedMarker[]) => void }, unknown>(
+  function MarkerLayer(_props, ref) {
+    const [items, setItems] = useState<ProjectedMarker[]>([]);
+    const prevKey = useRef("");
+    useImperativeHandle(
+      ref,
+      () => ({
+        set: (next: ProjectedMarker[]) => {
+          const key = next
+            .map((i) => `${i.id}:${Math.round(i.x)}:${Math.round(i.y)}:${i.hovered ? 1 : 0}`)
+            .join("|");
+          if (key === prevKey.current) return; // nothing moved/changed → skip re-render
+          prevKey.current = key;
+          setItems(next);
+        },
+      }),
+      [],
+    );
+    if (items.length === 0) return null;
+    return (
+      <View style={StyleSheet.absoluteFill} pointerEvents="none">
+        {items.map((it) => (
+          <View key={it.id} style={[styles.markerTag, { left: it.x - 110, top: it.y - 104 }]}>
+            {it.hovered && it.detail ? (
+              <View style={[styles.markerBubble, { borderColor: it.color }]}>
+                <Text style={styles.markerBubbleText} numberOfLines={3}>
+                  {it.detail}
+                </Text>
+              </View>
+            ) : null}
+            {it.kind === "ask" && it.label ? (
+              <View style={[styles.markerChip, { borderColor: it.color }]}>
+                <Text style={styles.markerChipText} numberOfLines={1}>
+                  {it.label}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        ))}
+      </View>
+    );
+  },
+);
+
 export function Globe({
   activePoolId,
   home,
@@ -240,6 +291,10 @@ export function Globe({
   const [askResult, setAskResult] = useState<AskResult | null>(null);
   const [askError, setAskError] = useState<string | null>(null);
   const askHandleRef = useRef<{ cancel: () => void } | null>(null);
+  // Which globe marker (event or ask result) is under the pointer — pops its 3D core
+  // and shows its detail bubble. A separate overlay holds the projected label positions.
+  const [hoveredMarkerId, setHoveredMarkerId] = useState<string | null>(null);
+  const markerLayerRef = useRef<{ set: (items: ProjectedMarker[]) => void }>(null);
 
   // View state the gesture layer mutates and the frame loop reads (no re-renders).
   const refs: GlobeViewRefs = {
@@ -448,15 +503,15 @@ export function Globe({
     if (!askResult || !askIndex) return [];
     const out: AskMarkerData[] = [];
     const seen = new Set<string>();
-    const push = (id: string, dir: Vec3, label: string) => {
+    const push = (id: string, dir: Vec3, label: string, detail = "") => {
       const key = `${dir.x.toFixed(2)}|${dir.y.toFixed(2)}|${dir.z.toFixed(2)}`;
       if (seen.has(key)) return;
       seen.add(key);
-      out.push({ id, dir, label });
+      out.push({ id, dir, label, detail });
     };
     askResult.places.forEach((p, i) => {
       const dir = resolveAskPlace(p.label, p.iso2, askIndex);
-      if (dir) push(`ask-${i}-${p.iso2 || p.label}`, dir, p.label);
+      if (dir) push(`ask-${i}-${p.iso2 || p.label}`, dir, p.label, p.blurb);
     });
     if (out.length === 0 && askResult.synopsis) {
       scanCountries(askResult.synopsis, askIndex).forEach((c, i) =>
@@ -805,6 +860,16 @@ export function Globe({
     [rightInset],
   );
 
+  // A globe marker was hovered (id) or left (null). Stable identity so GlobeScene's
+  // frame loop keeps the latest without churn.
+  const onMarkerHover = useCallback((id: string | null) => setHoveredMarkerId(id), []);
+  // Per-frame projected marker positions → pushed straight to the overlay (which
+  // de-dupes), so labels track the spinning globe without re-rendering the scene.
+  const onMarkersProject = useCallback(
+    (items: ProjectedMarker[]) => markerLayerRef.current?.set(items),
+    [],
+  );
+
   const childById = (id: string): CoverageNode | undefined =>
     (view?.children ?? []).find((c) => c.nodeId === id);
 
@@ -936,6 +1001,9 @@ export function Globe({
             onAlertPress={onAlertPress}
             askMarkers={askMarkers}
             onAskMarkerPress={onAskMarkerPress}
+            hoveredMarkerId={hoveredMarkerId}
+            onMarkerHover={onMarkerHover}
+            onMarkersProject={onMarkersProject}
             rightInset={rightInset}
             autoSpin={browse === GEO_ROOT_ID && !activePoolId}
             focusedId={focusedId}
@@ -1206,6 +1274,10 @@ export function Globe({
             to the globe (which selects). Position is pushed imperatively (onHoverMove). */}
         <CursorPin ref={pinRef} label={focused?.label ?? null} />
 
+        {/* Labels/detail bubbles anchored ON the globe's markers (positions pushed
+            imperatively from the scene's frame loop; pointerEvents none). */}
+        <MarkerLayer ref={markerLayerRef} />
+
         {loading && (
           <View style={styles.center} pointerEvents="none">
             <ActivityIndicator size="small" color={colors.accent} />
@@ -1440,5 +1512,42 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: font.small,
     fontWeight: "800",
+  },
+  // Marker overlay: a fixed-size box anchored above each pin (left/top set inline to
+  // the projected position), content bottom-anchored + centred so it floats just over
+  // the pin. Detail bubble stacks above the always-on place chip.
+  markerTag: {
+    position: "absolute",
+    width: 220,
+    height: 96,
+    alignItems: "center",
+    justifyContent: "flex-end",
+  },
+  markerChip: {
+    maxWidth: 200,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    backgroundColor: colors.surface + "F2",
+  },
+  markerChipText: {
+    color: colors.text,
+    fontSize: font.tiny,
+    fontWeight: "800",
+  },
+  markerBubble: {
+    maxWidth: 210,
+    marginBottom: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    backgroundColor: colors.surface + "F5",
+  },
+  markerBubbleText: {
+    color: colors.textDim,
+    fontSize: font.tiny,
+    lineHeight: 16,
   },
 });
