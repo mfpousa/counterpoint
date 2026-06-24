@@ -71,7 +71,7 @@ import type { AnalysisStatus, AskResult, Story } from "../../types";
 import countries110m from "../../data/world/countries-110m.json";
 import { useApp, useT } from "../../store/AppContext";
 import { colors, font, radius, spacing } from "../../theme";
-import { AskPanel } from "./AskPanel";
+import { AskPanel, renderCited } from "./AskPanel";
 import {
   GlobeScene,
   type AskMarkerData,
@@ -165,43 +165,70 @@ const CursorPin = forwardRef<
 /** 2D overlay that floats labels/detail bubbles ON the globe's markers. Positions are
  *  pushed imperatively from GlobeScene's frame loop (projected world→screen), so the
  *  globe never re-renders to move a label; a still globe pushes identical frames which
- *  this de-dupes (rounded), costing zero React updates. Ask results show an always-on
- *  place tag; the hovered marker (ask OR event) shows a detail bubble above it.
- *  pointerEvents none so it never steals taps from the globe beneath. */
-const MarkerLayer = forwardRef<{ set: (items: ProjectedMarker[]) => void }, unknown>(
-  function MarkerLayer(_props, ref) {
-    const [items, setItems] = useState<ProjectedMarker[]>([]);
-    const [height, setHeight] = useState(0); // layer height (px), for bottom-anchoring bubbles
-    const prevKey = useRef("");
-    useImperativeHandle(
-      ref,
-      () => ({
-        set: (next: ProjectedMarker[]) => {
-          const key = next
-            .map((i) => `${i.id}:${Math.round(i.x)}:${Math.round(i.y)}:${i.hovered ? 1 : 0}`)
-            .join("|");
-          if (key === prevKey.current) return; // nothing moved/changed → skip re-render
-          prevKey.current = key;
-          setItems(next);
-        },
-      }),
-      [],
-    );
-    // Anchor each stack by its BOTTOM (just above the pin) using the layer's measured
-    // height, so a bubble grows UPWARD with its content instead of being clipped to a
-    // fixed-height box — the whole text shows.
-    return (
-      <View
-        style={StyleSheet.absoluteFill}
-        pointerEvents="none"
-        onLayout={(e) => setHeight(e.nativeEvent.layout.height)}
-      >
-        {height > 0 &&
-          items.map((it) => (
-            <View
-              key={it.id}
-              style={[styles.markerTag, { left: it.x - 110, bottom: height - it.y + 12 }]}
-            >
+ *  this de-dupes (rounded), costing zero React updates. The root is `box-none`, so the
+ *  read-only hover bubbles (pointerEvents none) never steal taps from the globe — but
+ *  the FOCUSED pin's card is interactive (pointerEvents auto), on top, with a backdrop
+ *  that dismisses it on an outside tap. */
+const MarkerLayer = forwardRef<
+  { set: (items: ProjectedMarker[]) => void },
+  {
+    /** The clicked pin: its card is interactive + on top. */
+    focusedId: string | null;
+    /** Tap outside the focused card → release focus. */
+    onDismiss: () => void;
+    /** Rich, interactive content for the focused card (links + selectable text). */
+    renderFocused: (it: ProjectedMarker) => React.ReactNode;
+  }
+>(function MarkerLayer({ focusedId, onDismiss, renderFocused }, ref) {
+  const [items, setItems] = useState<ProjectedMarker[]>([]);
+  const [height, setHeight] = useState(0); // layer height (px), for bottom-anchoring bubbles
+  const prevKey = useRef("");
+  useImperativeHandle(
+    ref,
+    () => ({
+      set: (next: ProjectedMarker[]) => {
+        const key = next
+          .map((i) => `${i.id}:${Math.round(i.x)}:${Math.round(i.y)}:${i.hovered ? 1 : 0}`)
+          .join("|");
+        if (key === prevKey.current) return; // nothing moved/changed → skip re-render
+        prevKey.current = key;
+        setItems(next);
+      },
+    }),
+    [],
+  );
+  // Only show the backdrop when the focused pin is actually on screen (front hemisphere),
+  // so a stale/occluded focus never traps the globe behind an invisible catcher.
+  const focusedShown = focusedId !== null && items.some((i) => i.id === focusedId);
+  // Anchor each stack by its BOTTOM (just above the pin) using the layer's measured
+  // height, so a bubble grows UPWARD with its content instead of being clipped.
+  return (
+    <View
+      style={StyleSheet.absoluteFill}
+      pointerEvents="box-none"
+      onLayout={(e) => setHeight(e.nativeEvent.layout.height)}
+    >
+      {focusedShown && (
+        <Pressable
+          style={[StyleSheet.absoluteFill, styles.markerBackdrop]}
+          onPress={onDismiss}
+          accessibilityLabel="Dismiss"
+        />
+      )}
+      {height > 0 &&
+        items.map((it) => {
+          const pos = { left: it.x - 110, bottom: height - it.y + 12 };
+          if (it.id === focusedId) {
+            return (
+              <View key={it.id} style={[styles.markerTag, styles.markerFocusedWrap, pos]} pointerEvents="box-none">
+                <View style={[styles.markerCard, { borderColor: it.color }]} pointerEvents="auto">
+                  {renderFocused(it)}
+                </View>
+              </View>
+            );
+          }
+          return (
+            <View key={it.id} style={[styles.markerTag, pos]} pointerEvents="none">
               {it.hovered && it.detail ? (
                 <View style={[styles.markerBubble, { borderColor: it.color }]}>
                   <Text style={styles.markerBubbleText}>
@@ -219,11 +246,11 @@ const MarkerLayer = forwardRef<{ set: (items: ProjectedMarker[]) => void }, unkn
                 </View>
               ) : null}
             </View>
-          ))}
-      </View>
-    );
-  },
-);
+          );
+        })}
+    </View>
+  );
+});
 
 export function Globe({
   activePoolId,
@@ -307,6 +334,9 @@ export function Globe({
   // Which globe marker (event or ask result) is under the pointer — pops its 3D core
   // and shows its detail bubble. A separate overlay holds the projected label positions.
   const [hoveredMarkerId, setHoveredMarkerId] = useState<string | null>(null);
+  // The CLICKED marker, whose interactive card stays open (links + selectable text) until
+  // the reader taps outside it.
+  const [focusedMarkerId, setFocusedMarkerId] = useState<string | null>(null);
   const markerLayerRef = useRef<{ set: (items: ProjectedMarker[]) => void }>(null);
 
   // View state the gesture layer mutates and the frame loop reads (no re-renders).
@@ -519,10 +549,14 @@ export function Globe({
     setAskResult(null);
     setAskError(null);
     setAskQuery("");
+    setFocusedMarkerId(null);
   }, []);
 
   // Cancel any in-flight ask stream on unmount.
   useEffect(() => () => askHandleRef.current?.cancel(), []);
+
+  // Navigating to another place clears any open pin card (its marker is now gone/stale).
+  useEffect(() => setFocusedMarkerId(null), [browse]);
 
   // Name/alias index for locating the answer's places (built once per geo load).
   const askIndex = useMemo(
@@ -577,10 +611,9 @@ export function Globe({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [askMarkers]);
 
-  // Tapping a beacon flies to that country.
-  const onAskMarkerPress = useCallback(
+  // Fly the globe to centre an ask beacon (the focused card's "locate" action).
+  const flyToAskMarker = useCallback(
     (id: string) => {
-      if (didDrag.current) return; // ignore the click that ends a drag-to-rotate
       const m = askMarkers.find((x) => x.id === id);
       if (!m) return;
       refs.target.current = {
@@ -591,6 +624,64 @@ export function Globe({
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [askMarkers],
+  );
+
+  // Clicking a pin FOCUSES it (its interactive card opens). A drag-to-rotate that
+  // releases over a pin must not count as a click.
+  const onMarkerSelect = useCallback((id: string) => {
+    if (didDrag.current) return;
+    setFocusedMarkerId(id);
+  }, []);
+  const clearFocus = useCallback(() => setFocusedMarkerId(null), []);
+
+  // The interactive content of a focused pin's card: selectable text + clickable links.
+  // Ask pins show the place + its blurb with inline citation links (and a locate action);
+  // event pins show the headline + an "open story" link.
+  const renderFocused = useCallback(
+    (it: ProjectedMarker) => {
+      if (it.kind === "alert") {
+        return (
+          <>
+            <Text style={styles.markerCardText} selectable>
+              {it.flag ? `${it.flag}  ` : ""}
+              {it.detail}
+            </Text>
+            {onAlertPress && (
+              <Pressable
+                style={styles.markerCardLink}
+                onPress={() => {
+                  onAlertPress(it.id);
+                  setFocusedMarkerId(null);
+                }}
+                accessibilityRole="link"
+              >
+                <Ionicons name="open-outline" size={13} color={colors.accent} />
+                <Text style={styles.markerCardLinkText}>{t("globe.openStory")}</Text>
+              </Pressable>
+            )}
+          </>
+        );
+      }
+      return (
+        <>
+          <Pressable
+            style={styles.markerCardHead}
+            onPress={() => flyToAskMarker(it.id)}
+            accessibilityRole="button"
+          >
+            <Text style={styles.markerCardLabel} selectable>
+              {it.flag ? `${it.flag}  ` : ""}
+              {it.label}
+            </Text>
+            <Ionicons name="locate" size={13} color={colors.accent} />
+          </Pressable>
+          <Text style={styles.markerCardText} selectable>
+            {renderCited(it.detail, askResult?.sources ?? [])}
+          </Text>
+        </>
+      );
+    },
+    [onAlertPress, t, flyToAskMarker, askResult],
   );
 
   // The drill-down options (covered places + anything drillable), placed on the
@@ -905,15 +996,6 @@ export function Globe({
     [],
   );
 
-  // Tapping an event marker opens its story — but not when the press was a drag-to-rotate.
-  const handleAlertPress = useCallback(
-    (id: string) => {
-      if (didDrag.current) return;
-      onAlertPress?.(id);
-    },
-    [onAlertPress],
-  );
-
   const childById = (id: string): CoverageNode | undefined =>
     (view?.children ?? []).find((c) => c.nodeId === id);
 
@@ -1050,10 +1132,11 @@ export function Globe({
             outline={regionOutline}
             gizmos={gizmos}
             alerts={alerts}
-            onAlertPress={handleAlertPress}
+            onAlertPress={onMarkerSelect}
             askMarkers={askMarkers}
-            onAskMarkerPress={onAskMarkerPress}
+            onAskMarkerPress={onMarkerSelect}
             hoveredMarkerId={hoveredMarkerId}
+            focusedMarkerId={focusedMarkerId}
             onMarkerHover={onMarkerHover}
             onMarkersProject={onMarkersProject}
             rightInset={rightInset}
@@ -1327,8 +1410,14 @@ export function Globe({
         <CursorPin ref={pinRef} label={focused?.label ?? null} />
 
         {/* Labels/detail bubbles anchored ON the globe's markers (positions pushed
-            imperatively from the scene's frame loop; pointerEvents none). */}
-        <MarkerLayer ref={markerLayerRef} />
+            imperatively from the scene's frame loop). The CLICKED pin's card is
+            interactive (links + selectable text); tapping outside dismisses it. */}
+        <MarkerLayer
+          ref={markerLayerRef}
+          focusedId={focusedMarkerId}
+          onDismiss={clearFocus}
+          renderFocused={renderFocused}
+        />
 
         {loading && (
           <View style={styles.center} pointerEvents="none">
@@ -1600,4 +1689,38 @@ const styles = StyleSheet.create({
     fontSize: font.tiny,
     lineHeight: 16,
   },
+  // Click-to-focus pin card: a transparent backdrop catches the outside tap to dismiss,
+  // while the card itself sits on top and absorbs pointer events (links + text select).
+  markerBackdrop: { zIndex: 5 },
+  markerFocusedWrap: { zIndex: 10 },
+  markerCard: {
+    maxWidth: 220,
+    gap: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    backgroundColor: colors.surface + "FA",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.45,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  markerCardHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+  },
+  markerCardLabel: { flex: 1, color: colors.text, fontSize: font.small, fontWeight: "800" },
+  markerCardText: { color: colors.textDim, fontSize: font.small, lineHeight: 18 },
+  markerCardLink: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 2,
+    alignSelf: "flex-start",
+  },
+  markerCardLinkText: { color: colors.accent, fontSize: font.tiny, fontWeight: "700" },
 });

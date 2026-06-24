@@ -26,8 +26,9 @@ const CITE = /\[\s*\d+(?:\s*,\s*\d+)*\s*\]/g;
 
 /** Render prose with inline `[n]` citations turned into TAPPABLE links to the matching
  *  source (sources[n-1]) — so a specific term/claim hyperlinks to where it came from.
- *  Unknown / out-of-range numbers are left as plain text. */
-function renderCited(text: string, sources: AskSource[]): React.ReactNode {
+ *  Unknown / out-of-range numbers are left as plain text. Exported so the globe's
+ *  focused-pin card can render the same clickable citations. */
+export function renderCited(text: string, sources: AskSource[]): React.ReactNode {
   if (!text) return text;
   const out: React.ReactNode[] = [];
   let last = 0;

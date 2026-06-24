@@ -590,6 +590,7 @@ export function GlobeScene({
   askMarkers = [],
   onAskMarkerPress,
   hoveredMarkerId = null,
+  focusedMarkerId = null,
   onMarkerHover,
   onMarkersProject,
   autoSpin,
@@ -614,6 +615,8 @@ export function GlobeScene({
   onAskMarkerPress?: (id: string) => void;
   /** The marker currently under the pointer (its core pops + detail bubble shows). */
   hoveredMarkerId?: string | null;
+  /** The marker the reader CLICKED (its interactive card stays open; spin pauses). */
+  focusedMarkerId?: string | null;
   /** A marker was hovered (id) or left (null) — drives `hoveredMarkerId`. */
   onMarkerHover?: (id: string | null) => void;
   /** Per-frame: marker anchors projected to SCREEN px, for the wrapper's overlay
@@ -658,6 +661,7 @@ export function GlobeScene({
       autoSpin &&
       focusedId === null &&
       hoveredMarkerId === null && // freeze the spin while a pin is hovered so its bubble is readable
+      focusedMarkerId === null && // …and while a pin's card is open (so it doesn't drift)
       !refs.dragging.current
     ) {
       refs.rot.current.yaw += delta * 0.05; // idle auto-spin (landing only)
@@ -718,13 +722,14 @@ export function GlobeScene({
       for (const m of askMarkers) {
         add(m.id, "ask", m.dir, m.label, m.detail ?? "", colors.accent, m.iso2);
       }
-      if (hoveredMarkerId) {
-        const ha = alerts.find((a) => a.id === hoveredMarkerId);
-        if (ha) {
-          const more = (ha.count ?? 1) - 1;
-          const detail = more > 0 ? `${ha.title}  ·  +${more} more here` : ha.title;
-          add(ha.id, "alert", ha.dir, "", detail, EVENT_CATEGORIES[ha.category].color, ha.iso2);
-        }
+      // Project the hovered AND focused alerts (deduped) so their bubble / card can render.
+      for (const aid of new Set([hoveredMarkerId, focusedMarkerId])) {
+        if (!aid) continue;
+        const ha = alerts.find((a) => a.id === aid);
+        if (!ha) continue; // an ask marker id (already added) or stale
+        const more = (ha.count ?? 1) - 1;
+        const detail = more > 0 ? `${ha.title}  ·  +${more} more here` : ha.title;
+        add(ha.id, "alert", ha.dir, "", detail, EVENT_CATEGORIES[ha.category].color, ha.iso2);
       }
       onMarkersProject(out);
     }
