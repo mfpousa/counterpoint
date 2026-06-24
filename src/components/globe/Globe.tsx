@@ -66,6 +66,7 @@ import {
 } from "../../lib/geoAlerts";
 import { searchPlaces, type PlaceHit } from "../../lib/placeSearch";
 import { appendAskStream, resetAskStream } from "../../lib/askStream";
+import { buildAskNameIndex, resolveAskPlace, scanCountries } from "../../lib/askLocate";
 import type { AnalysisStatus, AskResult, Story } from "../../types";
 import countries110m from "../../data/world/countries-110m.json";
 import { useApp, useT } from "../../store/AppContext";
@@ -434,18 +435,36 @@ export function Globe({
   // Cancel any in-flight ask stream on unmount.
   useEffect(() => () => askHandleRef.current?.cancel(), []);
 
-  // Located beacons for the answer's places: map each ISO2 (or name) to a centroid.
+  // Name/alias index for locating the answer's places (built once per geo load).
+  const askIndex = useMemo(
+    () => (worldGeo ? buildAskNameIndex(worldGeo.centroids) : null),
+    [worldGeo],
+  );
+
+  // Located beacons: resolve each structured place (ISO2 → name/alias), de-duped by
+  // position. If NONE resolve, fall back to scanning the synopsis prose for countries
+  // so even a free-text answer (e.g. "the major world conflicts") still anchors.
   const askMarkers = useMemo<AskMarkerData[]>(() => {
-    if (!askResult || !worldGeo) return [];
-    const c = worldGeo.centroids;
-    const byName = new Map(c.countries.map((x) => [x.name.toLowerCase(), x.dir] as const));
+    if (!askResult || !askIndex) return [];
     const out: AskMarkerData[] = [];
+    const seen = new Set<string>();
+    const push = (id: string, dir: Vec3, label: string) => {
+      const key = `${dir.x.toFixed(2)}|${dir.y.toFixed(2)}|${dir.z.toFixed(2)}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      out.push({ id, dir, label });
+    };
     askResult.places.forEach((p, i) => {
-      const dir = (p.iso2 && c.byIso2.get(p.iso2)) || byName.get(p.label.toLowerCase()) || null;
-      if (dir) out.push({ id: `ask-${i}-${p.iso2 || p.label}`, dir, label: p.label });
+      const dir = resolveAskPlace(p.label, p.iso2, askIndex);
+      if (dir) push(`ask-${i}-${p.iso2 || p.label}`, dir, p.label);
     });
+    if (out.length === 0 && askResult.synopsis) {
+      scanCountries(askResult.synopsis, askIndex).forEach((c, i) =>
+        push(`ask-scan-${i}-${c.name}`, c.dir, c.name),
+      );
+    }
     return out;
-  }, [askResult, worldGeo]);
+  }, [askResult, askIndex]);
 
   // When an answer lands with locations, orient the globe to frame them (averaged
   // direction), zoomed out enough to take in the spread.
