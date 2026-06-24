@@ -38,20 +38,25 @@ const ASK_RULES =
   "provided recent news items (each: title, one-line summary, source, topic, age). Be " +
   "specific and grounded in the items; do NOT invent facts, places, or events that are " +
   "not present. If the items don't actually support an answer, say so in one sentence.\n" +
+  "Each item carries a number `n`. CITE YOUR SOURCES INLINE: immediately after a specific " +
+  "fact or claim, add the source number(s) in square brackets — e.g. '…mass arrests in " +
+  "Ankara [3].' or '…along the eastern front [1][4].' Cite the item(s) the fact came from, " +
+  "using ONLY those numbers; never invent a number or cite an item you didn't use.\n" +
   "Write PLAIN TEXT (no JSON) in EXACTLY this structure:\n" +
-  "1) A SYNOPSIS of 1-3 sentences that answers the question from the items.\n" +
+  "1) A SYNOPSIS of 1-3 sentences that answers the question from the items, with [n] " +
+  "citations after the specific claims.\n" +
   "2) THEN, whenever the answer involves things happening in specific PLACES (conflicts, " +
   "disasters, protests, elections, outbreaks, attacks, etc.), a blank line, then ONE line " +
   "per place, each formatted EXACTLY like these examples:\n" +
-  "- Ukraine (UA): Russia's full-scale invasion grinds on along the eastern front.\n" +
-  "- Gaza (PS): Israeli operations and a fragile truce dominate the coverage.\n" +
-  "- Sudan (SD): The army–RSF war drives the world's largest displacement crisis.\n" +
+  "- Ukraine (UA): Russia's full-scale invasion grinds on along the eastern front [1].\n" +
+  "- Gaza (PS): Israeli operations and a fragile truce dominate the coverage [2][5].\n" +
+  "- Sudan (SD): The army–RSF war drives the world's largest displacement crisis [3].\n" +
   "Place-line rules: start with '- ', then the place NAME, then its ISO 3166-1 alpha-2 " +
   "COUNTRY code in parentheses (TWO letters, e.g. (US), (FR), (CN), (IL)), then ': ', then " +
-  "ONE sentence on what's happening THERE. ALWAYS include the two-letter code. List up to " +
-  "8 places, most significant first. Use a country code even for a sub-national place " +
-  "(e.g. a city's country). Only omit the place lines when the topic has NO geographic " +
-  "dimension at all (a pure concept or a single person).\n" +
+  "ONE sentence on what's happening THERE with its [n] citation(s). ALWAYS include the " +
+  "two-letter code. List up to 8 places, most significant first. Use a country code even " +
+  "for a sub-national place (e.g. a city's country). Only omit the place lines when the " +
+  "topic has NO geographic dimension at all (a pure concept or a single person).\n" +
   "Output nothing else — no preamble, no headings, no closing remarks.";
 
 function relativeAge(publishedAt: number, now: number): string {
@@ -291,7 +296,7 @@ export async function askNews(
     mode: "answer",
     synopsis: "",
     places: [],
-    itemIds: [],
+    sources: [],
     basedOn: 0,
   };
   if (!q) return empty;
@@ -304,9 +309,12 @@ export async function askNews(
 
   // Phase 2 — ANSWER: feed the FULL content of just the picks to the streamed answer.
   const now = Date.now();
+  // NUMBER the items (1-based) so the model can cite them inline as [n]; the `sources`
+  // array below is built in the SAME order, so the client maps [n] → sources[n-1].
   const payload = {
     question: q,
-    items: selected.map((s) => ({
+    items: selected.map((s, i) => ({
+      n: i + 1,
       title: s.item.title,
       summary: (s.summary || s.item.summary || "").slice(0, 280),
       source: s.item.sourceTitle,
@@ -320,12 +328,20 @@ export async function askNews(
     onDelta,
   });
   const { synopsis, places } = parseAsk(full);
+  const sources = selected.map((s) => ({
+    id: s.item.id,
+    title: s.item.title,
+    sourceTitle: s.item.sourceTitle,
+    url: s.item.url,
+    // Kept short — the client uses it (with the place name) to attribute a source to a pin.
+    summary: (s.summary || s.item.summary || "").slice(0, 200),
+  }));
   return {
     query: q,
     mode: places.length > 0 ? "map" : "answer",
     synopsis,
     places,
-    itemIds: selected.map((s) => s.item.id),
+    sources,
     basedOn: selected.length,
   };
 }

@@ -268,6 +268,21 @@ export interface AskPlace {
   blurb: string;
 }
 
+/** A source article the AI answer was grounded in, so the reader can OPEN it and
+ *  verify what's written — both in the prose box and per pin. */
+export interface AskSource {
+  /** FeedItem id. */
+  id: string;
+  /** Article headline. */
+  title: string;
+  /** Outlet name. */
+  sourceTitle: string;
+  /** Original article URL (opened to verify). */
+  url: string;
+  /** One-line summary — used client-side to attribute a source to specific places. */
+  summary: string;
+}
+
 /**
  * The AI's answer to a free-text news search over the whole fetched database. The
  * SAME model both answers AND decides how to show it: `map` when the topic has a
@@ -283,8 +298,9 @@ export interface AskResult {
   synopsis: string;
   /** Located places to mark on the globe (empty for a pure `answer`). */
   places: AskPlace[];
-  /** FeedItem ids the answer was grounded in (newest/most-relevant first). */
-  itemIds: string[];
+  /** The source articles the answer was grounded in (most-relevant first), so the
+   *  reader can open + verify them — overall and per pin. */
+  sources: AskSource[];
   /** How many items were searched / matched, for a "based on N" affordance. */
   basedOn: number;
 }

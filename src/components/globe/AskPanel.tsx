@@ -5,13 +5,60 @@
 // itself drops the markers; this card carries the prose + the per-place reads.
 
 import React, { useSyncExternalStore } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  Linking,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import type { AskResult } from "../../types";
+import type { AskResult, AskSource } from "../../types";
 import { Cursor } from "../anim";
 import { getAskStream, subscribeAskStream } from "../../lib/askStream";
 import { useT } from "../../store/AppContext";
 import { colors, font, radius, spacing } from "../../theme";
+
+// Inline citation markers the model emits: [3], [1][4], [2, 5]. Matched globally.
+const CITE = /\[\s*\d+(?:\s*,\s*\d+)*\s*\]/g;
+
+/** Render prose with inline `[n]` citations turned into TAPPABLE links to the matching
+ *  source (sources[n-1]) — so a specific term/claim hyperlinks to where it came from.
+ *  Unknown / out-of-range numbers are left as plain text. */
+function renderCited(text: string, sources: AskSource[]): React.ReactNode {
+  if (!text) return text;
+  const out: React.ReactNode[] = [];
+  let last = 0;
+  let key = 0;
+  for (const m of text.matchAll(CITE)) {
+    const idx = m.index ?? 0;
+    if (idx > last) out.push(text.slice(last, idx));
+    for (const numStr of m[0].match(/\d+/g) ?? []) {
+      const n = Number(numStr);
+      const src = sources[n - 1];
+      if (src) {
+        out.push(
+          <Text
+            key={`cite-${key++}`}
+            style={styles.cite}
+            onPress={() => void Linking.openURL(src.url)}
+            accessibilityRole="link"
+            accessibilityLabel={`${src.sourceTitle}: ${src.title}`}
+          >
+            {`\u200a[${n}]`}
+          </Text>,
+        );
+      } else {
+        out.push(` [${numStr}]`);
+      }
+    }
+    last = idx + m[0].length;
+  }
+  if (last < text.length) out.push(text.slice(last));
+  return out;
+}
 
 export function AskPanel({
   query,
@@ -50,7 +97,7 @@ export function AskPanel({
       ) : result ? (
         <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
           {result.synopsis.length > 0 ? (
-            <Text style={styles.synopsis}>{result.synopsis}</Text>
+            <Text style={styles.synopsis}>{renderCited(result.synopsis, result.sources)}</Text>
           ) : (
             <Text style={styles.empty}>{t("ask.empty")}</Text>
           )}
@@ -64,12 +111,31 @@ export function AskPanel({
               <View style={styles.placeDot} />
               <Text style={styles.placeText}>
                 <Text style={styles.placeLabel}>{p.label}: </Text>
-                {p.blurb}
+                {renderCited(p.blurb, result.sources)}
               </Text>
             </Pressable>
           ))}
-          {result.basedOn > 0 && (
-            <Text style={styles.basedOn}>{t("ask.basedOn", { n: result.basedOn })}</Text>
+          {result.sources.length > 0 && (
+            <View style={styles.sourcesBlock}>
+              <Text style={styles.sourcesHeading}>
+                {t("ask.sources")} · {result.basedOn}
+              </Text>
+              {result.sources.slice(0, 8).map((s) => (
+                <Pressable
+                  key={s.id}
+                  style={styles.sourceRow}
+                  onPress={() => void Linking.openURL(s.url)}
+                  accessibilityRole="link"
+                  accessibilityLabel={`${s.sourceTitle}: ${s.title}`}
+                >
+                  <Ionicons name="open-outline" size={12} color={colors.accent} />
+                  <Text style={styles.sourceRowText} numberOfLines={1}>
+                    <Text style={styles.sourceOutlet}>{s.sourceTitle}</Text>
+                    {`  ${s.title}`}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
           )}
         </ScrollView>
       ) : stream.length === 0 ? (
@@ -117,7 +183,26 @@ const styles = StyleSheet.create({
   },
   placeText: { flex: 1, color: colors.textDim, fontSize: font.small, lineHeight: 19 },
   placeLabel: { color: colors.text, fontWeight: "700" },
-  basedOn: { color: colors.textFaint, fontSize: font.tiny, marginTop: spacing.xs },
+  // Inline citation link ([n]) sitting within the prose / blurb.
+  cite: { color: colors.accent, fontWeight: "700" },
+  // Overall grounding sources (back the synopsis), as tappable rows.
+  sourcesBlock: {
+    gap: spacing.xs,
+    marginTop: spacing.xs,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  sourcesHeading: {
+    color: colors.textDim,
+    fontSize: font.tiny,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  sourceRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
+  sourceRowText: { flex: 1, color: colors.textDim, fontSize: font.tiny, lineHeight: 16 },
+  sourceOutlet: { color: colors.text, fontWeight: "700" },
   loadingRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   loadingText: { color: colors.textDim, fontSize: font.small },
   error: { color: colors.danger, fontSize: font.small },
