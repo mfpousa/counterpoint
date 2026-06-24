@@ -85,8 +85,8 @@ export const config = {
     reserveInteractive: num("AI_RESERVE_INTERACTIVE", 1),
     // Items deeply analyzed per CHUNK — deliberately SMALL so the first
     // synthesized feed/stories land in SECONDS, not after one long pass. The
-    // background catch-up loop (scheduleCatchUp) then drains the rest in more
-    // small chunks while the pool is in use, up to each pool's total budget
+    // pull-based backfill batch (runBackfillBatch) then advances the rest one
+    // chunk per qualifying refresh, up to each pool's total budget
     // (geo.deepAnalyzeKeep / place.deepAnalyzeKeep). Keep this well under those
     // totals. 0 = no chunk cap (one big, blocking pass). Persisted either way.
     maxItems: numOrZero("AI_MAX_ITEMS", 24),
@@ -145,19 +145,23 @@ export const config = {
     // bucket, provider round-robin + importance decide order. Smaller = stricter
     // freshness priority; larger = more importance/fairness mixing across time.
     recencyBucketHours: num("FEED_RECENCY_BUCKET_HOURS", 2),
-    // Gap between background analysis chunks while draining the backlog.
+    // Gap before a (pull-based) backfill batch runs after a refresh.
     catchUpDelayMs: num("FEED_CATCHUP_DELAY_MS", 1500),
+    // Pull-based backfill: a manual refresh only digs into OLDER news (one analysis
+    // batch) when it surfaced FEWER than this many genuinely-new articles. With more
+    // new than this the reader already has fresh news, so we don't spend the GPU
+    // grinding backwards — they refresh again to discover more.
+    backfillMinNew: num("FEED_BACKFILL_MIN_NEW", 8),
     // Headlines PRESCREENED (cheap title-only triage) per chunk. The cold-start
     // feed only WAITS on the FIRST chunk, so it lands fast even when a pool floods
-    // with thousands of items; the background catch-up loop prescreens the rest in
-    // chunks, populating the feed continuously while it's in use. Keep it ~one
-    // triage batch so the first paint is a single model round. 0 = prescreen
-    // everything up front (one big, blocking pass).
+    // with thousands of items; each pull-based backfill batch prescreens one more
+    // chunk of the queued remainder. Keep it ~one triage batch so the first paint
+    // is a single model round. 0 = prescreen everything up front (one big pass).
     prescreenChunk: numOrZero("FEED_PRESCREEN_CHUNK", 40),
     // How long after a pool's last status poll we still consider it WATCHED. The
-    // client polls /api/status for the viewed pool every ~3s, so this allows a few
-    // missed polls of grace. While UNWATCHED, the background catch-up loop pauses
-    // at the next chunk boundary (never mid-chunk) and resumes when viewed again.
+    // client polls /api/status for the viewed pool every ~3s. Kept as a lightweight
+    // presence signal only — backfill is now pull-based (refresh-triggered), so a
+    // poll no longer starts or stops any background analysis.
     watchedTtlMs: num("FEED_WATCHED_TTL_MS", 10_000),
     // REACTIVE LOADING. Serve fetched + cheaply-triaged items that haven't been
     // deep-analyzed yet ("provisional") so the feed is usable in seconds instead

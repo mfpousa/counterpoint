@@ -125,10 +125,8 @@ interface WorldState {
   /** Per-zone last fetch time (epoch ms), for the reactive-load TTL. */
   zoneFetchedAt: Map<string, number>;
   catchUpTimer: ReturnType<typeof setTimeout> | null;
-  /** Epoch ms of this pool's last status poll — its "is anyone looking?" signal. */
+  /** Epoch ms of this pool's last status poll — a lightweight presence signal. */
   lastWatchedAt: number;
-  /** True when the catch-up loop stopped for lack of a viewer (resumes on return). */
-  catchUpPaused: boolean;
   /** Cached near-clone DEDUP for a GEO pool, keyed by survivor COUNT. The dedup is
    *  O(n²) and used to run on EVERY status poll + view build (the server stuttered while
    *  busy). Analysis only flips `analyzed` flags — it never adds/removes items — so the
@@ -161,7 +159,6 @@ function ws(worldId: string): WorldState {
       zoneFetchedAt: new Map(),
       catchUpTimer: null,
       lastWatchedAt: 0,
-      catchUpPaused: false,
       geoDedup: null,
     };
     worldStates.set(worldId, s);
@@ -181,23 +178,12 @@ function setPhase(state: WorldState, phase: BuildPhase, done = 0, total = 0): vo
   state.status = { phase, done, total };
 }
 
-/** A pool is WATCHED while the client keeps polling its status (every ~3s). The
- *  background catch-up loop only advances watched pools, so we never burn the
- *  model on a pool nobody's looking at. */
-function isWatched(worldId: string): boolean {
-  return Date.now() - ws(worldId).lastWatchedAt < config.feed.watchedTtlMs;
-}
-
 /** Heartbeat: record that the reader is looking at this pool (called on every
- *  status poll). If its catch-up loop had PAUSED for lack of a viewer, resume it. */
+ *  status poll). Backfill is now PULL-BASED (refresh-triggered, one batch), so a
+ *  status poll NO LONGER kicks off background analysis — navigating around can't
+ *  pin the GPU. We keep the timestamp only as a lightweight presence signal. */
 function markWatched(worldId: string): void {
-  const state = ws(worldId);
-  state.lastWatchedAt = Date.now();
-  if (state.catchUpPaused) {
-    state.catchUpPaused = false;
-    console.log(`[feed:${worldId}] catch-up resumed — pool watched again`);
-    scheduleCatchUp(worldId);
-  }
+  ws(worldId).lastWatchedAt = Date.now();
 }
 
 /** Human-readable name of the place/world a status refers to (shown in the UI as
@@ -478,11 +464,12 @@ async function prescreenAndStore(worldId: string, items: FeedItem[]): Promise<vo
 /**
  * Network phase: fetch all sources, then prescreen ONLY the freshest chunk
  * synchronously so the cold-start feed lands FAST even when a pool floods with
- * thousands of items. The remainder is queued on the world state; the background
- * catch-up loop (prescreenPending) drains it in chunks, populating the feed
- * continuously while it's in use. Deep analysis is likewise chunked downstream.
+ * thousands of items. The remainder is queued on the world state; a (pull-based)
+ * backfill batch prescreens the rest a chunk at a time. Deep analysis is likewise
+ * chunked downstream. Returns how many genuinely-new (never-seen, in-window) items
+ * this fetch surfaced, so the caller can decide whether to backfill older news.
  */
-async function refreshSources(worldId: string): Promise<void> {
+async function refreshSources(worldId: string): Promise<{ newCount: number }> {
   const state = ws(worldId);
   const st = getStore(worldId);
   const sources = sourcesForWorld(worldId);
@@ -496,6 +483,7 @@ async function refreshSources(worldId: string): Promise<void> {
   const untriaged = raw
     .filter((it) => !st.has(it.id) && it.publishedAt >= cutoff)
     .sort((a, b) => b.publishedAt - a.publishedAt);
+  const newCount = untriaged.length;
   const ago = (t?: number) => (t ? `${((started - t) / 3_600_000).toFixed(1)}h` : "—");
   console.log(
     `[feed:${worldId}] fetched ${raw.length}; ${untriaged.length} new & recent to triage ` +
@@ -510,7 +498,7 @@ async function refreshSources(worldId: string): Promise<void> {
       state.prescreenQueue = [];
       state.lastBuildAt = Date.now();
       setPhase(state, "idle");
-      return;
+      return { newCount };
     }
     // Only the FIRST chunk is awaited (one cheap model round); the rest is queued
     // for the background loop so the cold-start response isn't held by a flood.
@@ -529,6 +517,7 @@ async function refreshSources(worldId: string): Promise<void> {
     `[feed:${worldId}] refresh done in ${state.lastBuildAt - started}ms ` +
       `(${state.prescreenQueue.length} queued for background prescreen)`,
   );
+  return { newCount };
 }
 
 /**
@@ -1292,7 +1281,7 @@ function augmentReactively(worldId: string): Promise<void> {
     // Deferred transcript enrichment for important video/podcast items (all pools).
     // If anything was re-analyzed, its embedding was cleared — re-embed in the bg.
     const enriched = await enrichTranscripts(worldId);
-    if (enriched > 0) scheduleCatchUp(worldId);
+    if (enriched > 0) runBackfillBatch(worldId);
 
     // GEO pools show everything their own outlets report — no geo-scope filtering,
     // and no YouTube/zone augmentation (those extend TOPICAL worlds). Nothing more.
@@ -1309,10 +1298,10 @@ function augmentReactively(worldId: string): Promise<void> {
 
     getStore(worldId).save();
 
-    // Analyze the newly-added items in the background, like any other pending
-    // item. analyzePending is per-world re-entrancy-guarded and its model passes
+    // Analyze the newly-added items with ONE follow-up batch (not a continuous
+    // drain). analyzePending is per-world re-entrancy-guarded and its model passes
     // share the bounded request gate (ai.ts), so this needs no cross-world lock.
-    scheduleCatchUp(worldId);
+    runBackfillBatch(worldId);
   })()
     .catch((e) => {
       console.warn(`[augment:${worldId}] reactive augmentation failed:`, e);
@@ -1323,76 +1312,62 @@ function augmentReactively(worldId: string): Promise<void> {
   return state.augmentInFlight;
 }
 
-/** Schedule a background chunk to keep chewing through a world's analysis +
- *  embedding backlogs. Each chunk's model passes share the bounded request gate
- *  (ai.ts) — interactive work is prioritised over these background drains — and the
- *  loop yields between chunks so other worlds can interleave their own passes (a
- *  world switch isn't blocked by this world's full drain). */
-function scheduleCatchUp(worldId: string): void {
+/**
+ * Run ONE backfill batch: drain a chunk of the prescreen queue (so more provisional
+ * items enter the feed), then deep-analyze + embed a chunk of what's ready — newest
+ * first. This is PULL-BASED: a batch is only ever triggered by a cold start or a
+ * manual refresh that surfaced too little new news (see buildPool), NEVER a
+ * self-sustaining loop and NEVER from a status poll. So navigating around — or just
+ * leaving a pool open — can no longer pin the GPU grinding backwards through old
+ * news. When the deep-analysis backlog empties, reactively extend the stories
+ * (YouTube + per-zone coverage) once; the items that adds get their own batch.
+ * Model passes share the bounded request gate (ai.ts), below interactive work.
+ */
+function runBackfillBatch(worldId: string): void {
   const state = ws(worldId);
-  if (state.catchUpTimer) return;
+  // One batch at a time: don't stack timers or overlap an in-flight pass.
+  if (state.catchUpTimer || state.analyzeInFlight || state.embedInFlight) return;
   state.catchUpTimer = setTimeout(() => {
     state.catchUpTimer = null;
-    // PRESENCE GATE: never START a new chunk for a pool nobody's watching. An
-    // in-flight chunk is never interrupted — we only ever check at this boundary,
-    // and a returning reader's status poll (markWatched) restarts the loop.
-    if (!isWatched(worldId)) {
-      state.catchUpPaused = true;
-      console.log(`[feed:${worldId}] catch-up paused — pool unwatched (resumes when viewed)`);
-      return;
-    }
     void (async () => {
       try {
-        // Drain a chunk of the prescreen queue first so more provisional items keep
-        // entering the feed, then deep-analyze + embed a chunk of what's ready.
         const p = await prescreenPending(worldId);
         const a = await analyzePending(worldId);
-        // Only embed once a chunk's analysis is in (embedding needs the summary).
         const e = await embedPending(worldId);
-        const moreWork =
-          (p.remaining > 0 && p.progressed > 0) ||
-          (a.remaining > 0 && a.progressed > 0) ||
-          (e.remaining > 0 && e.progressed > 0);
-        if (moreWork) {
-          // The chunk we just ran finished uninterrupted; only queue the NEXT one
-          // if the reader is still here, else pause (resumes on their return).
-          if (isWatched(worldId)) {
-            scheduleCatchUp(worldId);
-          } else {
-            state.catchUpPaused = true;
-            console.log(
-              `[feed:${worldId}] catch-up paused — pool unwatched ` +
-                `(${p.remaining + a.remaining} pending, resumes when viewed)`,
-            );
-          }
-        } else {
-          const stuck = p.remaining + a.remaining;
-          if (stuck > 0) console.warn(`[feed:${worldId}] catch-up stalled with ${stuck} pending`);
-          else console.log(`[feed:${worldId}] analysis + embedding backlog cleared`);
-          // The pool is now fully analyzed — reactively extend the stories with
-          // relevant YouTube videos and international (per-zone) coverage.
-          void augmentReactively(worldId);
-        }
+        const pending = p.remaining + a.remaining + e.remaining;
+        console.log(
+          `[feed:${worldId}] backfill batch: +${p.progressed} prescreened, ` +
+            `+${a.progressed} analyzed, +${e.progressed} embedded (${pending} still pending)`,
+        );
+        // Backlog just cleared (we made progress and nothing's left) — reactively
+        // extend the stories with YouTube + per-zone coverage. augmentReactively
+        // adds items and triggers ONE follow-up batch to analyze them, then settles.
+        if (a.progressed > 0 && a.remaining === 0) void augmentReactively(worldId);
       } catch (err) {
-        console.warn(`[feed:${worldId}] catch-up failed:`, err);
+        console.warn(`[feed:${worldId}] backfill batch failed:`, err);
       }
     })();
   }, config.feed.catchUpDelayMs);
 }
 
 /**
- * Bring a world's store up to date (fetch + cheap triage) so PROVISIONAL items
- * are immediately servable, then drain the deep-analysis backlog in the
- * BACKGROUND. The cold-start response only waits on this fetch + triage — never
- * on the (slow) model analysis — so the feed is usable in seconds and enriches
- * live as each background chunk lands.
+ * Bring a world's store up to date (fetch + cheap triage) so PROVISIONAL items are
+ * immediately servable. Deep analysis is now PULL-BASED: we only advance the backlog
+ * by ONE batch when this is a cold start (nothing analyzed to show yet) or when an
+ * explicit refresh surfaced FEWER than `backfillMinNew` genuinely-new articles — so
+ * the reader pulls older news in a batch at a time instead of the GPU draining the
+ * whole 24h backlog in the background. The cold-start response only waits on fetch +
+ * triage, never the (slow) model analysis.
  */
-async function buildPool(worldId: string): Promise<void> {
-  await refreshSources(worldId);
-  // Deep analysis + embedding + augmentation run in the background through the
-  // bounded request gate (ai.ts), prioritised BELOW interactive work, so they never
-  // block the response or starve another world that the reader just switched to.
-  scheduleCatchUp(worldId);
+async function buildPool(worldId: string, opts: { cold: boolean; force: boolean }): Promise<void> {
+  const { newCount } = await refreshSources(worldId);
+  if (opts.cold || (opts.force && newCount < config.feed.backfillMinNew)) {
+    runBackfillBatch(worldId);
+  } else {
+    console.log(
+      `[feed:${worldId}] ${newCount} new article(s) — backlog left for a later refresh`,
+    );
+  }
 }
 
 /**
@@ -1425,7 +1400,10 @@ async function ensurePool(worldId: string, force: boolean): Promise<{ busyWith: 
     return { busyWith: null };
   }
 
-  const build = buildPool(worldId).finally(() => {
+  // cold = nothing to show yet (always advance one batch); force = an explicit
+  // refresh (may pull one batch of older news when little is new). A plain TTL
+  // rebuild from navigation does neither — it just fetches + triages new items.
+  const build = buildPool(worldId, { cold: !hasContent, force }).finally(() => {
     state.buildInFlight = null;
   });
   state.buildInFlight = build;
