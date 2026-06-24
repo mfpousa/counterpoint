@@ -966,10 +966,12 @@ export const GlobeScene = memo(function GlobeScene({
     const easingZoom = Math.abs(refs.zoom.current - g.scale.x) > 1e-3;
     const easingOffset = Math.abs(rightInset / 2 - offsetPx.current) > 0.5;
     const spinning = autoSpin && !pointerOverGlobe;
-    // ASK pins pulse AND the tension arcs flow → both keep the loop awake (at 30fps; these
-    // are steady-state, not gestures, so no full-rate burst). Worldview EVENT chips are now
-    // static 2D overlay icons, so they alone never keep it awake — the globe sleeps (0fps)
-    // with events on screen and only re-projects them on a gesture/data change.
+    // ASK pins pulse AND the arcs flow (tension comets + link flag/icon badges) → both keep
+    // the loop awake AND (via fullRate below) run it at FULL vsync rate: a small, fast badge
+    // the eye TRACKS judders at the throttled, non-vsync 30fps, so these steady-state
+    // animations get the smooth path too. Worldview EVENT chips are static 2D overlay icons,
+    // so they alone never keep it awake — the globe sleeps (0fps) with events on screen and
+    // only re-projects them on a gesture/data change.
     const markersLive = askMarkers.length > 0 || arcs.length > 0;
     const locking = zoomAnchor.current !== null; // cursor-lock needs full-rate steering
     // Transient camera EASES move the whole globe and are loop-driven (no per-event driver
@@ -984,7 +986,10 @@ export const GlobeScene = memo(function GlobeScene({
     // DRAGGING also runs full-rate: the 2D event chips are re-projected each tick to track
     // the surface, and at the throttled 30fps they visibly trail the (faster-rendered) globe
     // under the finger. Full rate keeps chip and globe in lock-step. Ends on release.
-    const fullRate = easingCamera || refs.dragging.current;
+    // `markersLive` joins it so the ARC flow + ask-pin PULSE animate at full vsync rate (the
+    // small travelling badges judder at the throttled, non-vsync 30fps). Costs more GPU while
+    // arcs/ask-pins are on screen — the globe still sleeps to 0fps once they're gone.
+    const fullRate = easingCamera || refs.dragging.current || markersLive;
     const needsMore =
       refs.dragging.current ||
       easingCamera ||
