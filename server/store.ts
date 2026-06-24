@@ -35,6 +35,10 @@ export interface StoredItem {
   summary: string;
   /** Lowercase topical keywords used to match reader interests. */
   keywords: string[];
+  /** ISO 3166-1 alpha-2 (lowercase) of the countries this item is centrally about, from
+   *  the model analysis. Drives REACTIVE side coverage (pull each named country's
+   *  discovered placeSources). Undefined on items predating this field; [] for global. */
+  countries?: string[];
   /** When this item was analyzed (epoch ms). */
   analyzedAt: number;
   /** Semantic embedding of the item (for meaning-based interest matching).

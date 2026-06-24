@@ -22,7 +22,7 @@ import { sanitizeModelText } from "./analysis";
 import { config } from "./config";
 import { langDirective } from "./lang";
 import { decodeEntities } from "../src/lib/rss";
-import { zoneLabel } from "../src/data/zones";
+import { countryLabel } from "../src/lib/countries";
 import type { StoredItem } from "./store";
 
 const SYNTH_SCHEMA: JsonSchema = {
@@ -332,7 +332,7 @@ export async function buildStory(members: StoredItem[], lang: Lang = "en"): Prom
   const chosen = ranked.slice(0, config.stories.maxClusterSources);
   const payload = chosen.map((m) => ({
     outlet: m.item.sourceTitle,
-    zone: zoneLabel(m.item.zone),
+    zone: countryLabel(m.item.zone),
     lean: leanLabel(m.lean),
     title: m.item.title,
     summary: (m.summary || m.item.summary || "").slice(0, 300),
@@ -575,7 +575,7 @@ export async function buildDevelopingStory(
     };
   });
   // Roster of contributing outlets with their zone, so the model can form SIDES.
-  const roster = [...new Map(members.map((m) => [m.item.sourceTitle, zoneLabel(m.item.zone)])).entries()]
+  const roster = [...new Map(members.map((m) => [m.item.sourceTitle, countryLabel(m.item.zone)])).entries()]
     .map(([outlet, zone]) => ({ outlet, zone }))
     .slice(0, 40);
   const payload = { events: eventsPayload, outlets: roster };

@@ -14,7 +14,7 @@ import { fetchStory } from "../../src/lib/api";
 import { cacheStories, getCachedStories, getCachedStory } from "../../src/lib/storyCache";
 import { goBack, openNews, openStory } from "../../src/lib/nav";
 import { topicMeta } from "../../src/lib/topics";
-import { zoneLabel } from "../../src/data/zones";
+import { countryLabel } from "../../src/lib/countries";
 import { storyChange, milestoneIsNew } from "../../src/lib/storyUpdates";
 import { leanColor } from "../../src/components/ui";
 import { TypewriterParagraphs } from "../../src/components/anim";
@@ -274,7 +274,7 @@ export default function StoryPanel() {
                       <View style={styles.zoneRow}>
                         {side.zones.map((z) => (
                           <View key={z} style={styles.zoneChip}>
-                            <Text style={styles.zoneChipText}>{zoneLabel(z)}</Text>
+                            <Text style={styles.zoneChipText}>{countryLabel(z)}</Text>
                           </View>
                         ))}
                       </View>
@@ -353,7 +353,7 @@ export default function StoryPanel() {
                       {s.zone && (
                         <View style={styles.srcZone}>
                           <Ionicons name="earth" size={9} color={colors.accent} />
-                          <Text style={styles.srcZoneText}>{zoneLabel(s.zone)}</Text>
+                          <Text style={styles.srcZoneText}>{countryLabel(s.zone)}</Text>
                         </View>
                       )}
                     </View>

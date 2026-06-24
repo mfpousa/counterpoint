@@ -206,8 +206,9 @@ export interface FeedItem {
    */
   youtubeSearch?: boolean;
   /**
-   * Geographic / affiliation zone this item's outlet belongs to (from a reactive
-   * international source — see Source.zone). Absent for default front-page items.
+   * The ISO 3166-1 alpha-2 COUNTRY code of the outlet behind this item, set when it
+   * was pulled as REACTIVE side coverage (the server fetched that country's discovered
+   * placeSources because a live story named it). Absent for default front-page items.
    * Used to group coverage into conflict SIDES inside a story.
    */
   zone?: string;

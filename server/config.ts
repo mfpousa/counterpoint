@@ -414,35 +414,36 @@ export const config = {
     searchTimeoutMs: num("YT_SEARCH_TIMEOUT_MS", 25_000),
   },
   zones: {
-    // Reactive INTERNATIONAL coverage. When a live story is detected to involve a
-    // foreign zone (e.g. Russia/Ukraine), load THAT zone's outlets on demand,
-    // relate their articles to the story, analyze them like any other item, and
-    // let the synthesis surface how each side frames it. Avoids fetching the whole
-    // world on every build. Disable with ZONES_OFF=1.
+    // Reactive SIDE coverage. When a live story names the COUNTRIES it's about (the
+    // model-emitted `countries`), load each country's DISCOVERED placeSources outlets
+    // on demand, relate their articles to the story, analyze them like any other item,
+    // and let the synthesis surface how each side frames it. The outlets come entirely
+    // from the discovery registry (placeSources) — no hand-curated source lists. Avoids
+    // fetching the whole world on every build. Disable with ZONES_OFF=1.
     enabled: !bool("ZONES_OFF"),
-    // Min distinct alias hits for a zone to count as involved (precision guard so
-    // a single passing mention doesn't drag in a whole region's outlets).
-    minAliasHits: num("ZONES_MIN_ALIAS_HITS", 2),
-    // Max zones loaded per augmentation pass (bounds reactive fetching cost).
+    // Max COUNTRIES whose outlets are loaded per augmentation pass (bounds fetch cost).
     maxZonesPerBuild: num("ZONES_MAX_PER_BUILD", 3),
+    // Max discovered outlets fetched per involved country per pass (a big country can
+    // have dozens of feeds; this caps the reactive fetch so a pass stays bounded).
+    maxSourcesPerCountry: num("ZONES_MAX_SOURCES_PER_COUNTRY", 12),
     // Consider only the top-N most important recent items as story seeds.
     seedItems: num("ZONES_SEED_ITEMS", 40),
-    // Min importance (0..1) for an analyzed item to seed zone detection.
+    // Min importance (0..1) for an analyzed item to seed country-side detection.
     minSeedImportance: num("ZONES_MIN_IMPORTANCE", 0.55),
-    // Only seed zone detection from items no older than this (live stories).
+    // Only seed from items no older than this (live stories).
     sourceMaxAgeMs: num("ZONES_SOURCE_MAX_AGE_MS", 3 * 24 * 60 * 60 * 1000),
-    // Max reactive articles kept per zone per pass (then fully analyzed).
+    // Max reactive articles kept per country per pass (then fully analyzed).
     perZoneItemCap: num("ZONES_PER_ZONE_ITEMS", 6),
-    // Relatedness gate: min shared salient tokens between a fetched zone article
-    // and the story's seed tokens to keep it (we don't want ALL of a region's news).
+    // Relatedness gate: min shared salient tokens between a fetched country article
+    // and the story's seed tokens to keep it (we don't want ALL of a country's news).
     // English feeds match here; ORIGINAL-LANGUAGE feeds (different script) won't, so
     // they're matched by embedding similarity instead (minRelevance below).
     minSharedTokens: num("ZONES_MIN_SHARED_TOKENS", 2),
-    // Embedding relatedness gate (cross-lingual): min cosine between a fetched zone
+    // Embedding relatedness gate (cross-lingual): min cosine between a fetched country
     // article's title and a seed story's embedding to keep it. This is what lets
     // original-language coverage attach to a story when token overlap can't.
     minRelevance: num("ZONES_MIN_RELEVANCE", 0.5),
-    // Re-fetch the same zone at most this often (ms) — bounds repeated loads.
+    // Re-fetch the same country at most this often (ms) — bounds repeated loads.
     zoneTtlMs: num("ZONES_TTL_MS", 6 * 60 * 60 * 1000),
   },
 } as const;

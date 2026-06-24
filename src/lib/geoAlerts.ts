@@ -144,7 +144,10 @@ export function locatePlace(
   for (const side of story.sides ?? []) for (const z of side.zones) zones.add(z);
   for (const s of story.sources) if (s.zone) zones.add(s.zone);
   for (const z of zones) {
-    const iso = idx.zoneToIso2[z];
+    // A side/source zone is now an ISO-2 COUNTRY code (from the discovered placeSources
+    // side coverage), so resolve it directly; `zoneToIso2` remains only as a fallback for
+    // any legacy curated-zone ids ("ukraine") still lingering in cached stories.
+    const iso = idx.zoneToIso2[z] ?? (/^[a-z]{2}$/.test(z) ? z : undefined);
     const dir = iso ? idx.centroidByIso2.get(iso) : undefined;
     if (dir) return { dir, iso2: iso };
   }

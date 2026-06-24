@@ -30,8 +30,7 @@ import {
   sourcesForGeoNode,
   type CoverageState,
 } from "./geoTree";
-import { ZONES, ZONES_BY_ID } from "../src/data/zones";
-import { detectZones } from "../src/lib/zones";
+import { countryLabel } from "../src/lib/countries";
 import { gazetteerFor } from "./places";
 import { placeSourcesFor } from "./placeSources";
 import { dedupeNearClones } from "./dedupe";
@@ -759,6 +758,7 @@ function applyAnalysisToItem(
     importance: a.importance,
     summary: a.summary,
     keywords: a.keywords,
+    countries: a.countries,
     analyzedAt: now,
     coveredBy: coveredBy && coveredBy > 1 ? coveredBy : target.coveredBy,
     // A clone points at its representative so the feed shows one card per story.
@@ -891,6 +891,7 @@ async function analyzeGeoChunk(
         importance: c.rep.importance,
         summary: c.rep.summary,
         keywords: c.rep.keywords,
+        countries: c.rep.countries ?? [],
       };
     }
     // No analysis available (rep failed this round, or wasn't in this chunk's
@@ -978,6 +979,7 @@ function analyzePending(worldId: string): Promise<{ remaining: number; progresse
         importance: a.importance,
         summary: a.summary,
         keywords: a.keywords,
+        countries: a.countries,
         analyzedAt: now,
       });
       progressed += 1;
@@ -1212,15 +1214,16 @@ function articleTokens(title: string): Set<string> {
 }
 
 /**
- * Reactive INTERNATIONAL coverage: detect which foreign zones the live stories
- * involve (gazetteer over the top analyzed headlines), then for each involved
- * zone fetch ONLY that zone's outlets, keep the articles related to the active
- * stories, and add them as PENDING items tagged with their `zone`. They are then
- * analyzed like any other item and cluster into the story, where the synthesis
- * surfaces how each side frames it. Bounded (maxZonesPerBuild) + per-zone TTL.
+ * Reactive SIDE coverage, sourced from the DISCOVERED registry (placeSources) —
+ * the single source of truth for outlets. For the COUNTRIES the live stories are
+ * about (the model-emitted `countries` on each analyzed item), fetch each country's
+ * own discovered outlets, keep the articles related to those stories, and queue them
+ * as PENDING items tagged with their country code (in `zone`). They then analyze and
+ * cluster into the story, where the synthesis compares how each side frames it.
+ * Bounded: maxZonesPerBuild countries/build, capped sources/country, per-country TTL.
  * Returns how many articles were queued; does NOT analyze.
  */
-async function addZonePending(worldId: string): Promise<number> {
+async function addSideCoverage(worldId: string): Promise<number> {
   if (!config.zones.enabled) return 0;
   const st = getStore(worldId);
   const now = Date.now();
@@ -1228,7 +1231,7 @@ async function addZonePending(worldId: string): Promise<number> {
   const state = ws(worldId);
 
   // Seeds: the most important, recent, NON-reactive analyzed items (the stories
-  // currently in play). Reactive (already-zoned) items don't seed new fetches.
+  // currently in play). Reactive (already country-tagged) items don't re-seed.
   const seeds = st
     .all()
     .filter(
@@ -1243,51 +1246,53 @@ async function addZonePending(worldId: string): Promise<number> {
     .slice(0, config.zones.seedItems);
   if (seeds.length === 0) return 0;
 
-  // Accumulate involved zones + the salient tokens AND embeddings of the stories
-  // that triggered each. Tokens relate English coverage; embeddings relate
-  // ORIGINAL-LANGUAGE coverage (cross-lingual) that shares no Latin tokens.
+  // Accumulate involved COUNTRIES (the model-emitted ISO-2 codes) + the salient
+  // tokens AND embeddings of the stories that named each. Tokens relate English
+  // coverage; embeddings relate ORIGINAL-LANGUAGE coverage (cross-lingual) that
+  // shares no Latin tokens with the seed.
   const involved = new Map<
     string,
     { score: number; tokens: Set<string>; embeddings: number[][] }
   >();
   for (const s of seeds) {
-    const text = `${s.item.title} ${s.summary} ${s.keywords.join(" ")}`;
-    const zoneIds = detectZones(text, ZONES, config.zones.minAliasHits);
-    if (zoneIds.length === 0) continue;
+    const ccs = s.countries ?? [];
+    if (ccs.length === 0) continue;
     const seedToks = titleTokens(s.item.title, s.keywords);
-    for (const id of zoneIds) {
-      const cur = involved.get(id) ?? { score: 0, tokens: new Set<string>(), embeddings: [] };
+    for (const cc of ccs) {
+      const cur = involved.get(cc) ?? { score: 0, tokens: new Set<string>(), embeddings: [] };
       cur.score += 1;
       for (const t of seedToks) cur.tokens.add(t);
       if (s.embedding && s.embedding.length > 0) cur.embeddings.push(s.embedding);
-      involved.set(id, cur);
+      involved.set(cc, cur);
     }
   }
   if (involved.size === 0) return 0;
 
-  // Strongest zones first, skipping any fetched within the TTL, capped per build.
+  // Strongest countries first, skipping any fetched within the TTL, capped per build.
   const chosen = [...involved.entries()]
     .sort((a, b) => b[1].score - a[1].score)
-    .filter(([id]) => now - (state.zoneFetchedAt.get(id) ?? 0) >= config.zones.zoneTtlMs)
+    .filter(([cc]) => now - (state.zoneFetchedAt.get(cc) ?? 0) >= config.zones.zoneTtlMs)
     .slice(0, config.zones.maxZonesPerBuild);
   if (chosen.length === 0) return 0;
 
   let added = 0;
-  for (const [zoneId, { tokens, embeddings }] of chosen) {
-    const zone = ZONES_BY_ID[zoneId];
-    if (!zone || zone.sources.length === 0) continue;
-    state.zoneFetchedAt.set(zoneId, now);
+  for (const [cc, { tokens, embeddings }] of chosen) {
+    // The country's DISCOVERED outlets (the source of truth). Cap the number fetched
+    // per pass so reactively pulling a large country (dozens of feeds) stays bounded.
+    const sources = placeSourcesFor(cc).slice(0, config.zones.maxSourcesPerCountry);
+    if (sources.length === 0) continue; // discovery hasn't catalogued this country yet
+    state.zoneFetchedAt.set(cc, now);
     let raw: FeedItem[];
     try {
-      raw = await fetchAll(zone.sources);
+      raw = await fetchAll(sources);
     } catch (e) {
-      console.warn(`[zones:${worldId}] fetch failed for "${zoneId}":`, e);
+      console.warn(`[sides:${worldId}] fetch failed for "${cc}":`, e);
       continue;
     }
-    // Candidates: NEW, recent articles from this zone. We then keep only those
+    // Candidates: NEW, recent articles from this country's outlets, kept only when
     // RELATED to the triggering stories — by shared salient tokens (English) OR by
     // cross-lingual embedding similarity (original-language) — so we get this
-    // zone's take on THESE stories, not its entire feed.
+    // country's take on THESE stories, not its entire feed.
     const candidates = raw.filter((it) => !st.has(it.id) && it.publishedAt >= cutoff);
     const scored = candidates.map((it) => {
       let shared = 0;
@@ -1312,7 +1317,10 @@ async function addZonePending(worldId: string): Promise<number> {
 
     for (const { it } of related) {
       st.upsert({
-        item: it, // carries `zone` from the source (set in rss.normalize)
+        // Tag the item with the COUNTRY it represents (its "side" vantage) — placeSources
+        // outlets carry no zone, so we set it here. This is what finalizeSides detects and
+        // the synthesis groups by, so the cross-country divide can surface.
+        item: { ...it, zone: cc },
         clickbait: false,
         analyzed: false, // full analysis pending, same as any item
         topic: it.topic,
@@ -1325,7 +1333,9 @@ async function addZonePending(worldId: string): Promise<number> {
       added += 1;
     }
     if (related.length > 0) {
-      console.log(`[zones:${worldId}] queued ${related.length} "${zone.label}" article(s) for analysis`);
+      console.log(
+        `[sides:${worldId}] queued ${related.length} "${countryLabel(cc)}" article(s) for analysis`,
+      );
     }
   }
   return added;
@@ -1475,7 +1485,7 @@ function augmentReactively(worldId: string): Promise<void> {
     h.stage("fetching");
     let added = 0;
     added += await addYouTubePending(worldId);
-    added += await addZonePending(worldId);
+    added += await addSideCoverage(worldId);
     if (added === 0) return;
 
     getStore(worldId).save();

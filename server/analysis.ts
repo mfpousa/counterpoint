@@ -90,6 +90,7 @@ const ANALYZE_SCHEMA = arraySchema("analysis", {
     importance: { type: "number" },
     summary: { type: "string" },
     keywords: { type: "array", items: { type: "string" } },
+    countries: { type: "array", items: { type: "string" } },
   },
   required: [
     "id",
@@ -99,6 +100,7 @@ const ANALYZE_SCHEMA = arraySchema("analysis", {
     "importance",
     "summary",
     "keywords",
+    "countries",
   ],
   additionalProperties: false,
 });
@@ -119,6 +121,11 @@ export interface ItemAnalysis {
   summary: string;
   /** Lowercase topical keywords/entities, used to match reader interests. */
   keywords: string[];
+  /** ISO 3166-1 alpha-2 (lowercase) of the countries this story is centrally about /
+   *  the principal parties (e.g. ["ua","ru"]). Drives REACTIVE side coverage: the server
+   *  pulls each named country's discovered placeSources so the synthesis can compare how
+   *  each side frames the story. [] for non-country / global items. */
+  countries: string[];
 }
 
 const VALID_TOPICS: ReadonlySet<string> = new Set<Topic>([
@@ -167,6 +174,10 @@ const ANALYZE_PROMPT =
   '- "keywords": 3-8 lowercase topical keywords/entities capturing the subject ' +
   '(e.g. ["artificial intelligence","llm","regulation"]). Be substantive — these ' +
   "are used to match reader interests.\n" +
+  '- "countries": 0-4 ISO 3166-1 alpha-2 codes (lowercase) of the countries this story ' +
+  'is centrally ABOUT or that are its principal parties (e.g. ["ua","ru"] for a ' +
+  'Russia\u2013Ukraine story, ["il","ps"] for Israel\u2013Gaza). Use the COUNTRY, not ' +
+  "nationalities of incidental mentions; [] for a global/non-country story.\n" +
   'Some items include a "transcript" of spoken content — weigh it heavily.\n' +
   'Respond with ONLY a JSON object {"items": [ ...one object per article... ]}, ' +
   "same order as input. No prose.";
@@ -539,8 +550,20 @@ export function coerceAnalysis(raw: Record<string, unknown>, fallback: FeedItem)
         .filter((k) => k && !looksDegenerate(k))
         .slice(0, 10)
     : [];
+  // ISO 3166-1 alpha-2 only (two letters), de-duped, capped — the principal countries
+  // the story is about, used to fetch each side's discovered outlets reactively.
+  const countries = Array.isArray(raw["countries"])
+    ? [
+        ...new Set(
+          (raw["countries"] as unknown[])
+            .filter((c): c is string => typeof c === "string")
+            .map((c) => c.toLowerCase().trim())
+            .filter((c) => /^[a-z]{2}$/.test(c)),
+        ),
+      ].slice(0, 4)
+    : [];
 
-  return { topic, lean, leanRefined, leanRationale, importance, summary, keywords };
+  return { topic, lean, leanRefined, leanRationale, importance, summary, keywords, countries };
 }
 
 async function analyzeBatch(

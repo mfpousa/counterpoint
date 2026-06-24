@@ -90,6 +90,45 @@ describe("coerceAnalysis — lean provenance + rationale", () => {
   });
 });
 
+describe("coerceAnalysis — model-named countries (ISO-2 for reactive sides)", () => {
+  it("keeps valid lowercase ISO-2 codes, de-duped and capped at 4", () => {
+    const a = coerceAnalysis(
+      {
+        id: "1",
+        topic: "world",
+        lean: null,
+        importance: 0.8,
+        summary: "Russia–Ukraine front-line update.",
+        keywords: ["war"],
+        countries: ["UA", "ru", "ua", "fr", "de", "es"],
+      },
+      fallback({ topic: "world", lean: null }),
+    );
+    expect(a.countries).toEqual(["ua", "ru", "fr", "de"]);
+  });
+
+  it("drops non-ISO-2 junk and defaults to [] when absent", () => {
+    const a = coerceAnalysis(
+      {
+        id: "1",
+        topic: "world",
+        lean: null,
+        importance: 0.5,
+        summary: "x",
+        keywords: [],
+        countries: ["usa", "u", "123", "gb"],
+      },
+      fallback({ topic: "world", lean: null }),
+    );
+    expect(a.countries).toEqual(["gb"]);
+    const b = coerceAnalysis(
+      { id: "1", topic: "world", lean: null, importance: 0.5, summary: "x", keywords: [] },
+      fallback({ topic: "world", lean: null }),
+    );
+    expect(b.countries).toEqual([]);
+  });
+});
+
 describe("looksDegenerate / sanitizeModelText", () => {
   it("flags repeated-punctuation and symbol-soup runs from the logs", () => {
     expect(looksDegenerate("...???…??..………………………………………………………")).toBe(true);

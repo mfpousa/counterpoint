@@ -118,8 +118,9 @@ const REGION_RADIUS = 1.004; // province fills sit just above the country fill (
 const OUTLINE_RADIUS = 1.006; // region borders just above the province fills
 const COUNTRY_OUTLINE_RADIUS = 1.003; // faint country borders just above the country fill
 
-// Affiliation zone (src/data/zones.ts) → ISO-2, so a zoned story drops a marker on the
-// right country. Broad zones (latam/africa) are omitted — those fall back to name match.
+// LEGACY fallback only: side/source zones are now ISO-2 country codes (resolved directly).
+// This maps the old curated-zone ids that may still linger in cached stories → ISO-2, so an
+// older story's arcs/markers keep resolving until it's re-synthesized. New stories skip it.
 const ZONE_ISO2: Record<string, string> = {
   ukraine: "ua",
   russia: "ru",
@@ -728,7 +729,9 @@ export function Globe({
     const now = Date.now();
     const sideDir = (zones: string[]) => {
       for (const z of zones) {
-        const iso = ZONE_ISO2[z];
+        // A side's zone is now an ISO-2 COUNTRY code (placeSources side coverage), so
+        // resolve it directly; ZONE_ISO2 is only a fallback for legacy curated zone ids.
+        const iso = ZONE_ISO2[z] ?? (/^[a-z]{2}$/.test(z) ? z : undefined);
         const dir = iso ? byIso2.get(iso) : undefined;
         if (dir) return dir;
       }
