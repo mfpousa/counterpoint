@@ -7,9 +7,10 @@
 // then every vertex is lifted onto the sphere with the tested latLonToVec3. The
 // renderer (GlobeScene) only turns the returned typed arrays into a BufferGeometry.
 //
-// Known v1 limitation: polygons that cross the ±180° antimeridian (Russia, Fiji,
-// Alaska) triangulate with a few stretched faces — acceptable for a stylized globe;
-// splitting at the antimeridian is a later refinement.
+// Antimeridian: polygons that cross the ±180° line (Russia's far east, Fiji, Alaska's
+// Aleutians) are UNWRAPPED (negative longitudes shifted +360) before earcut, so they
+// triangulate as one contiguous ring instead of producing faces that slice through the
+// globe's core. See the ANTIMERIDIAN FIX in addPolygon.
 
 import earcut from "earcut";
 import { latLonToVec3, normalize, type Vec3 } from "./globeLayout";
@@ -81,14 +82,32 @@ type Ring = [number, number][];
  *  EXPANDED (non-indexed) triangle vertices + outward normals to the shared arrays. */
 function addPolygon(rings: Ring[], radius: number, outPos: number[], outNorm: number[]): void {
   if (rings.length === 0) return;
+  // ANTIMERIDIAN FIX: a polygon whose outer ring spans > 180° of longitude must cross the
+  // ±180° line (e.g. Russia's far east at ~-169° together with its body up to +180°). In
+  // raw lon/lat that makes earcut connect the +180 side to the -180 side, producing huge
+  // triangles that slice THROUGH the globe's core (the "gap" the reader sees). UNWRAP the
+  // negative longitudes by +360 so the ring is contiguous before triangulating — the 3D
+  // projection (sin/cos) is periodic, so a lon of 191° still maps to the correct point.
+  let minLon = Infinity;
+  let maxLon = -Infinity;
+  for (const [lon] of rings[0]) {
+    const v = Number(lon);
+    if (Number.isFinite(v)) {
+      if (v < minLon) minLon = v;
+      if (v > maxLon) maxLon = v;
+    }
+  }
+  const unwrap = maxLon - minLon > 180;
   const flat: number[] = [];
   const holes: number[] = [];
   rings.forEach((ring, ri) => {
     if (ri > 0) holes.push(flat.length / 2);
     for (const pt of ring) {
-      const lon = Number(pt[0]);
+      let lon = Number(pt[0]);
       const lat = Number(pt[1]);
-      if (Number.isFinite(lon) && Number.isFinite(lat)) flat.push(lon, lat);
+      if (!Number.isFinite(lon) || !Number.isFinite(lat)) continue;
+      if (unwrap && lon < 0) lon += 360;
+      flat.push(lon, lat);
     }
   });
   if (flat.length < 6) return; // need at least a triangle
