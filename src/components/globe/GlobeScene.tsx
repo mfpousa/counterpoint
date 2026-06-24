@@ -918,7 +918,15 @@ export const GlobeScene = memo(function GlobeScene({
         zoomAnchor.current = null;
       } else {
         _anchor.project(cam);
-        const gain = DRAG_K / (g.scale.x * (size.height || 600));
+        // Perspective correction (the fix for the zoom-in flicker): the linear drag gain
+        // assumes the surface sits at the globe-CENTRE distance, but zoomed in the FRONT
+        // surface is much closer to the camera and magnifies far more on screen — so the
+        // closed loop over-corrects harder the deeper you zoom, oscillating into a flicker.
+        // Scaling by (front-surface distance / centre distance) keeps the loop gain ~1 at
+        // every zoom; the extra 0.85 leaves a stability margin so it eases in without ringing.
+        const CAM_Z = 3.2; // camera sits at z = 3.2 (see <Canvas camera> in Globe)
+        const persp = Math.max(0.12, (CAM_Z - g.scale.x * PLANET_RADIUS) / CAM_Z);
+        const gain = (DRAG_K / (g.scale.x * (size.height || 600))) * persp * 0.85;
         const STEP = 0.1; // max rad/tick — a hard cap against any single-frame lurch
         const dyaw = (anchor.ndcX - _anchor.x) * (size.width / 2) * gain;
         const dpitch = -(anchor.ndcY - _anchor.y) * (size.height / 2) * gain;
