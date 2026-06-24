@@ -24,6 +24,7 @@ import React, {
 } from "react";
 import {
   ActivityIndicator,
+  Animated,
   Keyboard,
   PanResponder,
   Platform,
@@ -165,13 +166,14 @@ const CursorPin = forwardRef<
   );
 });
 
-/** 2D overlay that floats labels/detail bubbles ON the globe's markers. Positions are
- *  pushed imperatively from GlobeScene's frame loop (projected world→screen), so the
- *  globe never re-renders to move a label; a still globe pushes identical frames which
- *  this de-dupes (rounded), costing zero React updates. The root is `box-none`, so the
- *  read-only hover bubbles (pointerEvents none) never steal taps from the globe — but
- *  the FOCUSED pin's card is interactive (pointerEvents auto), on top, with a backdrop
- *  that dismisses it on an outside tap. */
+/** 2D overlay that floats event chips / labels / cards ON the globe's markers. Each
+ *  marker's POSITION rides an Animated.ValueXY that GlobeScene's frame loop drives via
+ *  `set` (projected world→screen) — so a moving globe updates chip transforms imperatively
+ *  WITHOUT a React render, keeping them glued to the surface with zero commit lag. A React
+ *  render happens only when the SET of markers (or their static content) changes, not when
+ *  they move. The root is `box-none` so read-only labels never steal globe taps; event
+ *  chips ARE interactive (tap → focus); the focused card sits on top over a dismiss
+ *  backdrop. Hovering a chip also reports up (onHoverMarker) so the auto-spin pauses. */
 const MarkerLayer = forwardRef<
   { set: (items: ProjectedMarker[]) => void },
   {
@@ -181,24 +183,55 @@ const MarkerLayer = forwardRef<
     onDismiss: () => void;
     /** Tap an event chip → focus it (opens its card). */
     onPressMarker: (id: string) => void;
+    /** Pointer entered (id) / left (null) a chip — pauses/resumes the globe's auto-spin. */
+    onHoverMarker: (id: string | null) => void;
     /** Rich, interactive content for the focused card (links + selectable text). */
     renderFocused: (it: ProjectedMarker) => React.ReactNode;
   }
->(function MarkerLayer({ focusedId, onDismiss, onPressMarker, renderFocused }, ref) {
+>(function MarkerLayer(
+  { focusedId, onDismiss, onPressMarker, onHoverMarker, renderFocused },
+  ref,
+) {
   const [items, setItems] = useState<ProjectedMarker[]>([]);
-  const [height, setHeight] = useState(0); // layer height (px), for bottom-anchoring bubbles
-  // Which event chip the pointer is over (web) — shows its headline bubble, locally, so a
-  // hover never round-trips through the 3D scene (no re-render of the globe).
+  // Which event chip the pointer is over (web) — shows its headline bubble.
   const [hoverId, setHoverId] = useState<string | null>(null);
-  const prevKey = useRef("");
+  // Per-marker screen position as an Animated value, so the frame loop can move a chip
+  // imperatively (setValue) without re-rendering this list. Created lazily, pruned in set.
+  const posRef = useRef<Map<string, Animated.ValueXY>>(new Map());
+  const prevKey = useRef(""); // signature of the marker SET + static content (NOT position)
+  const getPos = (it: ProjectedMarker) => {
+    let v = posRef.current.get(it.id);
+    if (!v) {
+      v = new Animated.ValueXY({ x: it.x, y: it.y });
+      posRef.current.set(it.id, v);
+    }
+    return v;
+  };
   useImperativeHandle(
     ref,
     () => ({
       set: (next: ProjectedMarker[]) => {
+        const map = posRef.current;
+        const seen = new Set<string>();
+        for (const it of next) {
+          seen.add(it.id);
+          const v = map.get(it.id);
+          if (v) v.setValue({ x: it.x, y: it.y }); // move imperatively — no React render
+          else map.set(it.id, new Animated.ValueXY({ x: it.x, y: it.y }));
+        }
+        for (const id of [...map.keys()]) if (!seen.has(id)) map.delete(id);
+        // Re-render ONLY when the set, a chip's static content, or its hovered flag changes
+        // (NOT its position — that's imperative). `hovered` flips on a hover action, never
+        // per-frame, so it's cheap to include and it drives the ask-pin bubble.
         const key = next
-          .map((i) => `${i.id}:${Math.round(i.x)}:${Math.round(i.y)}:${i.hovered ? 1 : 0}`)
+          .map(
+            (i) =>
+              `${i.id}:${i.kind}:${i.category ?? ""}:${i.count ?? 1}:${Math.round(
+                (i.severity ?? 0) * 20,
+              )}:${i.hovered ? 1 : 0}:${i.label}:${i.detail}`,
+          )
           .join("|");
-        if (key === prevKey.current) return; // nothing moved/changed → skip re-render
+        if (key === prevKey.current) return;
         prevKey.current = key;
         setItems(next);
       },
@@ -208,14 +241,8 @@ const MarkerLayer = forwardRef<
   // Only show the backdrop when the focused pin is actually on screen (front hemisphere),
   // so a stale/occluded focus never traps the globe behind an invisible catcher.
   const focusedShown = focusedId !== null && items.some((i) => i.id === focusedId);
-  // Anchor each stack by its BOTTOM (just above the pin) using the layer's measured
-  // height, so a bubble grows UPWARD with its content instead of being clipped.
   return (
-    <View
-      style={StyleSheet.absoluteFill}
-      pointerEvents="box-none"
-      onLayout={(e) => setHeight(e.nativeEvent.layout.height)}
-    >
+    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       {focusedShown && (
         <Pressable
           style={[StyleSheet.absoluteFill, styles.markerBackdrop]}
@@ -223,75 +250,82 @@ const MarkerLayer = forwardRef<
           accessibilityLabel="Dismiss"
         />
       )}
-      {height > 0 &&
-        items.map((it) => {
-          const pos = { left: it.x - 110, bottom: height - it.y + 12 };
-          // FOCUSED pin (ask or event): its interactive card, anchored above the point.
-          if (it.id === focusedId) {
-            return (
-              <View key={it.id} style={[styles.markerTag, styles.markerFocusedWrap, pos]} pointerEvents="box-none">
+      {items.map((it) => {
+        // A zero-size anchor pinned to the marker's screen point (driven imperatively); all
+        // content positions itself relative to that point, so it tracks the spinning globe.
+        const transform = getPos(it).getTranslateTransform();
+        // FOCUSED pin (ask or event): its interactive card, anchored just above the point.
+        if (it.id === focusedId) {
+          return (
+            <Animated.View key={it.id} style={[styles.markerAnchor, { transform }]} pointerEvents="box-none">
+              <View style={[styles.markerStack, styles.markerFocusedWrap]} pointerEvents="box-none">
                 <View style={[styles.markerCard, { borderColor: it.color }]} pointerEvents="auto">
                   {renderFocused(it)}
                 </View>
               </View>
-            );
-          }
-          // WORLDVIEW EVENT: a legible, category-coloured ICON chip sitting on the point.
-          // Size scales with severity; a "+N" badge marks stacked events; tap → focus card;
-          // hover (web) → headline bubble. Constant on-screen size at any zoom.
-          if (it.kind === "alert" && it.category) {
-            const cr = Math.round(11 + (it.severity ?? 0.4) * 7); // chip RADIUS (px)
-            const showBubble = hoverId === it.id && !!it.detail;
-            const more = (it.count ?? 1) - 1;
-            return (
-              <React.Fragment key={it.id}>
-                {showBubble && (
-                  <View
-                    style={[styles.markerTag, { left: it.x - 110, bottom: height - it.y + cr + 6 }]}
-                    pointerEvents="none"
-                  >
-                    <View style={[styles.markerBubble, { borderColor: it.color }]}>
-                      <Text style={styles.markerBubbleText} numberOfLines={3}>
-                        {it.detail}
-                      </Text>
-                    </View>
+            </Animated.View>
+          );
+        }
+        // WORLDVIEW EVENT: a legible, category-coloured ICON chip sitting on the point.
+        // Size scales with severity; a "+N" badge marks stacked events; tap → focus card;
+        // hover → headline bubble AND pauses the spin. Constant on-screen size at any zoom.
+        if (it.kind === "alert" && it.category) {
+          const cr = Math.round(11 + (it.severity ?? 0.4) * 7); // chip RADIUS (px)
+          const showBubble = hoverId === it.id && !!it.detail;
+          const more = (it.count ?? 1) - 1;
+          return (
+            <Animated.View key={it.id} style={[styles.markerAnchor, { transform }]} pointerEvents="box-none">
+              {showBubble && (
+                <View style={[styles.markerStack, { bottom: cr + 6 }]} pointerEvents="none">
+                  <View style={[styles.markerBubble, { borderColor: it.color }]}>
+                    <Text style={styles.markerBubbleText} numberOfLines={3}>
+                      {it.detail}
+                    </Text>
+                  </View>
+                </View>
+              )}
+              <Pressable
+                style={[
+                  styles.eventChip,
+                  {
+                    left: -cr,
+                    top: -cr,
+                    width: cr * 2,
+                    height: cr * 2,
+                    borderRadius: cr,
+                    backgroundColor: it.color,
+                  },
+                ]}
+                onPress={() => onPressMarker(it.id)}
+                onHoverIn={() => {
+                  setHoverId(it.id);
+                  onHoverMarker(it.id); // pause the auto-spin while the reader inspects
+                }}
+                onHoverOut={() => {
+                  setHoverId((h) => (h === it.id ? null : h));
+                  onHoverMarker(null);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={it.detail}
+              >
+                <Ionicons
+                  name={EVENT_CATEGORIES[it.category].icon as IoniconName}
+                  size={Math.round(cr * 1.15)}
+                  color="#0b0f14"
+                />
+                {more > 0 && (
+                  <View style={styles.eventCount}>
+                    <Text style={styles.eventCountText}>{more > 9 ? "9+" : `+${more}`}</Text>
                   </View>
                 )}
-                <Pressable
-                  style={[
-                    styles.eventChip,
-                    {
-                      left: it.x - cr,
-                      top: it.y - cr,
-                      width: cr * 2,
-                      height: cr * 2,
-                      borderRadius: cr,
-                      backgroundColor: it.color,
-                    },
-                  ]}
-                  onPress={() => onPressMarker(it.id)}
-                  onHoverIn={() => setHoverId(it.id)}
-                  onHoverOut={() => setHoverId((h) => (h === it.id ? null : h))}
-                  accessibilityRole="button"
-                  accessibilityLabel={it.detail}
-                >
-                  <Ionicons
-                    name={EVENT_CATEGORIES[it.category].icon as IoniconName}
-                    size={Math.round(cr * 1.15)}
-                    color="#0b0f14"
-                  />
-                  {more > 0 && (
-                    <View style={styles.eventCount}>
-                      <Text style={styles.eventCountText}>{more > 9 ? "9+" : `+${more}`}</Text>
-                    </View>
-                  )}
-                </Pressable>
-              </React.Fragment>
-            );
-          }
-          // AI-SEARCH pin: an always-on place label, plus a blurb bubble on hover.
-          return (
-            <View key={it.id} style={[styles.markerTag, pos]} pointerEvents="none">
+              </Pressable>
+            </Animated.View>
+          );
+        }
+        // AI-SEARCH pin: an always-on place label, plus a blurb bubble on hover.
+        return (
+          <Animated.View key={it.id} style={[styles.markerAnchor, { transform }]} pointerEvents="none">
+            <View style={styles.markerStack} pointerEvents="none">
               {it.hovered && it.detail ? (
                 <View style={[styles.markerBubble, { borderColor: it.color }]}>
                   <Text style={styles.markerBubbleText}>{it.detail}</Text>
@@ -305,8 +339,9 @@ const MarkerLayer = forwardRef<
                 </View>
               ) : null}
             </View>
-          );
-        })}
+          </Animated.View>
+        );
+      })}
     </View>
   );
 });
@@ -533,11 +568,22 @@ export function Globe({
     for (const a of raw) {
       const key = `${a.dir.x.toFixed(2)}|${a.dir.y.toFixed(2)}|${a.dir.z.toFixed(2)}`;
       const ex = byLoc.get(key);
-      if (ex) ex.count = (ex.count ?? 1) + 1;
-      else byLoc.set(key, { ...a, count: 1 });
+      if (ex) {
+        ex.count = (ex.count ?? 1) + 1;
+        ex.stacked!.push({ id: a.id, title: a.title }); // keep each collapsed story for fan-out
+      } else {
+        byLoc.set(key, { ...a, count: 1, stacked: [{ id: a.id, title: a.title }] });
+      }
     }
     return [...byLoc.values()].slice(0, 40);
   }, [worldGeo, stories]);
+
+  // id → alert, so a focused chip's card can look up its full record (incl. the `stacked`
+  // events it aggregates) without threading that whole list through the projected markers.
+  const alertById = useMemo(
+    () => new Map(alerts.map((a) => [a.id, a])),
+    [alerts],
+  );
 
   // The categories actually present, for the on-globe legend (in a stable order).
   const legendCats = useMemo<EventCategory[]>(() => {
@@ -735,6 +781,10 @@ export function Globe({
     if (didDrag.current) return;
     setFocusedMarkerId(id);
   }, []);
+  // Tapping a 2D event CHIP focuses it. Unlike the 3D pins above, a chip tap doesn't go
+  // through the globe's PanResponder, so `didDrag` is never reset for it — gating on the
+  // stale flag would swallow the tap. The chip's own Pressable already distinguishes a tap.
+  const onChipPress = useCallback((id: string) => setFocusedMarkerId(id), []);
   const clearFocus = useCallback(() => setFocusedMarkerId(null), []);
 
   // The interactive content of a focused pin's card: selectable text + clickable links.
@@ -743,6 +793,36 @@ export function Globe({
   const renderFocused = useCallback(
     (it: ProjectedMarker) => {
       if (it.kind === "alert") {
+        // An aggregated chip (many stories on one country) FANS OUT: list every collapsed
+        // headline, each its own tap-to-open row. A lone event keeps the simple card.
+        const stacked = alertById.get(it.id)?.stacked ?? [
+          { id: it.id, title: it.detail },
+        ];
+        if (stacked.length > 1) {
+          return (
+            <>
+              <Text style={styles.markerCardCount}>
+                {t("globe.storiesHere", { count: stacked.length })}
+              </Text>
+              {stacked.map((s) => (
+                <Pressable
+                  key={s.id}
+                  style={styles.markerCardRow}
+                  onPress={() => {
+                    onAlertPress?.(s.id);
+                    setFocusedMarkerId(null);
+                  }}
+                  accessibilityRole="link"
+                >
+                  <Text style={styles.markerCardRowText} numberOfLines={2}>
+                    {s.title}
+                  </Text>
+                  <Ionicons name="open-outline" size={13} color={colors.accent} />
+                </Pressable>
+              ))}
+            </>
+          );
+        }
         return (
           <>
             <Text style={styles.markerCardText} selectable>
@@ -782,7 +862,7 @@ export function Globe({
         </>
       );
     },
-    [onAlertPress, t, flyToAskMarker, askResult],
+    [onAlertPress, t, flyToAskMarker, askResult, alertById],
   );
 
   // The drill-down options (covered places + anything drillable), placed on the
@@ -1563,7 +1643,8 @@ export function Globe({
           ref={markerLayerRef}
           focusedId={focusedMarkerId}
           onDismiss={clearFocus}
-          onPressMarker={onMarkerSelect}
+          onPressMarker={onChipPress}
+          onHoverMarker={onMarkerHover}
           renderFocused={renderFocused}
         />
 
@@ -1851,11 +1932,13 @@ const styles = StyleSheet.create({
     fontSize: font.small,
     fontWeight: "800",
   },
-  // Marker overlay: a stack anchored by its BOTTOM just above each pin (left/bottom set
-  // inline to the projected position), centred, auto-height so the full bubble text
-  // shows. Detail bubble stacks above the always-on place chip.
-  markerTag: {
+  // Zero-size anchor pinned to a marker's projected point (moved imperatively via Animated).
+  markerAnchor: { position: "absolute", left: 0, top: 0 },
+  // A centred column floating just ABOVE the anchor point (labels / bubbles / focused card).
+  markerStack: {
     position: "absolute",
+    bottom: 12,
+    left: -110,
     width: 220,
     alignItems: "center",
   },
@@ -1920,4 +2003,21 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
   },
   markerCardLinkText: { color: colors.accent, fontSize: font.tiny, fontWeight: "700" },
+  // Aggregated-chip fan-out: a small heading + one tap-to-open row per collapsed story.
+  markerCardCount: {
+    color: colors.textDim,
+    fontSize: font.tiny,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+  markerCardRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingVertical: 5,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  markerCardRowText: { flex: 1, color: colors.text, fontSize: font.small, lineHeight: 17 },
 });
