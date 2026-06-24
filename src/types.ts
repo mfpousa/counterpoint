@@ -422,6 +422,14 @@ export interface Story {
    */
   sides?: StorySide[];
   /**
+   * Directed PHYSICAL connections the story draws between two countries (ISO 3166-1
+   * alpha-2, lowercase) — e.g. a disease, shipment, migration, evacuation, aid, attack,
+   * or route spreading/moving FROM one place TO another ("Ebola spreads from DRC to
+   * France"). The globe draws a flowing arc per link (origin → destination). Absent when
+   * the story isn't about a place-to-place connection.
+   */
+  links?: { from: string; to: string }[];
+  /**
    * True when synthesis is a graceful FALLBACK (model offline/failed): built
    * from the source one-line summaries without cross-outlet analysis. The UI
    * surfaces this so the distinction is never hidden.

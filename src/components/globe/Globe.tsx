@@ -107,6 +107,10 @@ const TIME_WINDOWS: TimeWindow[] = ["all", "week", "day", "now"];
 // Stable empty arcs reference — passed while an AI search owns the globe (so the tension
 // web hides), avoiding a fresh [] each render that would defeat React.memo(GlobeScene).
 const EMPTY_ARCS: ArcData[] = [];
+// Arc palette: WARM for conflict tension (who's pulling against whom), COOL for a physical
+// LINK/flow between two places (a spread/route/shipment/migration, origin → destination).
+const ARC_TENSION = "#ff7a5c";
+const ARC_LINK = "#22d3ee";
 const WORLD_ZOOM = 0.9; // zoomed-OUT scale for the world landing (whole globe in view)
 // Pixels→radians drag gain: 2·cameraZ·tan(fov/2) = the world height the viewport spans
 // at the globe's distance. Dividing by (zoom·canvasHeightPx) makes a drag STICK to the
@@ -727,11 +731,11 @@ export function Globe({
     return [...byLoc.values()].slice(0, 40);
   }, [worldGeo, stories]);
 
-  // RELATIONSHIPS (the tension web): the most severe MULTI-SIDE conflicts become flowing
-  // great-circle arcs between their sides' home zones — who is pulling against whom. Capped
-  // to the top few so the globe reads as a clear instrument, not a hairball, and tied to the
-  // time window so the scrubber narrows the web too. Independent of the category lenses (the
-  // ties are their own layer). A side's anchor is the centroid of its first resolvable zone.
+  // RELATIONSHIPS web — two kinds of flowing great-circle ties, time-windowed + capped so the
+  // globe reads as a clear instrument, not a hairball: (1) TENSION ties (warm) between the home
+  // zones of a multi-side conflict — who is pulling against whom; (2) LINK ties (cool) for any
+  // story that physically connects two places (model-emitted `links`, origin → destination):
+  // a disease spread, shipment, migration, route, … The comet always flows a → b.
   const relationshipArcs = useMemo<ArcData[]>(() => {
     if (!worldGeo) return [];
     const byIso2 = worldGeo.centroids.byIso2;
@@ -746,14 +750,13 @@ export function Globe({
       }
       return undefined;
     };
-    const top = stories
-      .filter(
-        (s) => (s.sides?.length ?? 0) >= 2 && withinWindow(s.updatedAt, timeWindow, now),
-      )
+    const out: ArcData[] = [];
+    // (1) TENSION ties: top multi-side conflicts, pairwise between distinct side anchors.
+    const conflicts = stories
+      .filter((s) => (s.sides?.length ?? 0) >= 2 && withinWindow(s.updatedAt, timeWindow, now))
       .sort((a, b) => (b.severity ?? 0) - (a.severity ?? 0))
       .slice(0, 8);
-    const out: ArcData[] = [];
-    for (const s of top) {
+    for (const s of conflicts) {
       const dirs = (s.sides ?? [])
         .map((side) => sideDir(side.zones))
         .filter((d): d is NonNullable<typeof d> => !!d);
@@ -762,11 +765,26 @@ export function Globe({
           const a = dirs[i];
           const b = dirs[j];
           if (a.x * b.x + a.y * b.y + a.z * b.z > 0.9999) continue; // same country → skip
-          out.push({ id: `${s.id}:${i}-${j}`, a, b, severity: s.severity ?? 0.6 });
+          out.push({ id: `${s.id}:${i}-${j}`, a, b, severity: s.severity ?? 0.6, color: ARC_TENSION });
         }
       }
     }
-    return out;
+    // (2) LINK ties: any story connecting two physical places (origin → destination).
+    const linked = stories
+      .filter((s) => (s.links?.length ?? 0) > 0 && withinWindow(s.updatedAt, timeWindow, now))
+      .sort((a, b) => (b.severity ?? 0) - (a.severity ?? 0))
+      .slice(0, 10);
+    for (const s of linked) {
+      const links = s.links ?? [];
+      for (let i = 0; i < links.length; i++) {
+        const a = byIso2.get(links[i].from);
+        const b = byIso2.get(links[i].to);
+        if (!a || !b) continue;
+        if (a.x * b.x + a.y * b.y + a.z * b.z > 0.9999) continue; // same country → skip
+        out.push({ id: `link:${s.id}:${i}`, a, b, severity: s.severity ?? 0.6, color: ARC_LINK });
+      }
+    }
+    return out.slice(0, 20); // hard cap so the flow animation stays bounded
   }, [worldGeo, stories, timeWindow]);
 
   // id → alert, so a focused chip's card can look up its full record (incl. the `stacked`

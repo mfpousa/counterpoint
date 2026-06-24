@@ -266,19 +266,22 @@ function Outline({
 // each with a comet flowing along it so the tie reads as a live, directional link.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** One tension tie to draw on the globe: a great circle from `a` to `b` (unit dirs). */
+/** One tie to draw on the globe: a great circle from `a` to `b` (unit dirs). */
 export interface ArcData {
   id: string;
   a: Vec3;
   b: Vec3;
   /** 0..1 — drives the arc's brightness, thickness-feel and comet size. */
   severity: number;
+  /** Hex colour for this tie (e.g. warm = conflict tension, cool = a physical link/flow).
+   *  Falls back to ARC_COLOR when omitted. The comet flows a → b (origin → destination). */
+  color?: string;
 }
 
 const ARC_SEGMENTS = 56; // polyline resolution along the great circle
 const ARC_BASE_RADIUS = 1.012; // hugs just above the land at the endpoints
 const ARC_LIFT = 0.22; // how high the arc bows out at its midpoint (scaled by span)
-const ARC_COLOR = "#ff7a5c"; // warm "tension" hue, additively blended → energy line
+const ARC_COLOR = "#ff7a5c"; // default (conflict tension) hue; per-arc `color` overrides it
 const ARC_FLOW_SPEED = 0.32; // comet loops per second along each arc
 
 /** Build the bowed great-circle geometry between two unit directions: the continuous
@@ -333,7 +336,7 @@ function Arcs({ arcs }: { arcs: ArcData[] }) {
               <bufferAttribute attach="attributes-position" args={[g.line, 3]} />
             </bufferGeometry>
             <lineBasicMaterial
-              color={ARC_COLOR}
+              color={g.color ?? ARC_COLOR}
               transparent
               opacity={0.22 + 0.4 * g.severity}
               blending={AdditiveBlending}
@@ -347,7 +350,7 @@ function Arcs({ arcs }: { arcs: ArcData[] }) {
           >
             <sphereGeometry args={[0.011 + 0.012 * g.severity, 12, 12]} />
             <meshBasicMaterial
-              color={ARC_COLOR}
+              color={g.color ?? ARC_COLOR}
               transparent
               opacity={0.95}
               blending={AdditiveBlending}

@@ -62,8 +62,17 @@ const SYNTH_SCHEMA: JsonSchema = {
         required: ["name", "iso2"],
         additionalProperties: false,
       },
+      links: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: { from: { type: "string" }, to: { type: "string" } },
+          required: ["from", "to"],
+          additionalProperties: false,
+        },
+      },
     },
-    required: ["title", "summary", "synthesis", "angles", "sides", "contradictions", "protagonist"],
+    required: ["title", "summary", "synthesis", "angles", "sides", "contradictions", "protagonist", "links"],
     additionalProperties: false,
   },
 };
@@ -80,8 +89,14 @@ const SYNTH_RULES =
   '  "angles": [ { "outlet": "<exact outlet name>", "framing": "ONE sentence on how THIS outlet framed/emphasized it" } ],\n' +
   '  "sides": [ { "label": "<short side label, e.g. \'Western media\', \'Russian media\', \'Ukrainian media\'>", "outlets": ["<exact outlet names on this side>"], "framing": "1-2 sentences on how THIS side frames/emphasizes the story" } ],\n' +
   '  "contradictions": ["specific points where the outlets disagree or report differently; [] if none are evident"],\n' +
-  '  "protagonist": { "name": "the central actor/subject the story is MOST about (a country, organisation, or person)", "iso2": "if that protagonist IS a country or a national government/actor, its ISO 3166-1 alpha-2 code in lowercase (e.g. us, es, ua); otherwise an empty string" }\n' +
+  '  "protagonist": { "name": "the central actor/subject the story is MOST about (a country, organisation, or person)", "iso2": "if that protagonist IS a country or a national government/actor, its ISO 3166-1 alpha-2 code in lowercase (e.g. us, es, ua); otherwise an empty string" },\n' +
+  '  "links": [ { "from": "<ISO 3166-1 alpha-2 ORIGIN>", "to": "<ISO 3166-1 alpha-2 DESTINATION>" } ]\n' +
   "}\n" +
+  "For 'links', emit a DIRECTED connection ONLY when the story describes a PHYSICAL link or " +
+  "movement between two DISTINCT countries \u2014 a disease spreading, a flight/shipment/migration/" +
+  "evacuation/aid/attack/pipeline, or a route \u2014 from an ORIGIN ('from') to a DESTINATION ('to'), " +
+  "both ISO 3166-1 alpha-2 lowercase. Return [] when the story is not about a place-to-place " +
+  "connection. " +
   "For 'protagonist', pick the single entity the story most centres on and name it; set 'iso2' ONLY " +
   "when that protagonist is a nation/national actor (use \"\" for organisations, people, or anything " +
   "non-national). Each outlet has a geographic/affiliation 'zone'. For 'sides', GROUP the outlets into the " +
@@ -190,6 +205,31 @@ function coerceProtagonist(raw: unknown): { name: string; iso2?: string } | unde
   const code = typeof r["iso2"] === "string" ? r["iso2"].trim().toLowerCase() : "";
   const iso2 = /^[a-z]{2}$/.test(code) ? code : undefined;
   return iso2 ? { name, iso2 } : { name };
+}
+
+/**
+ * Parse the model's place-to-place LINKS — directed physical connections between two
+ * DISTINCT countries (a spread, route, shipment, migration, evacuation, aid, attack, …).
+ * Validates ISO 3166-1 alpha-2 endpoints, drops self/degenerate + duplicate links, and
+ * caps the count. The globe draws a flowing arc per link (origin → destination).
+ */
+export function coerceLinks(raw: unknown, max = 4): { from: string; to: string }[] {
+  if (!Array.isArray(raw)) return [];
+  const out: { from: string; to: string }[] = [];
+  const seen = new Set<string>();
+  for (const row of raw) {
+    if (!row || typeof row !== "object") continue;
+    const r = row as Record<string, unknown>;
+    const from = typeof r["from"] === "string" ? r["from"].trim().toLowerCase() : "";
+    const to = typeof r["to"] === "string" ? r["to"].trim().toLowerCase() : "";
+    if (!/^[a-z]{2}$/.test(from) || !/^[a-z]{2}$/.test(to) || from === to) continue;
+    const key = `${from}>${to}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ from, to });
+    if (out.length >= max) break;
+  }
+  return out;
 }
 
 /** Resolve an outlet name the model returned back to a contributing member. */
@@ -350,6 +390,7 @@ export async function buildStory(members: StoredItem[], lang: Lang = "en"): Prom
   const angles = coerceAngles(obj["angles"], members, config.stories.maxClusterSources);
   const sides = finalizeSides(coerceSides(obj["sides"], members), members);
   const contradictions = coerceStringArray(obj["contradictions"], 6);
+  const links = coerceLinks(obj["links"]);
 
   // Nothing usable came back — fall back rather than ship an empty story.
   if (!title && synthesis.length === 0) return fallbackStory(members);
@@ -367,6 +408,7 @@ export async function buildStory(members: StoredItem[], lang: Lang = "en"): Prom
     sources: toSources(members),
     angles,
     ...(sides ? { sides } : {}),
+    ...(links.length > 0 ? { links } : {}),
     contradictions,
     ...(coerceProtagonist(obj["protagonist"]) ? { protagonist: coerceProtagonist(obj["protagonist"]) } : {}),
     relatedIds: [],
@@ -433,6 +475,15 @@ const DEVELOPING_SCHEMA: JsonSchema = {
         required: ["name", "iso2"],
         additionalProperties: false,
       },
+      links: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: { from: { type: "string" }, to: { type: "string" } },
+          required: ["from", "to"],
+          additionalProperties: false,
+        },
+      },
     },
     required: [
       "title",
@@ -444,6 +495,7 @@ const DEVELOPING_SCHEMA: JsonSchema = {
       "sides",
       "contradictions",
       "protagonist",
+      "links",
     ],
     additionalProperties: false,
   },
@@ -473,7 +525,12 @@ const DEVELOPING_RULES =
   "side with no outlets present, use an empty string. For 'sides', GROUP the roster outlets into the " +
   "opposing geographic/affiliation vantage points actually PRESENT (by 'zone') and describe how each " +
   "frames the issue \u2014 e.g. Western vs Ukrainian vs Russian media. Use only zones present; return [] " +
-  "when all outlets share one vantage point. No prose outside the JSON.";
+  "when all outlets share one vantage point. " +
+  'Also include "links": [ { "from": "<ISO 3166-1 alpha-2 ORIGIN>", "to": "<ISO 3166-1 alpha-2 DESTINATION>" } ] ' +
+  "\u2014 a DIRECTED connection ONLY when the issue describes a PHYSICAL link or movement between two " +
+  "DISTINCT countries (a spread, route, shipment, migration, evacuation, aid, attack, or pipeline) from " +
+  "an ORIGIN to a DESTINATION, both lowercase; [] when it is not about a place-to-place connection. " +
+  "No prose outside the JSON.";
 
 function earliestAt(members: StoredItem[]): number {
   return Math.min(...members.map((m) => m.item.publishedAt));
@@ -594,6 +651,7 @@ export async function buildDevelopingStory(
   const timeline = buildTimeline(orderedEvents, obj["timeline"]);
   const spectrum = coerceSpectrum(obj["spectrum"]);
   const sides = finalizeSides(coerceSides(obj["sides"], members), members);
+  const links = coerceLinks(obj["links"]);
   const resolved = sanitizeModelText(obj["status"]).toLowerCase() === "resolved";
 
   if (!title && synthesis.length === 0) return fallbackDevelopingStory(orderedEvents);
@@ -619,6 +677,7 @@ export async function buildDevelopingStory(
     timeline,
     spectrum,
     ...(sides ? { sides } : {}),
+    ...(links.length > 0 ? { links } : {}),
     ...(coerceProtagonist(obj["protagonist"]) ? { protagonist: coerceProtagonist(obj["protagonist"]) } : {}),
   };
 }
