@@ -575,7 +575,15 @@ async function prescreenAndStore(
  * chunked downstream. Returns how many genuinely-new (never-seen, in-window) items
  * this fetch surfaced, so the caller can decide whether to backfill older news.
  */
-async function refreshSources(worldId: string): Promise<{ newCount: number }> {
+async function refreshSources(
+  worldId: string,
+  // Priority for THIS refresh's first-chunk triage. Server-driven refreshes (auto TTL
+  // re-fetch, navigation, manual, and coldFill's follow-up subset pulls) MUST be
+  // "background" so they yield to user-facing requests via the gate's reserved interactive
+  // slot. Only the genuine COLD first paint (a reader waiting on an empty pool) is
+  // "interactive" — see buildPool. Defaulting to background is the safe choice.
+  priority: "interactive" | "background" = "background",
+): Promise<{ newCount: number }> {
   const state = ws(worldId);
   const st = getStore(worldId);
   const allSources = sourcesForWorld(worldId);
@@ -632,7 +640,9 @@ async function refreshSources(worldId: string): Promise<{ newCount: number }> {
     // items from earlier refreshes aren't dropped when this refresh lands mid-flush.
     const firstN = config.feed.prescreenChunk > 0 ? config.feed.prescreenChunk : untriaged.length;
     await withActivity(worldId, "triage", (h) =>
-      prescreenAndStore(worldId, untriaged.slice(0, firstN), h),
+      withModelPriority(priority, () =>
+        prescreenAndStore(worldId, untriaged.slice(0, firstN), h),
+      ),
     );
     enqueuePrescreen(worldId, untriaged.slice(firstN));
   } else {
@@ -1621,7 +1631,10 @@ async function buildPool(
   opts: { cold: boolean; trigger: RefreshTrigger },
 ): Promise<void> {
   const state = ws(worldId);
-  await refreshSources(worldId);
+  // Only a COLD first paint (reader waiting on an empty pool) earns interactive triage; a
+  // WARM refresh (auto/navigation/manual) is server-driven and runs background so it never
+  // occupies the gate's reserved interactive slot and delays the reader's search/briefing.
+  await refreshSources(worldId, opts.cold ? "interactive" : "background");
   // A (re)build means the reader is here — seed the watch gate so the flush chain isn't
   // cut off before the client's first status poll lands.
   markWatched(worldId);
