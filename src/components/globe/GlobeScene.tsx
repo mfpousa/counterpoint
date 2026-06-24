@@ -809,6 +809,10 @@ export const GlobeScene = memo(function GlobeScene({
     // (idle spin, marker pulse, post-kick settle) stay at 30fps to save power.
     const flyingTo = refs.target.current !== null;
     const easingCamera = flyingTo || easingZoom || easingOffset || locking;
+    // DRAGGING also runs full-rate: the 2D event chips are re-projected each tick to track
+    // the surface, and at the throttled 30fps they visibly trail the (faster-rendered) globe
+    // under the finger. Full rate keeps chip and globe in lock-step. Ends on release.
+    const fullRate = easingCamera || refs.dragging.current;
     const needsMore =
       refs.dragging.current ||
       easingCamera ||
@@ -820,7 +824,7 @@ export const GlobeScene = memo(function GlobeScene({
       nextFrame.current = null;
     }
     if (needsMore && !pausedRef.current) {
-      if (easingCamera) {
+      if (fullRate) {
         // Full rate (vsync-aligned via r3f's demand loop) so the move is smooth and quick.
         // The eases above converge on their targets, so this burst self-terminates and the
         // loop falls back to the 30fps throttle (or sleeps) once everything settles.

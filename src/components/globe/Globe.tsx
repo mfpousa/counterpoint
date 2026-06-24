@@ -24,11 +24,11 @@ import React, {
 } from "react";
 import {
   ActivityIndicator,
-  Animated,
   Keyboard,
   PanResponder,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -166,11 +166,12 @@ const CursorPin = forwardRef<
   );
 });
 
-/** 2D overlay that floats event chips / labels / cards ON the globe's markers. Each
- *  marker's POSITION rides an Animated.ValueXY that GlobeScene's frame loop drives via
- *  `set` (projected world→screen) — so a moving globe updates chip transforms imperatively
- *  WITHOUT a React render, keeping them glued to the surface with zero commit lag. A React
- *  render happens only when the SET of markers (or their static content) changes, not when
+/** 2D overlay that floats event chips / labels / cards ON the globe's markers. GlobeScene's
+ *  frame loop drives `set` (projected world→screen) which writes each marker's transform
+ *  STRAIGHT to its host node (setNativeProps) — so a moving globe updates chip positions
+ *  imperatively WITHOUT a React render, keeping them glued to the surface with zero commit
+ *  lag. A React render happens only when the SET of markers (or their static content) changes,
+ *  not when
  *  they move. The root is `box-none` so read-only labels never steal globe taps; event
  *  chips ARE interactive (tap → focus); the focused card sits on top over a dismiss
  *  backdrop. Hovering a chip also reports up (onHoverMarker) so the auto-spin pauses. */
@@ -195,31 +196,35 @@ const MarkerLayer = forwardRef<
   const [items, setItems] = useState<ProjectedMarker[]>([]);
   // Which event chip the pointer is over (web) — shows its headline bubble.
   const [hoverId, setHoverId] = useState<string | null>(null);
-  // Per-marker screen position as an Animated value, so the frame loop can move a chip
-  // imperatively (setValue) without re-rendering this list. Created lazily, pruned in set.
-  const posRef = useRef<Map<string, Animated.ValueXY>>(new Map());
+  // Each marker's host node + its last screen position. The frame loop writes the transform
+  // STRAIGHT to the node (setNativeProps) — synchronously, in the SAME frame the globe
+  // renders, with no React commit in between — which is what keeps a chip glued to the
+  // surface while dragging (a state/Animated round-trip lands a frame late and trails).
+  const nodes = useRef<Map<string, React.ElementRef<typeof View>>>(new Map());
+  const pos = useRef<Map<string, { x: number; y: number }>>(new Map());
   const prevKey = useRef(""); // signature of the marker SET + static content (NOT position)
-  const getPos = (it: ProjectedMarker) => {
-    let v = posRef.current.get(it.id);
-    if (!v) {
-      v = new Animated.ValueXY({ x: it.x, y: it.y });
-      posRef.current.set(it.id, v);
-    }
-    return v;
+  const setNode = (id: string) => (node: React.ElementRef<typeof View> | null) => {
+    if (node) nodes.current.set(id, node);
+    else nodes.current.delete(id);
   };
+  const transformOf = (p: { x: number; y: number }) => [
+    { translateX: p.x },
+    { translateY: p.y },
+  ];
   useImperativeHandle(
     ref,
     () => ({
       set: (next: ProjectedMarker[]) => {
-        const map = posRef.current;
         const seen = new Set<string>();
         for (const it of next) {
           seen.add(it.id);
-          const v = map.get(it.id);
-          if (v) v.setValue({ x: it.x, y: it.y }); // move imperatively — no React render
-          else map.set(it.id, new Animated.ValueXY({ x: it.x, y: it.y }));
+          pos.current.set(it.id, { x: it.x, y: it.y });
+          // Move the chip imperatively — no React render, no commit lag.
+          nodes.current
+            .get(it.id)
+            ?.setNativeProps({ style: { transform: transformOf(it) } });
         }
-        for (const id of [...map.keys()]) if (!seen.has(id)) map.delete(id);
+        for (const id of [...pos.current.keys()]) if (!seen.has(id)) pos.current.delete(id);
         // Re-render ONLY when the set, a chip's static content, or its hovered flag changes
         // (NOT its position — that's imperative). `hovered` flips on a hover action, never
         // per-frame, so it's cheap to include and it drives the ask-pin bubble.
@@ -251,19 +256,20 @@ const MarkerLayer = forwardRef<
         />
       )}
       {items.map((it) => {
-        // A zero-size anchor pinned to the marker's screen point (driven imperatively); all
-        // content positions itself relative to that point, so it tracks the spinning globe.
-        const transform = getPos(it).getTranslateTransform();
+        // A zero-size anchor pinned to the marker's screen point (its transform is written
+        // imperatively each frame); content positions relative to that point, so it tracks
+        // the spinning globe. Initial transform = last known position (fresh on re-render).
+        const transform = transformOf(pos.current.get(it.id) ?? { x: it.x, y: it.y });
         // FOCUSED pin (ask or event): its interactive card, anchored just above the point.
         if (it.id === focusedId) {
           return (
-            <Animated.View key={it.id} style={[styles.markerAnchor, { transform }]} pointerEvents="box-none">
+            <View key={it.id} ref={setNode(it.id)} style={[styles.markerAnchor, { transform }]} pointerEvents="box-none">
               <View style={[styles.markerStack, styles.markerFocusedWrap]} pointerEvents="box-none">
                 <View style={[styles.markerCard, { borderColor: it.color }]} pointerEvents="auto">
                   {renderFocused(it)}
                 </View>
               </View>
-            </Animated.View>
+            </View>
           );
         }
         // WORLDVIEW EVENT: a legible, category-coloured ICON chip sitting on the point.
@@ -274,7 +280,7 @@ const MarkerLayer = forwardRef<
           const showBubble = hoverId === it.id && !!it.detail;
           const more = (it.count ?? 1) - 1;
           return (
-            <Animated.View key={it.id} style={[styles.markerAnchor, { transform }]} pointerEvents="box-none">
+            <View key={it.id} ref={setNode(it.id)} style={[styles.markerAnchor, { transform }]} pointerEvents="box-none">
               {showBubble && (
                 <View style={[styles.markerStack, { bottom: cr + 6 }]} pointerEvents="none">
                   <View style={[styles.markerBubble, { borderColor: it.color }]}>
@@ -319,12 +325,12 @@ const MarkerLayer = forwardRef<
                   </View>
                 )}
               </Pressable>
-            </Animated.View>
+            </View>
           );
         }
         // AI-SEARCH pin: an always-on place label, plus a blurb bubble on hover.
         return (
-          <Animated.View key={it.id} style={[styles.markerAnchor, { transform }]} pointerEvents="none">
+          <View key={it.id} ref={setNode(it.id)} style={[styles.markerAnchor, { transform }]} pointerEvents="none">
             <View style={styles.markerStack} pointerEvents="none">
               {it.hovered && it.detail ? (
                 <View style={[styles.markerBubble, { borderColor: it.color }]}>
@@ -339,7 +345,7 @@ const MarkerLayer = forwardRef<
                 </View>
               ) : null}
             </View>
-          </Animated.View>
+          </View>
         );
       })}
     </View>
@@ -804,22 +810,31 @@ export function Globe({
               <Text style={styles.markerCardCount}>
                 {t("globe.storiesHere", { count: stacked.length })}
               </Text>
-              {stacked.map((s) => (
-                <Pressable
-                  key={s.id}
-                  style={styles.markerCardRow}
-                  onPress={() => {
-                    onAlertPress?.(s.id);
-                    setFocusedMarkerId(null);
-                  }}
-                  accessibilityRole="link"
-                >
-                  <Text style={styles.markerCardRowText} numberOfLines={2}>
-                    {s.title}
-                  </Text>
-                  <Ionicons name="open-outline" size={13} color={colors.accent} />
-                </Pressable>
-              ))}
+              {/* Cap the height and scroll when many stories collapse here, so a busy
+                  country (e.g. 12+ events) doesn't grow a card taller than the screen. */}
+              <ScrollView
+                style={styles.markerCardScroll}
+                contentContainerStyle={styles.markerCardScrollBody}
+                nestedScrollEnabled
+                showsVerticalScrollIndicator
+              >
+                {stacked.map((s) => (
+                  <Pressable
+                    key={s.id}
+                    style={styles.markerCardRow}
+                    onPress={() => {
+                      onAlertPress?.(s.id);
+                      setFocusedMarkerId(null);
+                    }}
+                    accessibilityRole="link"
+                  >
+                    <Text style={styles.markerCardRowText} numberOfLines={2}>
+                      {s.title}
+                    </Text>
+                    <Ionicons name="open-outline" size={13} color={colors.accent} />
+                  </Pressable>
+                ))}
+              </ScrollView>
             </>
           );
         }
@@ -1932,7 +1947,7 @@ const styles = StyleSheet.create({
     fontSize: font.small,
     fontWeight: "800",
   },
-  // Zero-size anchor pinned to a marker's projected point (moved imperatively via Animated).
+  // Zero-size anchor pinned to a marker's projected point (transform written imperatively).
   markerAnchor: { position: "absolute", left: 0, top: 0 },
   // A centred column floating just ABOVE the anchor point (labels / bubbles / focused card).
   markerStack: {
@@ -2011,6 +2026,9 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 0.4,
   },
+  // Scrollable list of collapsed stories — capped height so a busy country stays compact.
+  markerCardScroll: { maxHeight: 240, alignSelf: "stretch" },
+  markerCardScrollBody: { paddingRight: 2 },
   markerCardRow: {
     flexDirection: "row",
     alignItems: "center",
