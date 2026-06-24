@@ -147,19 +147,46 @@ export const config = {
     recencyBucketHours: num("FEED_RECENCY_BUCKET_HOURS", 2),
     // Gap before a (pull-based) backfill batch runs after a refresh.
     catchUpDelayMs: num("FEED_CATCHUP_DELAY_MS", 1500),
-    // SOURCE ROTATION. A warm refresh fetches only this many sources — a random subset
-    // dealt from a shuffled "deck" so successive refreshes get a DIFFERENT subset with no
-    // repeats until every source has been fetched once, then the deck reshuffles. Spreads
-    // fetch cost/bytes over time instead of re-pulling every feed each refresh; previously-
-    // fetched items persist in the store between a source's turns. COLD starts ignore this
-    // and fetch all sources to seed the pool. 0 (or >= a world's source count) = fetch all.
+    // SOURCE ROTATION. EVERY refresh — including a cold open — fetches only this many
+    // sources: a random subset dealt from a shuffled "deck" so successive refreshes get a
+    // DIFFERENT subset with no repeats until every source has been fetched once, then the
+    // deck reshuffles. Spreads fetch cost/bytes over time instead of re-pulling every feed
+    // each refresh; items from sources not fetched this turn persist in the store until
+    // their turn. A cold open just repeats this (see coldBacklogTarget) until there's a
+    // decent backlog — it never bursts every source at once. 0 (or >= a world's source
+    // count) = fetch all in one go.
     sourceFetchBudget: numOrZero("FEED_SOURCE_FETCH_BUDGET", 10),
+    // COLD-FILL backlog target. A freshly-opened pool keeps pulling further rotating source
+    // subsets until it has at least this many in-window items queued/servable, or it has
+    // cycled through all sources once, or the reader navigates away — then it behaves like a
+    // warm pool. One subset of active feeds usually clears this in a single pull; a quiet
+    // pool fetches a few more. ~The provisional view size.
+    coldBacklogTarget: num("FEED_COLD_BACKLOG_TARGET", 120),
+    // SOURCE REPEAT RATIO. Fraction of each refresh's source budget spent RE-FETCHING
+    // already-seen sources (least-recently-fetched first) instead of advancing to new ones.
+    // With many sources, pure no-repeat rotation only ever samples each source's freshest
+    // items (and the prescreen queue is replaced each refresh), so older articles get
+    // starved. Spending part of the budget on repeats keeps moving through time: it catches
+    // what a source published since we last saw it and gives earlier items another chance to
+    // be analyzed; the rest stays fresh (no-repeat) for breadth. 0 = pure rotation; ~0.5–0.8
+    // balances recent vs. catch-up; 1 would freeze breadth.
+    sourceRepeatRatio: numOrZero("FEED_SOURCE_REPEAT_RATIO", 0.5),
+    // NAVIGATION batch gate. Switching to a pool starts a deep-analysis round only if it's
+    // been at least this long since the last batch — so flipping between pools (or re-opening
+    // one) doesn't re-kick processing every time. Manual refreshes ignore this (always run a
+    // batch); automatic/live-reload fetches never start one. Default 15 min.
+    navBatchTtlMs: num("FEED_NAV_BATCH_TTL_MS", 15 * 60 * 1000),
     // Headlines PRESCREENED (cheap title-only triage) per chunk. The cold-start
     // feed only WAITS on the FIRST chunk, so it lands fast even when a pool floods
     // with thousands of items; each pull-based backfill batch prescreens one more
     // chunk of the queued remainder. Keep it ~one triage batch so the first paint
     // is a single model round. 0 = prescreen everything up front (one big pass).
     prescreenChunk: numOrZero("FEED_PRESCREEN_CHUNK", 40),
+    // BOUND on the prescreen queue (fetched-but-not-yet-triaged items). The queue is now
+    // MERGED across refreshes (not replaced), so older un-prescreened items survive until a
+    // flush drains them; this caps how many we hold. Over the cap, the OLDEST are dropped
+    // (lowest priority — they'd age out of the analysis window anyway). 0 = unbounded.
+    prescreenQueueMax: numOrZero("FEED_PRESCREEN_QUEUE_MAX", 3000),
     // How long after a pool's last status poll we still consider it WATCHED. The
     // client polls /api/status for the viewed pool every ~3s. Kept as a lightweight
     // presence signal only — backfill is now pull-based (refresh-triggered), so a

@@ -311,6 +311,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const res = await fetchRankedFeed({
         interest: interestRef.current,
         world: reqWorld,
+        // Live reload (status-poll driven): pull newly-analyzed items into the view but
+        // NEVER kick off a new analysis round — that's reserved for manual/navigation.
+        auto: true,
       });
       // Same guard as refreshFeed: ignore if superseded or the place changed mid-flight.
       if (fSeq !== feedSeq.current || reqWorld !== worldRef.current) return;

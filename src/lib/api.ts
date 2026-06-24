@@ -60,12 +60,15 @@ export interface FeedResponse {
 }
 
 /**
- * Fetch the AI-ranked feed from the backend. When `force` is true we POST
- * /api/refresh to rebuild from scratch; otherwise GET /api/feed (TTL-cached).
+ * Fetch the AI-ranked feed from the backend.
+ *  - `force` (manual refresh): POST /api/refresh — rebuilds and ALWAYS runs an analysis round.
+ *  - `auto` (background/live-reload): GET /api/feed?auto=1 — refreshes the view + may fetch/
+ *    triage, but NEVER starts a new analysis round.
+ *  - neither (navigation): GET /api/feed — may start a round, gated server-side by ~15 min.
  * Throws on network/HTTP failure so the caller can surface a clear message.
  */
 export async function fetchRankedFeed(
-  opts: { force?: boolean; interest?: string; world?: string } = {},
+  opts: { force?: boolean; interest?: string; world?: string; auto?: boolean } = {},
 ): Promise<FeedResponse> {
   const base = apiBaseUrl();
   const interest = (opts.interest ?? "").trim();
@@ -81,6 +84,8 @@ export async function fetchRankedFeed(
     const params = new URLSearchParams();
     if (interest) params.set("interest", interest);
     if (world) params.set("world", world);
+    // Background/live-reload fetch: refresh the view without kicking off a new analysis round.
+    if (opts.auto) params.set("auto", "1");
     const qs = params.toString();
     res = await fetch(`${base}/api/feed${qs ? `?${qs}` : ""}`, { method: "GET" });
   }

@@ -114,9 +114,13 @@ app.get("/api/status", (req, res) => {
 
 app.get("/api/feed", async (req, res) => {
   try {
+    // `auto=1` marks a BACKGROUND/live-reload fetch (status-poll driven): it refreshes the
+    // view and may fetch + triage, but NEVER starts a deep-analysis round. A plain GET is a
+    // NAVIGATION, which may start one (gated by feed.navBatchTtlMs). POST /api/refresh is manual.
+    const auto = req.query.auto === "1" || req.query.auto === "true";
     const feed = await getFeed(
       readWorld(req.query.world),
-      false,
+      auto ? "auto" : "navigation",
       readInterest(req.query.interest),
     );
     res.json(feed);
@@ -405,7 +409,7 @@ app.post("/api/refresh", async (req, res) => {
   try {
     const world = readWorld(req.body?.world);
     clearCaches(world);
-    const feed = await getFeed(world, true, readInterest(req.body?.interest));
+    const feed = await getFeed(world, "manual", readInterest(req.body?.interest));
     res.json(feed);
   } catch (e) {
     console.error("[api] /api/refresh failed:", e);

@@ -106,6 +106,10 @@ interface WorldState {
   worldId: string;
   /** Timestamp of this world's last pool build (for TTL + cache validity). */
   lastBuildAt: number;
+  /** Epoch ms a deep-analysis ROUND (backfill flush) was last kicked off / progressed.
+   *  Gates how often a NAVIGATION refresh may start a new round (config.feed.navBatchTtlMs);
+   *  manual refreshes ignore it, automatic refreshes never start one. */
+  lastBatchAt: number;
   status: { phase: BuildPhase; done: number; total: number };
   /** Assembled per-interest views (valid while builtAt matches lastBuildAt). */
   viewCache: Map<string, { builtAt: number; result: FeedResult }>;
@@ -149,6 +153,7 @@ function ws(worldId: string): WorldState {
     s = {
       worldId,
       lastBuildAt: 0,
+      lastBatchAt: 0,
       status: { phase: "idle", done: 0, total: 0 },
       viewCache: new Map(),
       briefingCache: new Map(),
@@ -480,41 +485,37 @@ async function prescreenAndStore(worldId: string, items: FeedItem[]): Promise<vo
 }
 
 /**
- * Network phase: fetch all sources, then prescreen ONLY the freshest chunk
+ * Network phase: fetch a rotating SUBSET of sources, then prescreen ONLY the freshest chunk
  * synchronously so the cold-start feed lands FAST even when a pool floods with
  * thousands of items. The remainder is queued on the world state; a (pull-based)
  * backfill batch prescreens the rest a chunk at a time. Deep analysis is likewise
  * chunked downstream. Returns how many genuinely-new (never-seen, in-window) items
  * this fetch surfaced, so the caller can decide whether to backfill older news.
  */
-async function refreshSources(
-  worldId: string,
-  opts: { full: boolean } = { full: false },
-): Promise<{ newCount: number }> {
+async function refreshSources(worldId: string): Promise<{ newCount: number }> {
   const state = ws(worldId);
   const st = getStore(worldId);
   const allSources = sourcesForWorld(worldId);
-  // Warm refresh: fetch only a rotating random SUBSET (config.feed.sourceFetchBudget),
-  // cycling through every source with no repeats before the deck reshuffles — this spreads
-  // fetch cost/bytes over successive refreshes. Cold starts (opts.full) fetch ALL to seed
-  // the pool; items from sources not fetched this turn persist in the store until their turn.
-  const sources = opts.full
-    ? allSources
-    : (() => {
-        const byId = new Map(allSources.map((s) => [s.id, s]));
-        const ids = dealNextBatch(
-          state.rotation,
-          allSources.map((s) => s.id),
-          config.feed.sourceFetchBudget,
-        );
-        const picked = ids.map((id) => byId.get(id)).filter((s): s is Source => !!s);
-        return picked.length > 0 ? picked : allSources;
-      })();
+  // Fetch only a SUBSET (config.feed.sourceFetchBudget) of the sources per refresh, split
+  // into a FRESH half (no-repeat deck → breadth: every source visited once per cycle) and a
+  // REPEAT half (config.feed.sourceRepeatRatio → re-fetch least-recently-fetched sources so
+  // we keep moving through TIME, not just sampling the present). Items from sources not
+  // fetched this turn persist in the store until their turn; a cold open repeats this via
+  // coldFill() until there's a decent backlog, so it never bursts every source at once.
+  const byId = new Map(allSources.map((s) => [s.id, s]));
+  const ids = dealNextBatch(
+    state.rotation,
+    allSources.map((s) => s.id),
+    config.feed.sourceFetchBudget,
+    { repeatRatio: config.feed.sourceRepeatRatio },
+  );
+  const picked = ids.map((id) => byId.get(id)).filter((s): s is Source => !!s);
+  const sources = picked.length > 0 ? picked : allSources;
   const started = Date.now();
   setPhase(state, "fetching");
   console.log(
-    `[feed:${worldId}] refresh — fetching ${sources.length}/${allSources.length} sources` +
-      `${opts.full ? " (full seed)" : ` (rotating subset, ${state.rotation.queue.length} left this cycle)`}…`,
+    `[feed:${worldId}] refresh — fetching ${sources.length}/${allSources.length} sources ` +
+      `(rotating subset, ${state.rotation.queue.length} left this cycle)…`,
   );
   const raw = await fetchAll(sources);
   const cutoff = analyzeCutoff();
@@ -532,21 +533,28 @@ async function refreshSources(
   );
 
   if (untriaged.length > 0) {
-    // Fail fast if the model is down: don't store half-processed items; retry later.
+    // Fail fast if the model is down: we can't prescreen now, so QUEUE everything (capped)
+    // for later instead of dropping it — the backlog survives until the model returns and a
+    // flush drains it.
     if (!(await aiReachable())) {
-      console.warn(`[feed:${worldId}] AI endpoint unreachable — skipping triage this refresh.`);
-      state.prescreenQueue = [];
+      console.warn(
+        `[feed:${worldId}] AI endpoint unreachable — queued ${untriaged.length} for later triage.`,
+      );
+      enqueuePrescreen(worldId, untriaged);
       state.lastBuildAt = Date.now();
       setPhase(state, "idle");
       return { newCount };
     }
-    // Only the FIRST chunk is awaited (one cheap model round); the rest is queued
-    // for the background loop so the cold-start response isn't held by a flood.
+    // Only the FIRST chunk is awaited (one cheap model round) so the response isn't held by a
+    // flood; the rest is MERGED into the queue (not replacing it) so older un-prescreened
+    // items from earlier refreshes aren't dropped when this refresh lands mid-flush.
     const firstN = config.feed.prescreenChunk > 0 ? config.feed.prescreenChunk : untriaged.length;
-    state.prescreenQueue = untriaged.slice(firstN);
     await prescreenAndStore(worldId, untriaged.slice(0, firstN));
+    enqueuePrescreen(worldId, untriaged.slice(firstN));
   } else {
-    state.prescreenQueue = [];
+    // Nothing new this refresh — KEEP (and re-filter) the existing backlog rather than
+    // clearing it; a later flush still has older items to drain.
+    enqueuePrescreen(worldId, []);
   }
 
   const removed = st.prune();
@@ -564,6 +572,43 @@ async function refreshSources(
       `(${state.prescreenQueue.length} queued for background prescreen)`,
   );
   return { newCount };
+}
+
+/**
+ * Merge freshly-fetched, un-prescreened items into the world's prescreen queue WITHOUT
+ * dropping the un-drained remainder from earlier refreshes. (The queue used to be REPLACED
+ * each refresh, so when a new refresh landed before the background flush finished, older
+ * queued items were silently lost.) Dedups by id (the rotation's repeat half can re-fetch an
+ * already-queued source), drops anything already prescreened+stored or fallen out of the
+ * analysis window, keeps the queue FRESHEST-FIRST (its drain order), and BOUNDS it
+ * (config.feed.prescreenQueueMax) — over the cap the OLDEST are dropped, lowest-priority and
+ * about to age out anyway.
+ */
+export function mergePrescreenQueue(
+  existing: FeedItem[],
+  incoming: FeedItem[],
+  opts: { isStored: (id: string) => boolean; cutoff: number; cap: number },
+): FeedItem[] {
+  const seen = new Set<string>();
+  const merged: FeedItem[] = [];
+  for (const it of [...existing, ...incoming]) {
+    if (seen.has(it.id) || opts.isStored(it.id) || it.publishedAt < opts.cutoff) continue;
+    seen.add(it.id);
+    merged.push(it);
+  }
+  // Freshest-first: prescreenPending drains from the FRONT, so recent news is triaged first.
+  merged.sort((a, b) => b.publishedAt - a.publishedAt);
+  return opts.cap > 0 && merged.length > opts.cap ? merged.slice(0, opts.cap) : merged;
+}
+
+function enqueuePrescreen(worldId: string, incoming: FeedItem[]): void {
+  const state = ws(worldId);
+  const st = getStore(worldId);
+  state.prescreenQueue = mergePrescreenQueue(state.prescreenQueue, incoming, {
+    isStored: (id) => st.has(id),
+    cutoff: analyzeCutoff(),
+    cap: config.feed.prescreenQueueMax,
+  });
 }
 
 /**
@@ -1327,7 +1372,7 @@ function augmentReactively(worldId: string): Promise<void> {
     // Deferred transcript enrichment for important video/podcast items (all pools).
     // If anything was re-analyzed, its embedding was cleared — re-embed in the bg.
     const enriched = await enrichTranscripts(worldId);
-    if (enriched > 0) runBackfillBatch(worldId, true);
+    if (enriched > 0) runBackfillBatch(worldId);
 
     // GEO pools show everything their own outlets report — no geo-scope filtering,
     // and no YouTube/zone augmentation (those extend TOPICAL worlds). Nothing more.
@@ -1347,7 +1392,7 @@ function augmentReactively(worldId: string): Promise<void> {
     // Analyze the newly-added items (chained so the cascade completes). analyzePending
     // is per-world re-entrancy-guarded and its model passes share the bounded request
     // gate (ai.ts), so this needs no cross-world lock.
-    runBackfillBatch(worldId, true);
+    runBackfillBatch(worldId);
   })()
     .catch((e) => {
       console.warn(`[augment:${worldId}] reactive augmentation failed:`, e);
@@ -1359,23 +1404,22 @@ function augmentReactively(worldId: string): Promise<void> {
 }
 
 /**
- * Run a backfill batch: drain a chunk of the prescreen queue (so more provisional
- * items enter the feed), then deep-analyze + embed a chunk of what's ready — newest
- * first. PULL-BASED: only ever triggered by a cold open or an explicit refresh (see
- * buildPool), NEVER by a status poll, so navigating/idling can't pin the GPU.
+ * FLUSH the backlog: drain a chunk of the prescreen queue (so more provisional items
+ * enter the feed), then deep-analyze + embed a chunk of what's ready — newest first —
+ * and KEEP running batches while progress is made AND the reader is still on this pool.
+ * Once articles are fetched they're analyzed to completion: we never leave new articles
+ * un-analyzed (deep analysis is the stream's "flush"). Deep analysis is itself capped per
+ * pool by deepAnalyzeKeep, and the chain winds down when the backlog clears or the reader
+ * navigates away.
  *
- * `chain` controls the extent:
- *  - true  (a freshly-OPENED pool / cascade): keep running batches WHILE progress is
- *           made AND the reader is still on this pool, so the opened pool FILLS UP
- *           (deep analysis is itself capped per pool by deepAnalyzeKeep), then winds
- *           down when its backlog clears or they navigate away. Never auto-resumes.
- *  - false (an explicit REFRESH that found little new): run EXACTLY ONE batch — the
- *           reader pulls older news a batch at a time.
+ * Self-guarded: ONE batch at a time (the re-entrancy guard below), and only ever kicked
+ * off by buildPool — which runs solely on a TTL-gated feed fetch, never on a bare status
+ * poll — so the UI's polling can't re-arm or stack a flush.
  *
  * When the deep-analysis backlog empties, reactively extend the stories (YouTube +
  * per-zone coverage). Model passes share the bounded gate (ai.ts), below interactive.
  */
-function runBackfillBatch(worldId: string, chain: boolean): void {
+function runBackfillBatch(worldId: string): void {
   const state = ws(worldId);
   // One batch at a time: don't stack timers or overlap an in-flight pass.
   if (state.catchUpTimer || state.analyzeInFlight || state.embedInFlight) return;
@@ -1389,13 +1433,16 @@ function runBackfillBatch(worldId: string, chain: boolean): void {
         const progressed = p.progressed + a.progressed + e.progressed;
         const pending = p.remaining + a.remaining + e.remaining;
         console.log(
-          `[feed:${worldId}] backfill batch${chain ? " (cold-fill)" : ""}: ` +
+          `[feed:${worldId}] backfill batch: ` +
             `+${p.progressed} prescreened, +${a.progressed} analyzed, +${e.progressed} embedded ` +
             `(${pending} still pending)`,
         );
-        if (chain && progressed > 0 && pending > 0 && isWatched(worldId)) {
-          // Still filling the open pool — run the next batch.
-          runBackfillBatch(worldId, true);
+        // Mark a successful batch — a navigation refresh won't start a fresh round until
+        // config.feed.navBatchTtlMs after this.
+        if (progressed > 0) state.lastBatchAt = Date.now();
+        if (progressed > 0 && pending > 0 && isWatched(worldId)) {
+          // More to do and the reader's still here — flush the next batch.
+          runBackfillBatch(worldId);
         } else if (a.progressed > 0 && a.remaining === 0) {
           // Deep-analysis backlog cleared — reactively extend the stories with YouTube
           // + per-zone coverage; the items it adds get their own (chained) batch.
@@ -1408,38 +1455,107 @@ function runBackfillBatch(worldId: string, chain: boolean): void {
   }, config.feed.catchUpDelayMs);
 }
 
+/** How much in-window material a pool currently has to show/analyze: prescreened
+ *  survivors already in the store PLUS items fetched-but-not-yet-triaged (the prescreen
+ *  queue). coldFill uses this to decide when a freshly-opened pool has a "decent backlog"
+ *  and can stop pulling further source subsets. */
+function coldBacklogSize(worldId: string): number {
+  const cutoff = analyzeCutoff();
+  let servable = 0;
+  for (const s of getStore(worldId).all()) {
+    if (s.clickbait || s.global === true || s.item.publishedAt < cutoff) continue;
+    servable += 1;
+  }
+  return servable + ws(worldId).prescreenQueue.length;
+}
+
 /**
- * Bring a world's store up to date (fetch + cheap triage) so PROVISIONAL items are
- * immediately servable. Deep analysis is PULL-based and only ever started by a human
- * action — NEVER by an automatic/TTL fetch — so the UI's periodic reloads (the status
- * poll re-fetching as items graduate) can't kick off or sustain a backfill loop:
- *  - COLD open (you just navigated to a pool with nothing analyzed): chain batches to
- *    FILL it, winding down when its backlog clears or you leave.
- *  - explicit REFRESH (pull-to-refresh / refresh button, force=true): ONE batch —
- *    analyzes the freshest unanalyzed items (the new head), or digs one batch backward
- *    when nothing new. Refresh again to advance further.
- *  - everything else (a quiet TTL rebuild / live reload that fetched new items): fetch +
- *    triage only. The new items show provisionally; they deep-analyze on the next refresh.
- * A status poll never resumes a drain, so navigating/idling can't pin the GPU.
+ * COLD-FILL. A freshly-opened pool is just a warm refresh that KEEPS pulling further
+ * rotating source subsets — one at a time, never every source at once — until there's a
+ * decent backlog of in-window material (config.feed.coldBacklogTarget), or it has cycled
+ * through all sources once, or the reader navigates away. Then it hands off to the normal
+ * chained backfill that progressively deep-analyzes the pool while watched. The FIRST
+ * subset was already fetched by buildPool, so this continues from the second.
  */
-async function buildPool(worldId: string, opts: { cold: boolean; force: boolean }): Promise<void> {
-  const { newCount } = await refreshSources(worldId, { full: opts.cold });
-  if (opts.cold) {
-    // Opening a pool counts as watching it — seed the gate so the cold-fill chain
-    // isn't cut off before the client's first status poll lands.
-    markWatched(worldId);
-    runBackfillBatch(worldId, true); // fill the freshly-opened pool
-  } else if (opts.force) {
-    // Explicit, human-initiated refresh: ONE batch (analyze the fresh head, freshest
-    // first, or dig one batch into the older backlog when nothing new arrived).
-    runBackfillBatch(worldId, false);
-  } else {
-    // Automatic / TTL fetch (live reload, navigation re-fetch): NO model work — just the
-    // fetch + first-chunk triage above. This is what stops periodic UI refreshes from
-    // triggering (and re-triggering) backfills.
-    if (newCount > 0) {
-      console.log(`[feed:${worldId}] ${newCount} new (auto fetch) — analysis deferred to a refresh`);
+async function coldFill(worldId: string): Promise<void> {
+  const allCount = sourcesForWorld(worldId).length;
+  const budget = config.feed.sourceFetchBudget;
+  // Cap at one full pass of the deck so a quiet pool can't loop forever; subset 1 is done.
+  const maxFetches = budget > 0 && budget < allCount ? Math.ceil(allCount / budget) : 1;
+  let fetches = 1;
+  try {
+    while (
+      fetches < maxFetches &&
+      isWatched(worldId) &&
+      coldBacklogSize(worldId) < config.feed.coldBacklogTarget
+    ) {
+      await refreshSources(worldId); // pull the next rotating subset
+      fetches += 1;
     }
+  } catch (e) {
+    console.warn(`[feed:${worldId}] cold-fill fetch loop failed:`, e);
+  }
+  console.log(
+    `[feed:${worldId}] cold-fill: pulled ${fetches} subset(s), backlog ${coldBacklogSize(worldId)} ` +
+      `(target ${config.feed.coldBacklogTarget}) — handing off to backfill`,
+  );
+  // Hand off to the same flush every pool uses: deep-analyze the backlog while watched.
+  runBackfillBatch(worldId);
+}
+
+/** What kicked off a pool (re)build — governs whether it starts a deep-analysis round. */
+export type RefreshTrigger = "manual" | "navigation" | "auto";
+
+/**
+ * Bring a world's store up to date: fetch a rotating source SUBSET and cheap-triage the
+ * freshest chunk so PROVISIONAL items are immediately servable. Whether it then FLUSHES (a
+ * deep-analysis round — AI_MAX_ITEMS per batch, chained through the backlog while watched)
+ * depends on the TRIGGER:
+ *  - COLD open (empty pool): always — coldFill pulls rotating subsets until there's a decent
+ *    backlog, then flushes. You need SOMETHING to show.
+ *  - MANUAL refresh (button / pull-to-refresh): always flush.
+ *  - NAVIGATION (switching to a pool): flush only if it's been >= navBatchTtlMs since the
+ *    last batch — so flipping between pools doesn't re-kick processing every time.
+ *  - AUTO (live reload / quiet TTL re-fetch): never flush — fetch + triage only. The new
+ *    items show provisionally and deep-analyze on the next manual / eligible navigation.
+ *
+ * buildPool runs only on an actual (TTL-gated) feed fetch — a bare status poll never
+ * triggers it — and runBackfillBatch is single-flight, so polling can't re-arm or stack a
+ * flush, and each flush ends on its own once the backlog is empty.
+ */
+async function buildPool(
+  worldId: string,
+  opts: { cold: boolean; trigger: RefreshTrigger },
+): Promise<void> {
+  const state = ws(worldId);
+  await refreshSources(worldId);
+  // A (re)build means the reader is here — seed the watch gate so the flush chain isn't
+  // cut off before the client's first status poll lands.
+  markWatched(worldId);
+
+  if (opts.cold) {
+    // Cold always processes: coldFill keeps pulling rotating subsets until a decent backlog,
+    // then flushes. Fire-and-forget — the first subset's provisional items already serve.
+    state.lastBatchAt = Date.now();
+    void coldFill(worldId);
+    return;
+  }
+
+  // Warm rebuild: start a deep-analysis round only when the trigger allows it.
+  const sinceBatch = Date.now() - state.lastBatchAt;
+  const flush =
+    opts.trigger === "manual" ||
+    (opts.trigger === "navigation" && sinceBatch >= config.feed.navBatchTtlMs);
+  if (flush) {
+    state.lastBatchAt = Date.now();
+    runBackfillBatch(worldId);
+  } else {
+    console.log(
+      `[feed:${worldId}] ${opts.trigger} refresh — fetched + triaged; deep-analysis batch deferred` +
+        (opts.trigger === "navigation"
+          ? ` (last batch ${(sinceBatch / 60000).toFixed(0)}m ago < ${(config.feed.navBatchTtlMs / 60000).toFixed(0)}m)`
+          : ""),
+    );
   }
 }
 
@@ -1449,9 +1565,14 @@ async function buildPool(worldId: string, opts: { cold: boolean; force: boolean 
  * other — switching is responsive. `busyWith` is always null, kept only for API
  * compatibility with the client/status shape.
  */
-async function ensurePool(worldId: string, force: boolean): Promise<{ busyWith: string | null }> {
+async function ensurePool(
+  worldId: string,
+  trigger: RefreshTrigger,
+): Promise<{ busyWith: string | null }> {
   const state = ws(worldId);
   const st = getStore(worldId);
+  // Only a MANUAL refresh bypasses the freshness TTL; navigation/auto respect it.
+  const force = trigger === "manual";
   // Whether we already have something to serve. The persisted store survives
   // cache clears, so this is based on store size (NOT lastBuildAt, which a
   // forced refresh zeroes). When we have content we NEVER block a request on a
@@ -1473,10 +1594,11 @@ async function ensurePool(worldId: string, force: boolean): Promise<{ busyWith: 
     return { busyWith: null };
   }
 
-  // cold = nothing to show yet (always advance one batch); force = an explicit
-  // refresh (may pull one batch of older news when little is new). A plain TTL
-  // rebuild from navigation does neither — it just fetches + triages new items.
-  const build = buildPool(worldId, { cold: !hasContent, force }).finally(() => {
+  // cold = nothing to show yet (coldFill keeps pulling rotating subsets until a decent
+  // backlog, then flushes). For a warm rebuild, buildPool decides whether to FLUSH (run a
+  // deep-analysis round) from the TRIGGER: manual always; navigation only if it's been
+  // >= navBatchTtlMs since the last batch; automatic/live-reload never (fetch + triage only).
+  const build = buildPool(worldId, { cold: !hasContent, trigger }).finally(() => {
     state.buildInFlight = null;
   });
   state.buildInFlight = build;
@@ -1594,10 +1716,10 @@ function assembleView(
  */
 export async function getFeed(
   worldId: string = DEFAULT_WORLD_ID,
-  force = false,
+  trigger: RefreshTrigger = "navigation",
   interest = config.feed.interest,
 ): Promise<FeedResult> {
-  const { busyWith } = await ensurePool(worldId, force);
+  const { busyWith } = await ensurePool(worldId, trigger);
   const parsed = await interpretQuery(interest);
   // Embed the POSITIVE intent (not the raw query): embedding "not israel" would
   // sit right next to Israel coverage, which is the opposite of what's wanted.
@@ -1617,7 +1739,9 @@ export async function getBriefing(
   interest = config.feed.interest,
   lang: Lang = "en",
 ): Promise<Briefing | null> {
-  await ensurePool(worldId, force);
+  // The briefing reads the pool the feed built — it must never kick off a processing round
+  // on its own (the feed's getFeed is the sole driver); only honor an explicit force.
+  await ensurePool(worldId, force ? "manual" : "auto");
   const state = ws(worldId);
   // Key per language so an EN and ES briefing don't overwrite each other.
   const key = `${lang}:${interestKey(interest)}`;
@@ -1664,7 +1788,7 @@ export async function getBriefingStream(
   lang: Lang = "en",
   onDelta: (delta: string) => void = () => {},
 ): Promise<Briefing | null> {
-  await ensurePool(worldId, false);
+  await ensurePool(worldId, "auto");
   const state = ws(worldId);
   const key = `${lang}:${interestKey(interest)}`;
   const interestStr = interestKey(interest);
@@ -1807,7 +1931,9 @@ export async function getStories(
   force = false,
   lang: Lang = "en",
 ): Promise<{ stories: Story[]; busyWith: string | null; synthesizing: boolean }> {
-  const { busyWith } = await ensurePool(worldId, force);
+  // Stories are a secondary consumer too — don't let them start a processing round (the
+  // feed does); honor only an explicit force.
+  const { busyWith } = await ensurePool(worldId, force ? "manual" : "auto");
   if (!config.stories.enabled) return { stories: [], busyWith, synthesizing: false };
 
   const state = ws(worldId);
