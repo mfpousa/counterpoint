@@ -39,6 +39,11 @@ export interface StoredItem {
    *  the model analysis. Drives REACTIVE side coverage (pull each named country's
    *  discovered placeSources). Undefined on items predating this field; [] for global. */
   countries?: string[];
+  /** FORCE-JOIN hint for reactive SIDE coverage: the id of the SEED story article this item
+   *  was fetched for. The story planner attaches it to the cluster containing that seed
+   *  (bypassing the same-event similarity bar), so the side coverage lands on its story.
+   *  Set by addSideCoverage; absent for ordinary items. Persists through analysis. */
+  attachTo?: string;
   /** When this item was analyzed (epoch ms). */
   analyzedAt: number;
   /** Semantic embedding of the item (for meaning-based interest matching).

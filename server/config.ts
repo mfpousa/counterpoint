@@ -421,6 +421,12 @@ export const config = {
     // from the discovery registry (placeSources) — no hand-curated source lists. Avoids
     // fetching the whole world on every build. Disable with ZONES_OFF=1.
     enabled: !bool("ZONES_OFF"),
+    // FORCE-JOIN (the "dive deeper" behaviour as the NORMAL path): tag each reactively-
+    // fetched side article with the seed story it was fetched for, so the planner attaches
+    // it to that story's cluster — bypassing the same-event similarity bar so cross-country
+    // SIDES reliably form. Off → side coverage only joins a story if it CLUSTERS naturally.
+    // Disable with ZONES_FORCE_JOIN_OFF=1.
+    forceJoin: !bool("ZONES_FORCE_JOIN_OFF"),
     // Max COUNTRIES whose outlets are loaded per augmentation pass (bounds fetch cost).
     maxZonesPerBuild: num("ZONES_MAX_PER_BUILD", 3),
     // Max discovered outlets fetched per involved country per pass (a big country can

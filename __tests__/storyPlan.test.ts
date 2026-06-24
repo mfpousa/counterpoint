@@ -67,6 +67,30 @@ describe("computeStoryPlan", () => {
     expect(specs[0].memberIds).not.toContain("lonely");
   });
 
+  it("FORCE-JOINS an attached side item onto its seed's cluster, past the similarity bar", () => {
+    const inputs: ClusterInput[] = [
+      item("seed", "s1", "central bank raises interest rates sharply"),
+      item("seed2", "s2", "central bank raises interest rates sharply"),
+      // Foreign-language side coverage that shares no tokens (won't cluster on its own),
+      // but was reactively fetched FOR "seed" — so attachTo force-joins it onto that story.
+      { ...item("side", "s9", "banco central sube los tipos de interes"), attachTo: "seed" },
+    ];
+    const { specs } = computeStoryPlan(inputs, cfg({ minSources: 2 }), NOW);
+    expect(specs).toHaveLength(1);
+    expect(new Set(specs[0].memberIds)).toEqual(new Set(["seed", "seed2", "side"]));
+  });
+
+  it("leaves an UNattached unrelated item in its own (dropped) cluster", () => {
+    const inputs: ClusterInput[] = [
+      item("seed", "s1", "central bank raises interest rates sharply"),
+      item("seed2", "s2", "central bank raises interest rates sharply"),
+      item("side", "s9", "banco central sube los tipos de interes"), // no attachTo
+    ];
+    const { specs } = computeStoryPlan(inputs, cfg({ minSources: 2 }), NOW);
+    expect(specs).toHaveLength(1);
+    expect(specs[0].memberIds).not.toContain("side");
+  });
+
   it("emits a DEVELOPING issue spec (with a timeline) when several sub-events span time", () => {
     // Two distinct sub-events of the same storyline, days apart, many outlets each.
     const inputs = [

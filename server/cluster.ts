@@ -25,6 +25,11 @@ export interface ClusterInput {
    *  representative stands in for its whole group, so coverage counts it as `coveredBy`
    *  outlets even though only one copy is clustered. Absent/1 for a stand-alone item. */
   coveredBy?: number;
+  /** FORCE-JOIN hint: the id of the SEED article this item was reactively fetched for
+   *  (e.g. foreign side coverage of a specific story). When set, the planner moves this
+   *  item into the cluster CONTAINING that seed, bypassing the same-event similarity bar —
+   *  so the coverage reliably lands on its story. Absent for ordinary items. */
+  attachTo?: string;
 }
 
 export interface ClusterOptions {

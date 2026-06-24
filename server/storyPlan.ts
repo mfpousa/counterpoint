@@ -12,9 +12,51 @@ import {
   groupIntoIssues,
   isDevelopingIssue,
   rankClusters,
+  type Cluster,
   type ClusterInput,
 } from "./cluster";
 import type { StoryKind } from "./storyStore";
+
+/**
+ * FORCE-JOIN reactively-fetched coverage onto the cluster of the SEED it was fetched for
+ * (ClusterInput.attachTo), bypassing the same-event similarity bar — so a story's
+ * cross-country side coverage reliably lands ON it instead of forming its own thin cluster
+ * that gets dropped. Run BEFORE issue grouping so issues/timelines include it too. Mutates
+ * `clusters` in place: moves each attached member into its seed's cluster, then drops any
+ * cluster emptied by the moves. (Seed lookup uses the ORIGINAL membership, so chains and
+ * order can't matter — attachTo only ever points at a non-reactive seed.)
+ */
+export function forceJoinAttached<T extends ClusterInput>(clusters: Cluster<T>[]): void {
+  if (clusters.length < 2) return;
+  const clusterOf = new Map<string, number>(); // member id -> its cluster index
+  clusters.forEach((c, i) => c.members.forEach((m) => clusterOf.set(m.id, i)));
+  const moves: { from: number; to: number; member: T }[] = [];
+  clusters.forEach((c, i) => {
+    for (const m of c.members) {
+      if (!m.attachTo) continue;
+      const to = clusterOf.get(m.attachTo);
+      if (to === undefined || to === i) continue; // seed gone, or already together
+      moves.push({ from: i, to, member: m });
+    }
+  });
+  if (moves.length === 0) return;
+  const removed = new Map<number, Set<string>>();
+  for (const mv of moves) {
+    clusters[mv.to].members.push(mv.member);
+    let ids = removed.get(mv.from);
+    if (!ids) {
+      ids = new Set();
+      removed.set(mv.from, ids);
+    }
+    ids.add(mv.member.id);
+  }
+  for (const [i, ids] of removed) {
+    clusters[i].members = clusters[i].members.filter((m) => !ids.has(m.id));
+  }
+  for (let i = clusters.length - 1; i >= 0; i--) {
+    if (clusters[i].members.length === 0) clusters.splice(i, 1);
+  }
+}
 
 /** Every threshold computeStoryPlan needs, passed explicitly so the function stays pure
  *  (and serializable across the worker boundary). Mirrors config.stories.* one-to-one. */
@@ -79,6 +121,10 @@ export function computeStoryPlan(
     textSimThreshold: cfg.textSimThreshold,
     windowMs: cfg.windowMs,
   });
+
+  // Force-join reactively-fetched side coverage onto its seed's cluster (past the similarity
+  // bar) BEFORE issue grouping, so cross-country sides reliably form on the right story.
+  forceJoinAttached(clusters);
 
   // Level 2: group event clusters into broader ongoing issues, keep the DEVELOPING ones.
   const issues = groupIntoIssues(clusters, {

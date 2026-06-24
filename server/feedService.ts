@@ -372,33 +372,32 @@ function analyzeCutoff(now = Date.now()): number {
   return now - config.feed.analyzeMaxAgeMs;
 }
 
-/** The backlog of items still needing deep analysis. Items the cheap triage pass
- *  judged clickbait — or GLOBAL in a regional pool — are excluded (they'd be kept
- *  out of the feed anyway, so we never pay the expensive pass on them).
- *
- *  REGIONAL pools additionally cap the backlog to the top-N local survivors by
- *  COARSE (prescreen) importance: local outlets flood the pool but only a few
- *  hundred reach the reader, so deep-analyzing the long tail is wasted tokens.
- *  The cut is taken over ALL in-window survivors (analyzed + pending) so it stays
- *  stable as items get analyzed — we never deep-analyze more than N locals — and
- *  the returned backlog is importance-ordered so the most newsworthy go first. */
+/** How many near-clone CLUSTERS a pool deep-analyzes per pass: GEO pools cap to the
+ *  top-N by coarse importance (a country's local flood has a long tail not worth the
+ *  tokens); topical worlds (front page + themed) work the FULL backlog (0 = no cap). */
+function analyzeKeepFor(worldId: string): number {
+  return isGeoPoolId(worldId) ? config.geo.deepAnalyzeKeep : 0;
+}
+
 function pendingForAnalysis(worldId: string): StoredItem[] {
-  // GEO pools deep-analyze only the top-N near-clone CLUSTERS (see planGeoAnalysis +
-  // analyzeGeoChunk), so the "pending" set MUST mirror that — the still-unanalyzed
-  // cluster representatives. The generic all-unanalyzed list (below) is what made
-  // items BEYOND the cap (and clones not yet folded into a rep) show as provisional
-  // FOREVER: they were served to the feed but the analyzer never reached them, so
-  // they stayed "analyzing" across every refresh. Mirroring the plan fixes it — every
-  // provisional geo item is now one the analyzer WILL reach (and the long tail beyond
-  // the cap is simply not shown, never stuck).
-  if (isGeoPoolId(worldId)) {
-    return planGeoAnalysis(worldId, config.geo.deepAnalyzeKeep)
+  // GEO + TOPICAL pools near-clone DEDUP and deep-analyze ONE representative per cluster,
+  // fanning its analysis to the clones (planGeoAnalysis + analyzeGeoChunk), so the "pending"
+  // set MUST mirror that — the still-unanalyzed cluster REPRESENTATIVES. The generic
+  // all-unanalyzed list (the regional path below) is what made items BEYOND a cap (and
+  // clones not yet folded into a rep) show as provisional FOREVER: served to the feed but
+  // never reached by the analyzer. Mirroring the plan fixes it — every provisional item is
+  // one the analyzer WILL reach (clones are hidden via their rep; a GEO pool's long tail
+  // beyond the cap is simply not shown). GEO caps to the top-N clusters; topical works all.
+  if (!isPlaceWorldId(worldId)) {
+    return planGeoAnalysis(worldId, analyzeKeepFor(worldId))
       .filter((c) => !c.rep.analyzed)
       .map((c) => c.rep);
   }
+  // REGIONAL (place) pools: cap the deep pass to the top-N local survivors by coarse
+  // importance (the local flood's long tail isn't worth the tokens); per-item (no dedup).
   const cutoff = analyzeCutoff();
   const all = getStore(worldId).all();
-  if (isPlaceWorldId(worldId) && config.place.deepAnalyzeKeep > 0) {
+  if (config.place.deepAnalyzeKeep > 0) {
     const survivors = all.filter(
       (s) => !s.clickbait && s.global !== true && s.item.publishedAt >= cutoff,
     );
@@ -773,11 +772,12 @@ interface GeoCluster {
 }
 
 /**
- * Plan a GEO pool's deep analysis: near-clone DEDUP the in-window survivors, rank
- * clusters by representative coarse (prescreen) importance, keep the TOP-N, and
- * return those that still have un-analyzed members. The cut is over ALL survivors
- * (analyzed + pending) so it's stable like topLocalBacklog, but at CLUSTER
- * granularity — identical wire copy is analyzed once and fanned out to the rest.
+ * Plan a GEO or TOPICAL pool's deep analysis: near-clone DEDUP the in-window survivors,
+ * rank clusters by representative coarse (prescreen) importance, keep the TOP-N (keep=0
+ * = no cap, the full backlog for topical worlds), and return those that still have
+ * un-analyzed members. The cut is over ALL survivors (analyzed + pending) so it's stable
+ * like topLocalBacklog, but at CLUSTER granularity — identical wire copy is analyzed once
+ * and fanned out to the rest.
  */
 function planGeoAnalysis(worldId: string, keep: number): GeoCluster[] {
   const state = ws(worldId);
@@ -836,10 +836,10 @@ function planGeoAnalysis(worldId: string, keep: number): GeoCluster[] {
 }
 
 /**
- * Deep-analyze ONE chunk of a GEO pool. We only call the model on each cluster's
- * REPRESENTATIVE (capped to maxItems), then fan its analysis out to the cluster's
- * clones — so N near-identical copies cost ONE deep pass. Clusters whose rep is
- * already analyzed but still have un-analyzed clones are resolved for free.
+ * Deep-analyze ONE chunk of a GEO or TOPICAL pool. We only call the model on each
+ * cluster's REPRESENTATIVE (capped to maxItems), then fan its analysis out to the
+ * cluster's clones — so N near-identical copies cost ONE deep pass. Clusters whose rep
+ * is already analyzed but still have un-analyzed clones are resolved for free.
  */
 async function analyzeGeoChunk(
   worldId: string,
@@ -847,7 +847,7 @@ async function analyzeGeoChunk(
   st: ReturnType<typeof getStore>,
   h: ActivityHandle,
 ): Promise<{ remaining: number; progressed: number }> {
-  const plan = planGeoAnalysis(worldId, config.geo.deepAnalyzeKeep);
+  const plan = planGeoAnalysis(worldId, analyzeKeepFor(worldId));
   if (plan.length === 0) return { remaining: 0, progressed: 0 };
   if (!(await aiReachable())) return { remaining: plan.length, progressed: 0 };
 
@@ -863,7 +863,7 @@ async function analyzeGeoChunk(
     // analyzePending) — analyze on title+summary now to keep the path fast.
     const batches = Math.ceil(items.length / config.ai.batchSize);
     console.log(
-      `[feed:${worldId}] geo deep analysis: ${items.length} representative(s) ` +
+      `[feed:${worldId}] deep analysis: ${items.length} representative(s) ` +
         `(of ${plan.length} clusters) in ${batches} batch(es)…`,
     );
     analyses = await analyzeItems(items, new Map(), progressLogger(worldId, h, "analyze"));
@@ -913,9 +913,9 @@ async function analyzeGeoChunk(
   state.viewCache.clear();
   state.briefingCache.clear();
 
-  const remaining = planGeoAnalysis(worldId, config.geo.deepAnalyzeKeep).length;
+  const remaining = planGeoAnalysis(worldId, analyzeKeepFor(worldId)).length;
   console.log(
-    `[feed:${worldId}] geo analyzed ${progressed} item(s) ` +
+    `[feed:${worldId}] analyzed ${progressed} item(s) ` +
       `(${fannedOut} fanned out from clones); ${remaining} cluster(s) still pending`,
   );
   return { remaining, progressed };
@@ -931,8 +931,9 @@ function analyzePending(worldId: string): Promise<{ remaining: number; progresse
   if (state.analyzeInFlight) return state.analyzeInFlight;
   const st = getStore(worldId);
   state.analyzeInFlight = withActivity(worldId, "analyzing", async (h) => {
-    // GEO pools dedup near-clones and analyze one representative per cluster.
-    if (isGeoPoolId(worldId)) return analyzeGeoChunk(worldId, state, st, h);
+    // GEO + TOPICAL pools dedup near-clones and analyze one representative per cluster
+    // (fanning its analysis to the clones); only REGIONAL pools take the per-item path.
+    if (!isPlaceWorldId(worldId)) return analyzeGeoChunk(worldId, state, st, h);
     const pending = pendingForAnalysis(worldId);
     if (pending.length === 0) return { remaining: 0, progressed: 0 };
     if (!(await aiReachable())) return { remaining: pending.length, progressed: 0 };
@@ -1238,6 +1239,7 @@ async function addSideCoverage(worldId: string): Promise<number> {
       (s) =>
         s.analyzed &&
         !s.clickbait &&
+        !s.cloneOf && // seed from REPRESENTATIVES only, so attachTo points at a clustered item
         !s.item.zone &&
         s.importance >= config.zones.minSeedImportance &&
         now - s.item.publishedAt <= config.zones.sourceMaxAgeMs,
@@ -1252,17 +1254,24 @@ async function addSideCoverage(worldId: string): Promise<number> {
   // shares no Latin tokens with the seed.
   const involved = new Map<
     string,
-    { score: number; tokens: Set<string>; embeddings: number[][] }
+    {
+      score: number;
+      tokens: Set<string>;
+      embeddings: number[][];
+      seeds: { id: string; tokens: Set<string>; emb?: number[] }[];
+    }
   >();
   for (const s of seeds) {
     const ccs = s.countries ?? [];
     if (ccs.length === 0) continue;
     const seedToks = titleTokens(s.item.title, s.keywords);
     for (const cc of ccs) {
-      const cur = involved.get(cc) ?? { score: 0, tokens: new Set<string>(), embeddings: [] };
+      const cur =
+        involved.get(cc) ?? { score: 0, tokens: new Set<string>(), embeddings: [], seeds: [] };
       cur.score += 1;
       for (const t of seedToks) cur.tokens.add(t);
       if (s.embedding && s.embedding.length > 0) cur.embeddings.push(s.embedding);
+      cur.seeds.push({ id: s.item.id, tokens: seedToks, emb: s.embedding });
       involved.set(cc, cur);
     }
   }
@@ -1276,7 +1285,7 @@ async function addSideCoverage(worldId: string): Promise<number> {
   if (chosen.length === 0) return 0;
 
   let added = 0;
-  for (const [cc, { tokens, embeddings }] of chosen) {
+  for (const [cc, info] of chosen) {
     // The country's DISCOVERED outlets (the source of truth). Cap the number fetched
     // per pass so reactively pulling a large country (dozens of feeds) stays bounded.
     const sources = placeSourcesFor(cc).slice(0, config.zones.maxSourcesPerCountry);
@@ -1294,32 +1303,47 @@ async function addSideCoverage(worldId: string): Promise<number> {
     // cross-lingual embedding similarity (original-language) — so we get this
     // country's take on THESE stories, not its entire feed.
     const candidates = raw.filter((it) => !st.has(it.id) && it.publishedAt >= cutoff);
-    const scored = candidates.map((it) => {
-      let shared = 0;
-      for (const t of articleTokens(it.title)) if (tokens.has(t)) shared += 1;
-      return { it, shared, sim: 0 };
-    });
-    // Embedding relatedness (what attaches non-Latin-script coverage to a story).
-    if (config.ai.embeddingsEnabled && embeddings.length > 0 && scored.length > 0) {
-      const vecs = await embedTexts(scored.map((x) => x.it.title));
-      scored.forEach((x, i) => {
-        const v = vecs[i];
-        if (!v || v.length === 0) return;
-        let best = 0;
-        for (const e of embeddings) best = Math.max(best, cosineSim(v, e));
-        x.sim = best;
-      });
+    // Embed candidate titles ONCE — reused for BOTH the relatedness gate (vs the union of
+    // this country's seeds) AND picking the single best-matching seed to ATTACH each to.
+    let vecs: (number[] | null)[] = [];
+    if (config.ai.embeddingsEnabled && info.embeddings.length > 0 && candidates.length > 0) {
+      vecs = await embedTexts(candidates.map((c) => c.title));
     }
+    const scored = candidates.map((it, i) => {
+      const toks = articleTokens(it.title);
+      const v = vecs[i];
+      // GATE relatedness vs the UNION of the country's seeds (keeps recall unchanged).
+      let shared = 0;
+      for (const t of toks) if (info.tokens.has(t)) shared += 1;
+      let sim = 0;
+      if (v && v.length > 0) for (const e of info.embeddings) sim = Math.max(sim, cosineSim(v, e));
+      // ATTACH to the single best-matching seed, so this article force-joins THAT story.
+      let attachTo = info.seeds[0]?.id;
+      let bestSeedScore = -1;
+      for (const sd of info.seeds) {
+        let sShared = 0;
+        for (const t of toks) if (sd.tokens.has(t)) sShared += 1;
+        let sSim = 0;
+        if (v && v.length > 0 && sd.emb && sd.emb.length > 0) sSim = cosineSim(v, sd.emb);
+        const sc = sSim * 2 + sShared * 0.1; // embedding dominates; tokens break ties
+        if (sc > bestSeedScore) {
+          bestSeedScore = sc;
+          attachTo = sd.id;
+        }
+      }
+      return { it, shared, sim, attachTo };
+    });
     const related = scored
       .filter((x) => x.shared >= config.zones.minSharedTokens || x.sim >= config.zones.minRelevance)
       .sort((a, b) => b.sim - a.sim || b.shared - a.shared || b.it.publishedAt - a.it.publishedAt)
       .slice(0, config.zones.perZoneItemCap);
 
-    for (const { it } of related) {
+    for (const { it, attachTo } of related) {
       st.upsert({
         // Tag the item with the COUNTRY it represents (its "side" vantage) — placeSources
-        // outlets carry no zone, so we set it here. This is what finalizeSides detects and
-        // the synthesis groups by, so the cross-country divide can surface.
+        // outlets carry no zone, so we set it here — AND with `attachTo`: the seed story it
+        // was fetched for, so the planner FORCE-JOINS it onto that story (the "dive deeper"
+        // behaviour as the normal path) rather than leaving it to the same-event clustering bar.
         item: { ...it, zone: cc },
         clickbait: false,
         analyzed: false, // full analysis pending, same as any item
@@ -1329,6 +1353,7 @@ async function addSideCoverage(worldId: string): Promise<number> {
         summary: "",
         keywords: [],
         analyzedAt: 0,
+        ...(config.zones.forceJoin && attachTo ? { attachTo } : {}),
       });
       added += 1;
     }
@@ -2117,6 +2142,9 @@ export async function getStories(
       // A representative stands in for `coveredBy` outlets (its near-clone group), so
       // coverage thresholds still see the full breadth though we cluster one copy.
       coveredBy: s.coveredBy,
+      // FORCE-JOIN: reactive side coverage carries the seed story it was fetched for, so
+      // computeStoryPlan attaches it to that story's cluster past the same-event bar.
+      attachTo: s.attachTo,
     }));
 
     // Cluster + plan OFF the event loop (worker thread). The O(n^2) clustering that used
