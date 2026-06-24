@@ -63,7 +63,10 @@ const ENTITY_RADIUS = 1.05;
 const ALERT_RADIUS = 1.06; // alert pings sit just above everything else
 const ZOOM_MIN = 0.6; // matches the wrapper's gesture/button clamp
 const ZOOM_MAX = 2.6;
-const WHEEL_PULL = 0.14; // how strongly scroll-zoom-in pulls the cursor's point to centre
+// Drag/zoom sensitivity constant: maps a desired on-screen pixel move to a globe rotation
+// (= 2·cameraZ·tan(fov/2), the world-units spanned at the globe's distance). Mirrors the
+// wrapper's DRAG_K so the scroll-zoom cursor-lock rotates in the same scale as a drag.
+const DRAG_K = 2 * 3.2 * Math.tan((45 * Math.PI) / 180 / 2);
 const OFF = "#000000";
 // On-demand render budget: cap the animation loop at ~30fps (instead of the display's
 // 60). Halves the per-second GPU/CPU work for spin/pulse/flag-wave with no visible loss
@@ -301,6 +304,7 @@ const Countries = memo(function Countries({
 
 const UP = new Vector3(0, 1, 0);
 const _proj = new Vector3(); // reused scratch for per-frame marker screen projection
+const _anchor = new Vector3(); // reused scratch for the scroll-zoom cursor-lock projection
 
 /** Quaternion (as [x,y,z,w]) orienting a marker's local +Y OUTWARD along `dir`, so
  *  shapes sit upright on the globe like pins/spikes rather than lying flat. */
@@ -772,6 +776,11 @@ export const GlobeScene = memo(function GlobeScene({
   const camera = useThree((s) => s.camera);
   const size = useThree((s) => s.size);
   const group = useRef<Group>(null);
+  // Scroll-zoom CURSOR LOCK: the surface point under the cursor at the wheel tick, kept in
+  // the globe's LOCAL frame (so it rides the rotation) plus the cursor's screen NDC. While
+  // set, the frame loop steers the rotation each tick so this point stays pinned under the
+  // cursor as the scale eases — a true, jitter-free zoom-to-pointer. Cleared once settled.
+  const zoomAnchor = useRef<{ dir: Vector3; ndcX: number; ndcY: number } | null>(null);
   // Eased horizontal CAMERA view-offset (px) so the globe slides smoothly when the side
   // panel opens/closes. A projection offset (not a world translation) shifts EVERY depth
   // by the same pixels, so the focused country on the near surface lands exactly on the
@@ -843,6 +852,8 @@ export const GlobeScene = memo(function GlobeScene({
     const g = group.current;
     if (!g) return;
     if (refs.dragging.current) refs.target.current = null; // manual control cancels focus
+    // A drag or a fly-to overrides the scroll-zoom cursor lock (the user took the wheel).
+    if (refs.dragging.current || refs.target.current) zoomAnchor.current = null;
     const tgt = refs.target.current;
     if (tgt) {
       // Ease to the focus orientation along the SHORTEST yaw path (the globe may have
@@ -868,7 +879,8 @@ export const GlobeScene = memo(function GlobeScene({
       focusedId === null &&
       hoveredMarkerId === null && // freeze the spin while a pin is hovered so its bubble is readable
       focusedMarkerId === null && // …and while a pin's card is open (so it doesn't drift)
-      !refs.dragging.current
+      !refs.dragging.current &&
+      !zoomAnchor.current // …and while a scroll-zoom is locking a point under the cursor
     ) {
       refs.rot.current.yaw += delta * 0.05; // idle auto-spin (landing only)
     }
@@ -887,6 +899,31 @@ export const GlobeScene = memo(function GlobeScene({
       cam.setViewOffset(size.width, size.height, offsetPx.current, 0, size.width, size.height);
     } else if (cam.view?.enabled) {
       cam.clearViewOffset();
+    }
+
+    // Scroll-zoom CURSOR LOCK. Reproject the captured surface point through THIS tick's
+    // rotation+scale and steer the rotation so it returns to the cursor's NDC — pinning the
+    // exact point under the pointer as the scale eases (so you land on target, smoothly).
+    // The gain mirrors the drag math (px-of-content-move → rotation) using the LIVE scale so
+    // the correction tracks the easing zoom. The lock releases once the scale has settled.
+    const anchor = zoomAnchor.current;
+    if (anchor) {
+      g.updateMatrix(); // local matrix == world matrix (group is a direct scene child)
+      _anchor
+        .copy(anchor.dir)
+        .multiplyScalar(PLANET_RADIUS)
+        .applyMatrix4(g.matrix)
+        .project(cam);
+      if (_anchor.z < 1) {
+        const gain = DRAG_K / (g.scale.x * (size.height || 600));
+        refs.rot.current.yaw += (anchor.ndcX - _anchor.x) * (size.width / 2) * gain;
+        refs.rot.current.pitch += -(anchor.ndcY - _anchor.y) * (size.height / 2) * gain;
+        refs.rot.current.pitch = Math.max(-1.2, Math.min(1.2, refs.rot.current.pitch));
+        g.rotation.y = refs.rot.current.yaw;
+        g.rotation.x = refs.rot.current.pitch;
+        g.updateMatrix();
+      }
+      if (Math.abs(refs.zoom.current - g.scale.x) < 1e-3) zoomAnchor.current = null;
     }
 
     // Project the markers worth labelling to SCREEN px for the wrapper's overlay
@@ -948,8 +985,10 @@ export const GlobeScene = memo(function GlobeScene({
       focusedId === null &&
       hoveredMarkerId === null &&
       focusedMarkerId === null &&
-      !refs.dragging.current;
+      !refs.dragging.current &&
+      !zoomAnchor.current;
     const markersLive = alerts.length > 0 || askMarkers.length > 0;
+    const locking = zoomAnchor.current !== null; // cursor-lock needs full-rate steering
     // Transient camera EASES move the whole globe and are loop-driven (no per-event driver
     // once kicked): the fly-to (auto focus/zoom), the scroll/pinch ZOOM ease (a wheel notch
     // sets a target, then `scale` chases it over many frames), and the panel OFFSET shift.
@@ -958,7 +997,7 @@ export const GlobeScene = memo(function GlobeScene({
     // display's FULL rate; they're short, self-terminating bursts. The steady-state loops
     // (idle spin, marker pulse, post-kick settle) stay at 30fps to save power.
     const flyingTo = refs.target.current !== null;
-    const easingCamera = flyingTo || easingZoom || easingOffset;
+    const easingCamera = flyingTo || easingZoom || easingOffset || locking;
     const needsMore =
       refs.dragging.current ||
       easingCamera ||
@@ -984,9 +1023,10 @@ export const GlobeScene = memo(function GlobeScene({
     }
   });
 
-  // Scroll-wheel zoom that pulls the point under the cursor toward the view centre as it
-  // zooms in (the classic "zoom to pointer"). Manual zoom cancels any in-flight fly-to;
-  // when a place is selected the frame loop still clamps the nudge to its bounds.
+  // Scroll-wheel zoom-to-pointer. Capture the EXACT surface point under the cursor (in the
+  // globe's local frame, so it rides the rotation) plus the cursor's screen NDC, then let
+  // the frame loop steer the rotation each tick so that point stays pinned under the cursor
+  // as the scale eases — landing precisely on target with no jitter. Cancels any fly-to.
   const onWheel = (e: ThreeEvent<WheelEvent>) => {
     e.stopPropagation();
     refs.target.current = null;
@@ -995,11 +1035,13 @@ export const GlobeScene = memo(function GlobeScene({
       ZOOM_MIN,
       Math.min(ZOOM_MAX, refs.zoom.current * (zoomIn ? 1.12 : 1 / 1.12)),
     );
-    if (zoomIn) {
-      // e.pointer is NDC (x right, y up, 0 = centre): rotate so the pointed point
-      // shifts toward the centre (drag the content away from the cursor).
-      refs.rot.current.yaw -= e.pointer.x * WHEEL_PULL;
-      refs.rot.current.pitch += e.pointer.y * WHEEL_PULL;
+    const g = group.current;
+    if (g) {
+      // worldToLocal strips the group's rotation+scale → a stable local direction; project
+      // the same world hit to get the cursor's NDC (consistent with any active view offset).
+      const dir = g.worldToLocal(e.point.clone()).normalize();
+      _anchor.copy(e.point).project(camera);
+      zoomAnchor.current = { dir, ndcX: _anchor.x, ndcY: _anchor.y };
     }
     refs.wake.current?.(); // ref-only mutation → kick the on-demand loop
   };
