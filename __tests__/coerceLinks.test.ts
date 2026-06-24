@@ -1,17 +1,24 @@
 import { coerceLinks } from "../server/synthesize";
 
 describe("coerceLinks (place-to-place flow arcs)", () => {
-  it("keeps valid ISO-2 from→to pairs, lowercased, with the kind (default 'other')", () => {
+  it("keeps valid ISO-2 from→to pairs (lowercased) with a SPECIFIC kind", () => {
     expect(coerceLinks([{ from: "CD", to: "fr", kind: "spread" }])).toEqual([
       { from: "cd", to: "fr", kind: "spread" },
     ]);
-    // Missing/unknown kind falls back to "other".
-    expect(coerceLinks([{ from: "ru", to: "ua" }])).toEqual([
-      { from: "ru", to: "ua", kind: "other" },
-    ]);
-    expect(coerceLinks([{ from: "ru", to: "ua", kind: "bogus" }])).toEqual([
-      { from: "ru", to: "ua", kind: "other" },
-    ]);
+  });
+
+  it("drops links the model couldn't classify (missing / unknown / 'other' kind)", () => {
+    // No generic fallback — an unclassifiable link is not a valid link.
+    expect(coerceLinks([{ from: "ru", to: "ua" }])).toEqual([]);
+    expect(coerceLinks([{ from: "ru", to: "ua", kind: "bogus" }])).toEqual([]);
+    expect(coerceLinks([{ from: "ru", to: "ua", kind: "other" }])).toEqual([]);
+    // A dropped link doesn't block a valid one for the same pair.
+    expect(
+      coerceLinks([
+        { from: "ru", to: "ua", kind: "other" }, // dropped
+        { from: "ru", to: "ua", kind: "attack" }, // kept
+      ]),
+    ).toEqual([{ from: "ru", to: "ua", kind: "attack" }]);
   });
 
   it("drops self-links, non-ISO-2 endpoints, and duplicates", () => {
@@ -31,11 +38,11 @@ describe("coerceLinks (place-to-place flow arcs)", () => {
 
   it("caps at `max` (default 4)", () => {
     const pairs = [
-      { from: "aa", to: "bb", kind: "other" },
-      { from: "cc", to: "dd", kind: "other" },
-      { from: "ee", to: "ff", kind: "other" },
-      { from: "gg", to: "hh", kind: "other" },
-      { from: "ii", to: "jj", kind: "other" },
+      { from: "aa", to: "bb", kind: "trade" },
+      { from: "cc", to: "dd", kind: "trade" },
+      { from: "ee", to: "ff", kind: "trade" },
+      { from: "gg", to: "hh", kind: "trade" },
+      { from: "ii", to: "jj", kind: "trade" },
     ];
     expect(coerceLinks(pairs)).toHaveLength(4);
     expect(coerceLinks(pairs, 2)).toHaveLength(2);

@@ -72,7 +72,7 @@ const SYNTH_SCHEMA: JsonSchema = {
             to: { type: "string" },
             kind: {
               type: "string",
-              enum: ["attack", "spread", "trade", "migration", "aid", "transport", "other"],
+              enum: ["attack", "spread", "trade", "migration", "aid", "transport"],
             },
           },
           required: ["from", "to", "kind"],
@@ -98,15 +98,16 @@ const SYNTH_RULES =
   '  "sides": [ { "label": "<short side label, e.g. \'Western media\', \'Russian media\', \'Ukrainian media\'>", "outlets": ["<exact outlet names on this side>"], "framing": "1-2 sentences on how THIS side frames/emphasizes the story" } ],\n' +
   '  "contradictions": ["specific points where the outlets disagree or report differently; [] if none are evident"],\n' +
   '  "protagonist": { "name": "the central actor/subject the story is MOST about (a country, organisation, or person)", "iso2": "if that protagonist IS a country or a national government/actor, its ISO 3166-1 alpha-2 code in lowercase (e.g. us, es, ua); otherwise an empty string" },\n' +
-  '  "links": [ { "from": "<ISO-2 ORIGIN>", "to": "<ISO-2 DESTINATION>", "kind": "attack|spread|trade|migration|aid|transport|other" } ]\n' +
+  '  "links": [ { "from": "<ISO-2 ORIGIN>", "to": "<ISO-2 DESTINATION>", "kind": "attack|spread|trade|migration|aid|transport" } ]\n' +
   "}\n" +
   "For 'links', emit a DIRECTED connection ONLY when the story describes a PHYSICAL link or " +
   "movement between two DISTINCT countries, from an ORIGIN ('from') to a DESTINATION ('to'), both " +
   "ISO 3166-1 alpha-2 lowercase, each with a 'kind': 'attack' (military strike/invasion/cross-border " +
   "attack), 'spread' (disease/contagion), 'trade' (shipment/exports/energy/supply/pipeline), " +
   "'migration' (people/refugees/evacuation), 'aid' (humanitarian or military assistance), " +
-  "'transport' (flight/route/travel), or 'other'. Return [] when the story is not about a " +
-  "place-to-place connection. " +
+  "'transport' (flight/route/travel). Only emit a link you can classify into ONE of these " +
+  "SPECIFIC kinds; if the relationship doesn't clearly fit one, OMIT that link (do NOT guess or " +
+  "use a generic kind). Return [] when the story is not about a place-to-place connection. " +
   "For 'protagonist', pick the single entity the story most centres on and name it; set 'iso2' ONLY " +
   "when that protagonist is a nation/national actor (use \"\" for organisations, people, or anything " +
   "non-national). Each outlet has a geographic/affiliation 'zone'. For 'sides', GROUP the outlets into the " +
@@ -220,8 +221,9 @@ function coerceProtagonist(raw: unknown): { name: string; iso2?: string } | unde
 /**
  * Parse the model's place-to-place LINKS — directed physical connections between two
  * DISTINCT countries (a spread, route, shipment, migration, evacuation, aid, attack, …).
- * Validates ISO 3166-1 alpha-2 endpoints, drops self/degenerate + duplicate links, and
- * caps the count. The globe draws a flowing arc per link (origin → destination).
+ * Validates ISO 3166-1 alpha-2 endpoints, drops self/degenerate + duplicate links, DROPS
+ * links the model couldn't classify into a SPECIFIC kind (no generic catch-all), and caps
+ * the count. The globe draws a flowing arc per link (origin → destination).
  */
 const LINK_KINDS = new Set<LinkKind>([
   "attack",
@@ -230,7 +232,6 @@ const LINK_KINDS = new Set<LinkKind>([
   "migration",
   "aid",
   "transport",
-  "other",
 ]);
 
 export function coerceLinks(
@@ -246,11 +247,15 @@ export function coerceLinks(
     const from = typeof r["from"] === "string" ? r["from"].trim().toLowerCase() : "";
     const to = typeof r["to"] === "string" ? r["to"].trim().toLowerCase() : "";
     if (!/^[a-z]{2}$/.test(from) || !/^[a-z]{2}$/.test(to) || from === to) continue;
+    // A link is only VALID when the model classified it into a SPECIFIC kind. A missing,
+    // unknown, or catch-all kind means the relationship couldn't be determined → drop it
+    // rather than draw a generic, meaningless connection.
+    const k = typeof r["kind"] === "string" ? (r["kind"].trim().toLowerCase() as LinkKind) : null;
+    if (!k || !LINK_KINDS.has(k)) continue;
     const key = `${from}>${to}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    const k = typeof r["kind"] === "string" ? (r["kind"].trim().toLowerCase() as LinkKind) : "other";
-    out.push({ from, to, kind: LINK_KINDS.has(k) ? k : "other" });
+    out.push({ from, to, kind: k });
     if (out.length >= max) break;
   }
   return out;
@@ -508,7 +513,7 @@ const DEVELOPING_SCHEMA: JsonSchema = {
             to: { type: "string" },
             kind: {
               type: "string",
-              enum: ["attack", "spread", "trade", "migration", "aid", "transport", "other"],
+              enum: ["attack", "spread", "trade", "migration", "aid", "transport"],
             },
           },
           required: ["from", "to", "kind"],
@@ -557,10 +562,12 @@ const DEVELOPING_RULES =
   "opposing geographic/affiliation vantage points actually PRESENT (by 'zone') and describe how each " +
   "frames the issue \u2014 e.g. Western vs Ukrainian vs Russian media. Use only zones present; return [] " +
   "when all outlets share one vantage point. " +
-  'Also include "links": [ { "from": "<ISO-2 ORIGIN>", "to": "<ISO-2 DESTINATION>", "kind": "attack|spread|trade|migration|aid|transport|other" } ] ' +
+  'Also include "links": [ { "from": "<ISO-2 ORIGIN>", "to": "<ISO-2 DESTINATION>", "kind": "attack|spread|trade|migration|aid|transport" } ] ' +
   "\u2014 a DIRECTED connection ONLY when the issue describes a PHYSICAL link or movement between two " +
   "DISTINCT countries from an ORIGIN to a DESTINATION, both lowercase, classified by 'kind' " +
-  "(attack/spread/trade/migration/aid/transport/other); [] when it is not about a place-to-place connection. " +
+  "(attack/spread/trade/migration/aid/transport). Only emit a link you can classify into ONE of " +
+  "these SPECIFIC kinds; OMIT any link that doesn't clearly fit one (do NOT guess). [] when it is " +
+  "not about a place-to-place connection. " +
   "No prose outside the JSON.";
 
 function earliestAt(members: StoredItem[]): number {
