@@ -903,27 +903,35 @@ export const GlobeScene = memo(function GlobeScene({
 
     // Scroll-zoom CURSOR LOCK. Reproject the captured surface point through THIS tick's
     // rotation+scale and steer the rotation so it returns to the cursor's NDC — pinning the
-    // exact point under the pointer as the scale eases (so you land on target, smoothly).
-    // The gain mirrors the drag math (px-of-content-move → rotation) using the LIVE scale so
-    // the correction tracks the easing zoom. The lock releases once the scale has settled.
+    // exact point under the pointer as the scale eases (so you land on target, smoothly). The
+    // gain mirrors the drag math (px-of-content-move → rotation) using the LIVE scale so the
+    // correction tracks the easing zoom. Two guards keep it from going unstable: a per-tick
+    // STEP cap so an ill-conditioned (near-limb) error can't lurch, and a release if the point
+    // rotates onto the FAR hemisphere (it can't sit under a front cursor). Ends once settled.
     const anchor = zoomAnchor.current;
     if (anchor) {
       g.updateMatrix(); // local matrix == world matrix (group is a direct scene child)
-      _anchor
-        .copy(anchor.dir)
-        .multiplyScalar(PLANET_RADIUS)
-        .applyMatrix4(g.matrix)
-        .project(cam);
-      if (_anchor.z < 1) {
+      _anchor.copy(anchor.dir).multiplyScalar(PLANET_RADIUS).applyMatrix4(g.matrix); // world
+      if (_anchor.z < 0) {
+        // Far hemisphere → unreachable under a front-facing cursor. Drop the lock instead of
+        // chasing it (that unbounded chase is what spun the camera when zoomed low/out).
+        zoomAnchor.current = null;
+      } else {
+        _anchor.project(cam);
         const gain = DRAG_K / (g.scale.x * (size.height || 600));
-        refs.rot.current.yaw += (anchor.ndcX - _anchor.x) * (size.width / 2) * gain;
-        refs.rot.current.pitch += -(anchor.ndcY - _anchor.y) * (size.height / 2) * gain;
-        refs.rot.current.pitch = Math.max(-1.2, Math.min(1.2, refs.rot.current.pitch));
+        const STEP = 0.1; // max rad/tick — a hard cap against any single-frame lurch
+        const dyaw = (anchor.ndcX - _anchor.x) * (size.width / 2) * gain;
+        const dpitch = -(anchor.ndcY - _anchor.y) * (size.height / 2) * gain;
+        refs.rot.current.yaw += Math.max(-STEP, Math.min(STEP, dyaw));
+        refs.rot.current.pitch = Math.max(
+          -1.2,
+          Math.min(1.2, refs.rot.current.pitch + Math.max(-STEP, Math.min(STEP, dpitch))),
+        );
         g.rotation.y = refs.rot.current.yaw;
         g.rotation.x = refs.rot.current.pitch;
         g.updateMatrix();
+        if (Math.abs(refs.zoom.current - g.scale.x) < 1e-3) zoomAnchor.current = null;
       }
-      if (Math.abs(refs.zoom.current - g.scale.x) < 1e-3) zoomAnchor.current = null;
     }
 
     // Project the markers worth labelling to SCREEN px for the wrapper's overlay
@@ -1036,12 +1044,18 @@ export const GlobeScene = memo(function GlobeScene({
       Math.min(ZOOM_MAX, refs.zoom.current * (zoomIn ? 1.12 : 1 / 1.12)),
     );
     const g = group.current;
-    if (g) {
+    // Lock to the cursor on zoom-IN only. Zooming IN eases the locked point toward the view
+    // centre (always reachable) so the controller stays stable; zooming OUT shrinks the globe
+    // and holding a fixed off-centre cursor would force the point past the limb (unreachable),
+    // which sent the camera spinning. Zoom-OUT just recedes toward the centre (no lock).
+    if (zoomIn && g) {
       // worldToLocal strips the group's rotation+scale → a stable local direction; project
       // the same world hit to get the cursor's NDC (consistent with any active view offset).
       const dir = g.worldToLocal(e.point.clone()).normalize();
       _anchor.copy(e.point).project(camera);
       zoomAnchor.current = { dir, ndcX: _anchor.x, ndcY: _anchor.y };
+    } else {
+      zoomAnchor.current = null;
     }
     refs.wake.current?.(); // ref-only mutation → kick the on-demand loop
   };
