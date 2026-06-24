@@ -37,6 +37,7 @@ import { placeSourcesFor } from "./placeSources";
 import { dedupeNearClones } from "./dedupe";
 import { interleaveByRecencyBuckets } from "./fairness";
 import type { Source } from "../src/types";
+import { createRotation, dealNextBatch, type RotationState } from "./sourceRotation";
 import { aiReachable, withConcurrency, withModelPriority } from "./ai";
 import {
   analyzeItems,
@@ -135,6 +136,9 @@ interface WorldState {
   geoDedup:
     | { key: number; clusters: { repId: string; memberIds: string[]; sourceCount: number }[] }
     | null;
+  /** Shuffled-deck cursor for SOURCE ROTATION — which sources a warm refresh fetches,
+   *  rotating through all of a world's sources with no repeats until the deck is spent. */
+  rotation: RotationState;
 }
 
 const worldStates = new Map<string, WorldState>();
@@ -160,6 +164,7 @@ function ws(worldId: string): WorldState {
       catchUpTimer: null,
       lastWatchedAt: 0,
       geoDedup: null,
+      rotation: createRotation(),
     };
     worldStates.set(worldId, s);
   }
@@ -482,13 +487,35 @@ async function prescreenAndStore(worldId: string, items: FeedItem[]): Promise<vo
  * chunked downstream. Returns how many genuinely-new (never-seen, in-window) items
  * this fetch surfaced, so the caller can decide whether to backfill older news.
  */
-async function refreshSources(worldId: string): Promise<{ newCount: number }> {
+async function refreshSources(
+  worldId: string,
+  opts: { full: boolean } = { full: false },
+): Promise<{ newCount: number }> {
   const state = ws(worldId);
   const st = getStore(worldId);
-  const sources = sourcesForWorld(worldId);
+  const allSources = sourcesForWorld(worldId);
+  // Warm refresh: fetch only a rotating random SUBSET (config.feed.sourceFetchBudget),
+  // cycling through every source with no repeats before the deck reshuffles — this spreads
+  // fetch cost/bytes over successive refreshes. Cold starts (opts.full) fetch ALL to seed
+  // the pool; items from sources not fetched this turn persist in the store until their turn.
+  const sources = opts.full
+    ? allSources
+    : (() => {
+        const byId = new Map(allSources.map((s) => [s.id, s]));
+        const ids = dealNextBatch(
+          state.rotation,
+          allSources.map((s) => s.id),
+          config.feed.sourceFetchBudget,
+        );
+        const picked = ids.map((id) => byId.get(id)).filter((s): s is Source => !!s);
+        return picked.length > 0 ? picked : allSources;
+      })();
   const started = Date.now();
   setPhase(state, "fetching");
-  console.log(`[feed:${worldId}] refresh — fetching ${sources.length} sources…`);
+  console.log(
+    `[feed:${worldId}] refresh — fetching ${sources.length}/${allSources.length} sources` +
+      `${opts.full ? " (full seed)" : ` (rotating subset, ${state.rotation.queue.length} left this cycle)`}…`,
+  );
   const raw = await fetchAll(sources);
   const cutoff = analyzeCutoff();
   // Never-seen items inside the recency window are all that need triage, FRESHEST
@@ -1396,7 +1423,7 @@ function runBackfillBatch(worldId: string, chain: boolean): void {
  * A status poll never resumes a drain, so navigating/idling can't pin the GPU.
  */
 async function buildPool(worldId: string, opts: { cold: boolean; force: boolean }): Promise<void> {
-  const { newCount } = await refreshSources(worldId);
+  const { newCount } = await refreshSources(worldId, { full: opts.cold });
   if (opts.cold) {
     // Opening a pool counts as watching it — seed the gate so the cold-fill chain
     // isn't cut off before the client's first status poll lands.

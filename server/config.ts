@@ -147,6 +147,13 @@ export const config = {
     recencyBucketHours: num("FEED_RECENCY_BUCKET_HOURS", 2),
     // Gap before a (pull-based) backfill batch runs after a refresh.
     catchUpDelayMs: num("FEED_CATCHUP_DELAY_MS", 1500),
+    // SOURCE ROTATION. A warm refresh fetches only this many sources — a random subset
+    // dealt from a shuffled "deck" so successive refreshes get a DIFFERENT subset with no
+    // repeats until every source has been fetched once, then the deck reshuffles. Spreads
+    // fetch cost/bytes over time instead of re-pulling every feed each refresh; previously-
+    // fetched items persist in the store between a source's turns. COLD starts ignore this
+    // and fetch all sources to seed the pool. 0 (or >= a world's source count) = fetch all.
+    sourceFetchBudget: numOrZero("FEED_SOURCE_FETCH_BUDGET", 10),
     // Headlines PRESCREENED (cheap title-only triage) per chunk. The cold-start
     // feed only WAITS on the FIRST chunk, so it lands fast even when a pool floods
     // with thousands of items; each pull-based backfill batch prescreens one more
