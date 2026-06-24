@@ -78,6 +78,52 @@ export function iso2Of(props: Record<string, unknown>): string | null {
 
 type Ring = [number, number][];
 
+// On the coarse 110m mesh a single earcut triangle can span tens of degrees of arc, so
+// its FLAT face chords well below the spherical surface — denting big countries (Russia,
+// the US, Canada) toward the core. Recursively split any triangle with a wide edge so the
+// faces hug the sphere (high-res regional meshes never needed this). ~12° keeps the
+// mid-edge dip negligible vs the land/ocean radius gap; the depth cap bounds the blow-up.
+const SUBDIV_MIN_DOT = Math.cos((12 * Math.PI) / 180); // split an edge wider than ~12°
+const SUBDIV_MAX_DEPTH = 5;
+
+/** Midpoint of two unit directions, re-projected onto the unit sphere. */
+function midUnit(a: Vec3, b: Vec3): Vec3 {
+  return normalize({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, z: (a.z + b.z) / 2 });
+}
+
+/** Emit one sphere triangle (unit dirs a,b,c), subdividing 1→4 until every edge subtends
+ *  a small angle, so the flat faces follow the curvature instead of cutting through it. */
+function emitSphereTri(
+  a: Vec3,
+  b: Vec3,
+  c: Vec3,
+  radius: number,
+  outPos: number[],
+  outNorm: number[],
+  depth: number,
+): void {
+  // Smallest dot = widest edge angle (unit vectors → dot = cos(angle)).
+  const widest = Math.min(
+    a.x * b.x + a.y * b.y + a.z * b.z,
+    b.x * c.x + b.y * c.y + b.z * c.z,
+    c.x * a.x + c.y * a.y + c.z * a.z,
+  );
+  if (depth < SUBDIV_MAX_DEPTH && widest < SUBDIV_MIN_DOT) {
+    const ab = midUnit(a, b);
+    const bc = midUnit(b, c);
+    const ca = midUnit(c, a);
+    emitSphereTri(a, ab, ca, radius, outPos, outNorm, depth + 1);
+    emitSphereTri(ab, b, bc, radius, outPos, outNorm, depth + 1);
+    emitSphereTri(ca, bc, c, radius, outPos, outNorm, depth + 1);
+    emitSphereTri(ab, bc, ca, radius, outPos, outNorm, depth + 1);
+    return;
+  }
+  for (const v of [a, b, c]) {
+    outPos.push(v.x * radius, v.y * radius, v.z * radius);
+    outNorm.push(v.x, v.y, v.z); // outward normal == unit position for a sphere shell
+  }
+}
+
 /** Triangulate one polygon (outer ring + optional holes) onto the sphere, appending
  *  EXPANDED (non-indexed) triangle vertices + outward normals to the shared arrays. */
 function addPolygon(rings: Ring[], radius: number, outPos: number[], outNorm: number[]): void {
@@ -112,14 +158,14 @@ function addPolygon(rings: Ring[], radius: number, outPos: number[], outNorm: nu
   });
   if (flat.length < 6) return; // need at least a triangle
   const tris = earcut(flat, holes.length ? holes : undefined, 2);
-  // Expand each triangle index into its own vertex so the geometry needs NO index
-  // buffer at all (dodges the unsupported 32-bit index path on expo-gl).
-  for (const idx of tris) {
-    const lon = flat[idx * 2];
-    const lat = flat[idx * 2 + 1];
-    const v = latLonToVec3(lat, lon); // unit dir on the sphere
-    outPos.push(v.x * radius, v.y * radius, v.z * radius);
-    outNorm.push(v.x, v.y, v.z); // outward normal == unit position for a sphere shell
+  // Project each triangle's corners onto the sphere, then emit it (subdividing wide ones so
+  // the flat faces hug the surface). Vertices are EXPANDED per-triangle so the geometry
+  // needs NO index buffer (dodges the unsupported 32-bit index path on expo-gl).
+  for (let i = 0; i + 2 < tris.length; i += 3) {
+    const a = latLonToVec3(flat[tris[i] * 2 + 1], flat[tris[i] * 2]);
+    const b = latLonToVec3(flat[tris[i + 1] * 2 + 1], flat[tris[i + 1] * 2]);
+    const c = latLonToVec3(flat[tris[i + 2] * 2 + 1], flat[tris[i + 2] * 2]);
+    emitSphereTri(a, b, c, radius, outPos, outNorm, 0);
   }
 }
 
