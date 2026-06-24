@@ -179,11 +179,18 @@ function setPhase(state: WorldState, phase: BuildPhase, done = 0, total = 0): vo
 }
 
 /** Heartbeat: record that the reader is looking at this pool (called on every
- *  status poll). Backfill is now PULL-BASED (refresh-triggered, one batch), so a
- *  status poll NO LONGER kicks off background analysis — navigating around can't
- *  pin the GPU. We keep the timestamp only as a lightweight presence signal. */
+ *  status poll). A status poll NEVER starts/resumes analysis (that's what pinned the
+ *  GPU before) — the timestamp is only read by `isWatched` as the STOP condition for an
+ *  in-progress cold-fill chain, so it winds down once the reader navigates away. */
 function markWatched(worldId: string): void {
   ws(worldId).lastWatchedAt = Date.now();
+}
+
+/** Whether the reader is still on this pool (polled status within watchedTtlMs). Used
+ *  ONLY to decide whether a cold-fill backfill chain should run its NEXT batch — never
+ *  to (re)start one, so leaving a pool quietly stops its fill instead of resuming it. */
+function isWatched(worldId: string): boolean {
+  return Date.now() - ws(worldId).lastWatchedAt < config.feed.watchedTtlMs;
 }
 
 /** Human-readable name of the place/world a status refers to (shown in the UI as
@@ -1281,7 +1288,7 @@ function augmentReactively(worldId: string): Promise<void> {
     // Deferred transcript enrichment for important video/podcast items (all pools).
     // If anything was re-analyzed, its embedding was cleared — re-embed in the bg.
     const enriched = await enrichTranscripts(worldId);
-    if (enriched > 0) runBackfillBatch(worldId);
+    if (enriched > 0) runBackfillBatch(worldId, true);
 
     // GEO pools show everything their own outlets report — no geo-scope filtering,
     // and no YouTube/zone augmentation (those extend TOPICAL worlds). Nothing more.
@@ -1298,10 +1305,10 @@ function augmentReactively(worldId: string): Promise<void> {
 
     getStore(worldId).save();
 
-    // Analyze the newly-added items with ONE follow-up batch (not a continuous
-    // drain). analyzePending is per-world re-entrancy-guarded and its model passes
-    // share the bounded request gate (ai.ts), so this needs no cross-world lock.
-    runBackfillBatch(worldId);
+    // Analyze the newly-added items (chained so the cascade completes). analyzePending
+    // is per-world re-entrancy-guarded and its model passes share the bounded request
+    // gate (ai.ts), so this needs no cross-world lock.
+    runBackfillBatch(worldId, true);
   })()
     .catch((e) => {
       console.warn(`[augment:${worldId}] reactive augmentation failed:`, e);
@@ -1313,17 +1320,23 @@ function augmentReactively(worldId: string): Promise<void> {
 }
 
 /**
- * Run ONE backfill batch: drain a chunk of the prescreen queue (so more provisional
+ * Run a backfill batch: drain a chunk of the prescreen queue (so more provisional
  * items enter the feed), then deep-analyze + embed a chunk of what's ready — newest
- * first. This is PULL-BASED: a batch is only ever triggered by a cold start or a
- * manual refresh that surfaced too little new news (see buildPool), NEVER a
- * self-sustaining loop and NEVER from a status poll. So navigating around — or just
- * leaving a pool open — can no longer pin the GPU grinding backwards through old
- * news. When the deep-analysis backlog empties, reactively extend the stories
- * (YouTube + per-zone coverage) once; the items that adds get their own batch.
- * Model passes share the bounded request gate (ai.ts), below interactive work.
+ * first. PULL-BASED: only ever triggered by a cold open or an explicit refresh (see
+ * buildPool), NEVER by a status poll, so navigating/idling can't pin the GPU.
+ *
+ * `chain` controls the extent:
+ *  - true  (a freshly-OPENED pool / cascade): keep running batches WHILE progress is
+ *           made AND the reader is still on this pool, so the opened pool FILLS UP
+ *           (deep analysis is itself capped per pool by deepAnalyzeKeep), then winds
+ *           down when its backlog clears or they navigate away. Never auto-resumes.
+ *  - false (an explicit REFRESH that found little new): run EXACTLY ONE batch — the
+ *           reader pulls older news a batch at a time.
+ *
+ * When the deep-analysis backlog empties, reactively extend the stories (YouTube +
+ * per-zone coverage). Model passes share the bounded gate (ai.ts), below interactive.
  */
-function runBackfillBatch(worldId: string): void {
+function runBackfillBatch(worldId: string, chain: boolean): void {
   const state = ws(worldId);
   // One batch at a time: don't stack timers or overlap an in-flight pass.
   if (state.catchUpTimer || state.analyzeInFlight || state.embedInFlight) return;
@@ -1334,15 +1347,21 @@ function runBackfillBatch(worldId: string): void {
         const p = await prescreenPending(worldId);
         const a = await analyzePending(worldId);
         const e = await embedPending(worldId);
+        const progressed = p.progressed + a.progressed + e.progressed;
         const pending = p.remaining + a.remaining + e.remaining;
         console.log(
-          `[feed:${worldId}] backfill batch: +${p.progressed} prescreened, ` +
-            `+${a.progressed} analyzed, +${e.progressed} embedded (${pending} still pending)`,
+          `[feed:${worldId}] backfill batch${chain ? " (cold-fill)" : ""}: ` +
+            `+${p.progressed} prescreened, +${a.progressed} analyzed, +${e.progressed} embedded ` +
+            `(${pending} still pending)`,
         );
-        // Backlog just cleared (we made progress and nothing's left) — reactively
-        // extend the stories with YouTube + per-zone coverage. augmentReactively
-        // adds items and triggers ONE follow-up batch to analyze them, then settles.
-        if (a.progressed > 0 && a.remaining === 0) void augmentReactively(worldId);
+        if (chain && progressed > 0 && pending > 0 && isWatched(worldId)) {
+          // Still filling the open pool — run the next batch.
+          runBackfillBatch(worldId, true);
+        } else if (a.progressed > 0 && a.remaining === 0) {
+          // Deep-analysis backlog cleared — reactively extend the stories with YouTube
+          // + per-zone coverage; the items it adds get their own (chained) batch.
+          void augmentReactively(worldId);
+        }
       } catch (err) {
         console.warn(`[feed:${worldId}] backfill batch failed:`, err);
       }
@@ -1352,17 +1371,25 @@ function runBackfillBatch(worldId: string): void {
 
 /**
  * Bring a world's store up to date (fetch + cheap triage) so PROVISIONAL items are
- * immediately servable. Deep analysis is now PULL-BASED: we only advance the backlog
- * by ONE batch when this is a cold start (nothing analyzed to show yet) or when an
- * explicit refresh surfaced FEWER than `backfillMinNew` genuinely-new articles — so
- * the reader pulls older news in a batch at a time instead of the GPU draining the
- * whole 24h backlog in the background. The cold-start response only waits on fetch +
- * triage, never the (slow) model analysis.
+ * immediately servable, then advance deep analysis — PULL-BASED, never a background
+ * drain triggered by mere navigation:
+ *  - COLD open (nothing analyzed yet): chain batches to FILL the pool you just opened
+ *    (bounded by deepAnalyzeKeep), winding down when its backlog clears.
+ *  - explicit REFRESH that found FEWER than `backfillMinNew` new articles: ONE batch
+ *    backwards, so the reader discovers older news a batch at a time.
+ *  - otherwise (plain TTL rebuild from navigation, or a refresh rich in new news):
+ *    fetch + triage only — no model drain.
+ * The cold-open response only waits on fetch + triage, never the (slow) analysis.
  */
 async function buildPool(worldId: string, opts: { cold: boolean; force: boolean }): Promise<void> {
   const { newCount } = await refreshSources(worldId);
-  if (opts.cold || (opts.force && newCount < config.feed.backfillMinNew)) {
-    runBackfillBatch(worldId);
+  if (opts.cold) {
+    // Opening a pool counts as watching it — seed the gate so the cold-fill chain
+    // isn't cut off before the client's first status poll lands.
+    markWatched(worldId);
+    runBackfillBatch(worldId, true); // fill the freshly-opened pool
+  } else if (opts.force && newCount < config.feed.backfillMinNew) {
+    runBackfillBatch(worldId, false); // explicit refresh, little new → one batch backwards
   } else {
     console.log(
       `[feed:${worldId}] ${newCount} new article(s) — backlog left for a later refresh`,
