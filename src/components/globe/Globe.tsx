@@ -83,6 +83,9 @@ import {
 
 const clamp = (v: number, lo: number, hi: number) =>
   Math.min(hi, Math.max(lo, v));
+// Valid Ionicons glyph name — EVENT_CATEGORIES stores icon names as plain strings, so we
+// cast through this when handing them to <Ionicons> for the event chips + legend lenses.
+type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
 const ZOOM_MIN = 0.6;
 const ZOOM_MAX = 2.6;
 const WORLD_ZOOM = 0.9; // zoomed-OUT scale for the world landing (whole globe in view)
@@ -176,12 +179,17 @@ const MarkerLayer = forwardRef<
     focusedId: string | null;
     /** Tap outside the focused card → release focus. */
     onDismiss: () => void;
+    /** Tap an event chip → focus it (opens its card). */
+    onPressMarker: (id: string) => void;
     /** Rich, interactive content for the focused card (links + selectable text). */
     renderFocused: (it: ProjectedMarker) => React.ReactNode;
   }
->(function MarkerLayer({ focusedId, onDismiss, renderFocused }, ref) {
+>(function MarkerLayer({ focusedId, onDismiss, onPressMarker, renderFocused }, ref) {
   const [items, setItems] = useState<ProjectedMarker[]>([]);
   const [height, setHeight] = useState(0); // layer height (px), for bottom-anchoring bubbles
+  // Which event chip the pointer is over (web) — shows its headline bubble, locally, so a
+  // hover never round-trips through the 3D scene (no re-render of the globe).
+  const [hoverId, setHoverId] = useState<string | null>(null);
   const prevKey = useRef("");
   useImperativeHandle(
     ref,
@@ -218,6 +226,7 @@ const MarkerLayer = forwardRef<
       {height > 0 &&
         items.map((it) => {
           const pos = { left: it.x - 110, bottom: height - it.y + 12 };
+          // FOCUSED pin (ask or event): its interactive card, anchored above the point.
           if (it.id === focusedId) {
             return (
               <View key={it.id} style={[styles.markerTag, styles.markerFocusedWrap, pos]} pointerEvents="box-none">
@@ -227,6 +236,60 @@ const MarkerLayer = forwardRef<
               </View>
             );
           }
+          // WORLDVIEW EVENT: a legible, category-coloured ICON chip sitting on the point.
+          // Size scales with severity; a "+N" badge marks stacked events; tap → focus card;
+          // hover (web) → headline bubble. Constant on-screen size at any zoom.
+          if (it.kind === "alert" && it.category) {
+            const cr = Math.round(11 + (it.severity ?? 0.4) * 7); // chip RADIUS (px)
+            const showBubble = hoverId === it.id && !!it.detail;
+            const more = (it.count ?? 1) - 1;
+            return (
+              <React.Fragment key={it.id}>
+                {showBubble && (
+                  <View
+                    style={[styles.markerTag, { left: it.x - 110, bottom: height - it.y + cr + 6 }]}
+                    pointerEvents="none"
+                  >
+                    <View style={[styles.markerBubble, { borderColor: it.color }]}>
+                      <Text style={styles.markerBubbleText} numberOfLines={3}>
+                        {it.detail}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+                <Pressable
+                  style={[
+                    styles.eventChip,
+                    {
+                      left: it.x - cr,
+                      top: it.y - cr,
+                      width: cr * 2,
+                      height: cr * 2,
+                      borderRadius: cr,
+                      backgroundColor: it.color,
+                    },
+                  ]}
+                  onPress={() => onPressMarker(it.id)}
+                  onHoverIn={() => setHoverId(it.id)}
+                  onHoverOut={() => setHoverId((h) => (h === it.id ? null : h))}
+                  accessibilityRole="button"
+                  accessibilityLabel={it.detail}
+                >
+                  <Ionicons
+                    name={EVENT_CATEGORIES[it.category].icon as IoniconName}
+                    size={Math.round(cr * 1.15)}
+                    color="#0b0f14"
+                  />
+                  {more > 0 && (
+                    <View style={styles.eventCount}>
+                      <Text style={styles.eventCountText}>{more > 9 ? "9+" : `+${more}`}</Text>
+                    </View>
+                  )}
+                </Pressable>
+              </React.Fragment>
+            );
+          }
+          // AI-SEARCH pin: an always-on place label, plus a blurb bubble on hover.
           return (
             <View key={it.id} style={[styles.markerTag, pos]} pointerEvents="none">
               {it.hovered && it.detail ? (
@@ -338,6 +401,18 @@ export function Globe({
   // The CLICKED marker, whose interactive card stays open (links + selectable text) until
   // the reader taps outside it.
   const [focusedMarkerId, setFocusedMarkerId] = useState<string | null>(null);
+  // Worldview LENSES: categories the reader has toggled OFF in the legend (hidden from the
+  // map), so the globe answers "where are the {conflicts|disasters|…}?" by filtering. Empty
+  // = show everything. Toggling a legend chip flips its category in/out.
+  const [hiddenCats, setHiddenCats] = useState<Set<EventCategory>>(() => new Set());
+  const toggleCat = useCallback((c: EventCategory) => {
+    setHiddenCats((prev) => {
+      const next = new Set(prev);
+      if (next.has(c)) next.delete(c);
+      else next.add(c);
+      return next;
+    });
+  }, []);
   const markerLayerRef = useRef<{ set: (items: ProjectedMarker[]) => void }>(null);
 
   // View state the gesture layer mutates and the frame loop reads (no re-renders).
@@ -603,6 +678,17 @@ export function Globe({
     }
     return out;
   }, [askResult, askIndex]);
+
+  // What the globe actually paints as event chips: the located events MINUS any category
+  // the reader toggled off (the legend lenses). While an AI search is showing its own pins,
+  // we drop the worldview events entirely so the answer's places stand alone.
+  const visibleAlerts = useMemo<GeoAlert[]>(
+    () =>
+      askMarkers.length > 0
+        ? []
+        : alerts.filter((a) => !hiddenCats.has(a.category)),
+    [alerts, hiddenCats, askMarkers.length],
+  );
 
   // When an answer lands with locations, orient the globe to frame them (averaged
   // direction), zoomed out enough to take in the spread.
@@ -1176,8 +1262,7 @@ export function Globe({
             countryOutline={worldGeo?.countryOutline ?? null}
             outline={regionOutline}
             gizmos={gizmos}
-            alerts={alerts}
-            onAlertPress={onMarkerSelect}
+            alerts={visibleAlerts}
             askMarkers={askMarkers}
             onAskMarkerPress={onMarkerSelect}
             hoveredMarkerId={hoveredMarkerId}
@@ -1426,28 +1511,43 @@ export function Globe({
           </View>
         )}
 
-        {/* Worldview legend: which event categories are coloured on the map right now. */}
+        {/* Worldview legend = LENSES: the categories on the map, each a tappable filter. Tap
+            one to hide/show that category (so you can isolate "just conflicts" or "just
+            disasters"); hidden ones dim. The icon + colour match the on-globe chips exactly. */}
         {hero && legendCats.length > 0 && (
           <View
             style={[
               styles.legend,
               { bottom: 98 + bottomInset, right: rightInset + spacing.lg },
             ]}
-            pointerEvents="none"
+            pointerEvents="box-none"
           >
-            {legendCats.map((cat) => (
-              <View key={cat} style={styles.legendItem}>
-                <View
-                  style={[
-                    styles.legendDot,
-                    { backgroundColor: EVENT_CATEGORIES[cat].color },
-                  ]}
-                />
-                <Text style={styles.legendText}>
-                  {EVENT_CATEGORIES[cat].label}
-                </Text>
-              </View>
-            ))}
+            {legendCats.map((cat) => {
+              const off = hiddenCats.has(cat);
+              return (
+                <Pressable
+                  key={cat}
+                  style={[styles.legendItem, off && styles.legendItemOff]}
+                  onPress={() => toggleCat(cat)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: !off }}
+                  accessibilityLabel={EVENT_CATEGORIES[cat].label}
+                >
+                  <View
+                    style={[styles.legendDot, { backgroundColor: EVENT_CATEGORIES[cat].color }]}
+                  >
+                    <Ionicons
+                      name={EVENT_CATEGORIES[cat].icon as IoniconName}
+                      size={9}
+                      color="#0b0f14"
+                    />
+                  </View>
+                  <Text style={[styles.legendText, off && styles.legendTextOff]}>
+                    {EVENT_CATEGORIES[cat].label}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
         )}
 
@@ -1463,6 +1563,7 @@ export function Globe({
           ref={markerLayerRef}
           focusedId={focusedMarkerId}
           onDismiss={clearFocus}
+          onPressMarker={onMarkerSelect}
           renderFocused={renderFocused}
         />
 
@@ -1593,9 +1694,58 @@ const styles = StyleSheet.create({
     rowGap: spacing.xs,
     columnGap: spacing.md,
   },
-  legendItem: { flexDirection: "row", alignItems: "center", gap: 5 },
-  legendDot: { width: 9, height: 9, borderRadius: 5 },
-  legendText: { color: colors.textDim, fontSize: font.tiny, fontWeight: "700" },
+  // Each legend entry is a tappable LENS pill (icon swatch + label). Dimmed when toggled off.
+  legendItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingLeft: 4,
+    paddingRight: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface + "E6",
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  legendItemOff: { opacity: 0.4 },
+  // Colour swatch holding the category's icon — matches the on-globe chip exactly.
+  legendDot: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  legendText: { color: colors.text, fontSize: font.tiny, fontWeight: "800" },
+  legendTextOff: { color: colors.textDim },
+  // A worldview EVENT, drawn as a constant-size icon chip pinned on its globe point.
+  eventChip: {
+    position: "absolute",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1.5,
+    borderColor: "#0b0f14AA",
+    shadowColor: "#000",
+    shadowOpacity: 0.35,
+    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 1 },
+  },
+  // "+N" badge for events stacked on one place.
+  eventCount: {
+    position: "absolute",
+    top: -4,
+    right: -6,
+    minWidth: 15,
+    height: 15,
+    paddingHorizontal: 3,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  eventCountText: { color: colors.text, fontSize: 9, fontWeight: "800" },
   topBar: {
     position: "absolute",
     top: spacing.sm,

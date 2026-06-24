@@ -10,7 +10,7 @@
 // zoom are driven by refs the wrapper mutates from gestures, applied here in the
 // per-frame loop so the gesture layer never has to re-render React.
 
-import React, { memo, useEffect, useMemo, useRef, useState } from "react";
+import React, { memo, useEffect, useMemo, useRef } from "react";
 import type { MutableRefObject } from "react";
 import { AppState } from "react-native";
 import { useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
@@ -19,11 +19,9 @@ import {
   BackSide,
   DoubleSide,
   Quaternion,
-  SRGBColorSpace,
-  TextureLoader,
   Vector3,
 } from "three";
-import type { Group, Mesh, MeshBasicMaterial, PerspectiveCamera, Texture } from "three";
+import type { Group, Mesh, MeshBasicMaterial, PerspectiveCamera } from "three";
 import { colors } from "../../theme";
 import { hashId, type Vec3 } from "../../lib/globeLayout";
 import { EVENT_CATEGORIES, type EventCategory, type GeoAlert } from "../../lib/geoAlerts";
@@ -316,31 +314,6 @@ function outwardQuat(dir: Vec3): [number, number, number, number] {
   return [q.x, q.y, q.z, q.w];
 }
 
-/** Per-category CORE geometry — a distinct silhouette so the worldview is legible at
- *  a glance: a spike for conflict, a shard for disaster, a gem for health, a ring for
- *  diplomacy, a cube for unrest, a faceted ball for tech, a bar for economy, a dot
- *  otherwise. Sized by `r` (gravity). Heights are tuned to sit on the surface. */
-function CategoryGeometry({ category, r }: { category: EventCategory; r: number }) {
-  switch (category) {
-    case "conflict":
-      return <coneGeometry args={[r * 1.0, r * 2.3, 4]} />; // 4-sided spike
-    case "disaster":
-      return <tetrahedronGeometry args={[r * 1.35]} />; // jagged shard
-    case "health":
-      return <octahedronGeometry args={[r * 1.3]} />; // gem
-    case "diplomacy":
-      return <torusGeometry args={[r * 1.0, r * 0.38, 10, 18]} />; // ring
-    case "unrest":
-      return <boxGeometry args={[r * 1.4, r * 1.4, r * 1.4]} />; // cube
-    case "tech":
-      return <icosahedronGeometry args={[r * 1.25, 0]} />; // faceted ball
-    case "economy":
-      return <cylinderGeometry args={[r * 0.8, r * 0.8, r * 2.1, 12]} />; // bar
-    default:
-      return <sphereGeometry args={[r * 1.05, 14, 14]} />; // generic dot
-  }
-}
-
 /** A flat, expanding "sonar" ring laid on the surface (local XZ plane), driving the
  *  alive feel. Refs let the frame loop animate scale/opacity without re-rendering. */
 function PingRing({
@@ -406,101 +379,6 @@ function MarkerHit({
   );
 }
 
-/** One world-event marker: a category-SHAPED, category-COLOURED core standing on the
- *  surface, a looping sonar ring, and a hit sphere (→ open the story / block country
- *  hover). Phase is desynced per id so they shimmer; hovering pops the core. */
-function AlertMarker({
-  alert,
-  onPress,
-  onHover,
-  hovered,
-}: {
-  alert: GeoAlert;
-  onPress?: (id: string) => void;
-  onHover?: (id: string | null) => void;
-  hovered: boolean;
-}) {
-  const root = useRef<Group>(null);
-  const core = useRef<Mesh>(null);
-  const ring = useRef<Mesh>(null);
-  const ringMat = useRef<MeshBasicMaterial>(null);
-  const r = 0.008 + alert.severity * 0.011; // smaller: a dense cluster of countries stays legible
-  const color = EVENT_CATEGORIES[alert.category].color;
-  const phase = (hashId(alert.id) % 1000) / 1000;
-  const quat = useMemo(
-    () => outwardQuat(alert.dir),
-    [alert.dir.x, alert.dir.y, alert.dir.z],
-  );
-  useFrame((state) => {
-    const tt = (state.clock.elapsedTime * 0.7 + phase) % 1;
-    if (ring.current) ring.current.scale.setScalar(1 + tt * 2.8);
-    if (ringMat.current) ringMat.current.opacity = (1 - tt) * 0.4;
-    if (core.current) {
-      const target = hovered ? 1.5 : 1;
-      core.current.scale.setScalar(core.current.scale.x + (target - core.current.scale.x) * 0.2);
-    }
-    // Cap the marker's screen size: undo the globe-zoom scaling beyond MARKER_SIZE_CAP.
-    if (root.current) {
-      const z = root.current.parent?.scale.x ?? 1;
-      root.current.scale.setScalar(Math.min(1, MARKER_SIZE_CAP / z));
-    }
-  });
-  return (
-    <group
-      ref={root}
-      position={[alert.dir.x * ALERT_RADIUS, alert.dir.y * ALERT_RADIUS, alert.dir.z * ALERT_RADIUS]}
-      quaternion={quat}
-    >
-      <mesh ref={core} position={[0, r * 1.2, 0]}>
-        <CategoryGeometry category={alert.category} r={r} />
-        <meshStandardMaterial
-          color={color}
-          emissive={color}
-          emissiveIntensity={hovered ? 1.2 : 0.55}
-          metalness={0.3}
-          roughness={0.4}
-        />
-      </mesh>
-      <PingRing inner={r * 1.3} outer={r * 1.75} color={color} ringRef={ring} matRef={ringMat} />
-      {/* Only when the story's PROTAGONIST is a nation: a flag gizmo anchored on the
-          marker's CORE (same point as the visible shape) so it never drifts relative to
-          the pin as the globe turns; the pole then rises within its billboard. */}
-      {alert.iso2 && (
-        <group position={[0, r * 1.2, 0]}>
-          <FlagModel iso2={alert.iso2} />
-        </group>
-      )}
-      <MarkerHit id={alert.id} radius={Math.max(r * 2.6, 0.04)} y={r} onPress={onPress} onHover={onHover} />
-    </group>
-  );
-}
-
-function Alerts({
-  alerts,
-  onPress,
-  onHover,
-  hoveredId,
-}: {
-  alerts: GeoAlert[];
-  onPress?: (id: string) => void;
-  onHover?: (id: string | null) => void;
-  hoveredId: string | null;
-}) {
-  return (
-    <>
-      {alerts.map((a) => (
-        <AlertMarker
-          key={a.id}
-          alert={a}
-          onPress={onPress}
-          onHover={onHover}
-          hovered={hoveredId === a.id}
-        />
-      ))}
-    </>
-  );
-}
-
 /** One located result of an AI news search ("ask"): an accent "pin" — a thin stem +
  *  glowing head standing off the surface, with a pulsing base ring — deliberately
  *  unlike the flat category event shapes. `detail` (the one-line read) is shown in
@@ -514,101 +392,6 @@ export interface AskMarkerData {
   detail?: string;
   /** ISO 3166-1 alpha-2 (lowercase) of the place's nation, for its flag. */
   iso2?: string;
-}
-
-// Loaded flag textures, cached by ISO-2 so each country's PNG is fetched once.
-const _flagTextures = new Map<string, Texture>();
-const FLAG_W = 0.038;
-const FLAG_H = 0.024;
-// How far up the BILLBOARD's own (screen-up) axis the pole starts. The flag is anchored
-// on the marker core, so this is just enough for the pole to emerge from the pin rather
-// than a radial lift (which would offset it diagonally on screen, varying with angle).
-const FLAG_BASE = 0.006;
-
-/** A little 3D FLAG-on-a-pole gizmo, textured with the country's flag image
- *  (flagcdn.com). It BILLBOARDS to the camera so the cloth is always readable, and the
- *  cloth WAVES. Its ANCHOR sits AT the pin (so it never drifts off diagonally); the pole
- *  is raised along the billboard's screen-up axis (FLAG_BASE) to clear the marker.
- *  Rendered only for a pin whose story protagonist is a nation. Degrades to nothing if
- *  the texture can't load (offline / no remote loader). */
-function FlagModel({ iso2 }: { iso2: string }) {
-  const grp = useRef<Group>(null);
-  const cloth = useRef<Mesh>(null);
-  const base = useRef<Float32Array | null>(null); // the cloth's rest vertices, for the wave
-  const camera = useThree((s) => s.camera);
-  const [tex, setTex] = useState<Texture | null>(() => _flagTextures.get(iso2) ?? null);
-
-  useEffect(() => {
-    if (!iso2) return;
-    const cached = _flagTextures.get(iso2);
-    if (cached) {
-      setTex(cached);
-      return;
-    }
-    let cancelled = false;
-    try {
-      new TextureLoader().load(
-        `https://flagcdn.com/w80/${iso2}.png`,
-        (t) => {
-          t.colorSpace = SRGBColorSpace;
-          _flagTextures.set(iso2, t);
-          if (!cancelled) setTex(t);
-        },
-        undefined,
-        () => {}, // 404 / network / unsupported loader → just no flag
-      );
-    } catch {
-      /* TextureLoader unavailable in this runtime — no flag */
-    }
-    return () => {
-      cancelled = true;
-    };
-  }, [iso2]);
-
-  useFrame((state) => {
-    // Billboard the whole gizmo to the camera (independent of the globe's spin), then
-    // flip so the texture's FRONT faces us. lookAt accounts for the parent transform.
-    if (grp.current) {
-      grp.current.lookAt(camera.position);
-      grp.current.rotateY(Math.PI);
-    }
-    // Wave the cloth: vertices at the pole (rest x = -FLAG_W/2) stay put; the free edge
-    // moves most. A depth RIPPLE plus an exaggerated UP/DOWN flap so the motion reads even
-    // when the flag is small. Computed from the captured REST positions so it never drifts.
-    const geo = cloth.current?.geometry;
-    if (geo) {
-      const pos = geo.attributes.position;
-      if (!base.current) base.current = (pos.array as Float32Array).slice();
-      const b = base.current;
-      const t = state.clock.elapsedTime * 2.6;
-      for (let i = 0; i < pos.count; i++) {
-        const bx = b[i * 3];
-        const by = b[i * 3 + 1];
-        const f = (bx + FLAG_W / 2) / FLAG_W; // 0 at the pole edge → 1 at the free edge
-        const phase = bx * 70 + t;
-        pos.setZ(i, Math.sin(phase) * 0.0045 * f); // ripple toward/away (depth)
-        pos.setY(i, by + Math.sin(phase + 1.3) * 0.0045 * f); // gentle up/down flap
-      }
-      pos.needsUpdate = true;
-    }
-  });
-
-  if (!tex) return null;
-  return (
-    <group ref={grp}>
-      {/* Pole: ON the group origin (x=0) so it lands exactly on the pin, rising up. */}
-      <mesh position={[0, FLAG_BASE + FLAG_H, 0]}>
-        <cylinderGeometry args={[0.001, 0.001, FLAG_H * 2, 6]} />
-        <meshBasicMaterial color="#e2e8f0" />
-      </mesh>
-      {/* Cloth: flies OUT from the pole (its near edge at the pole/pin), and waves —
-          so the pin aligns with the POLE, not the flag's centre. */}
-      <mesh ref={cloth} position={[FLAG_W / 2, FLAG_BASE + FLAG_H * 1.55, 0]}>
-        <planeGeometry args={[FLAG_W, FLAG_H, 14, 2]} />
-        <meshBasicMaterial map={tex} side={DoubleSide} toneMapped={false} />
-      </mesh>
-    </group>
-  );
 }
 
 function AskMarker({
@@ -697,7 +480,7 @@ function AskMarkers({
   );
 }
 
-/** A marker projected to 2D screen space, for the wrapper's overlay bubbles. */
+/** A marker projected to 2D screen space, for the wrapper's overlay chips/bubbles. */
 export interface ProjectedMarker {
   id: string;
   kind: "ask" | "alert";
@@ -711,6 +494,14 @@ export interface ProjectedMarker {
   /** Tag/bubble accent colour. */
   color: string;
   hovered: boolean;
+  /** Event category (alerts only) — drives the overlay chip's ICON. */
+  category?: EventCategory;
+  /** 0..1 gravity (alerts only) — drives the chip size. */
+  severity?: number;
+  /** How many events collapsed onto this spot (alerts only) — drives a "+N" badge. */
+  count?: number;
+  /** Ongoing issue vs single event (alerts only) — for the time treatment. */
+  developing?: boolean;
 }
 
 // memo'd so the scene only re-renders when its OWN inputs change. Without this, every
@@ -725,7 +516,6 @@ export const GlobeScene = memo(function GlobeScene({
   outline,
   gizmos,
   alerts,
-  onAlertPress,
   askMarkers = [],
   onAskMarkerPress,
   hoveredMarkerId = null,
@@ -746,8 +536,6 @@ export const GlobeScene = memo(function GlobeScene({
   outline: Float32Array | null;
   gizmos: GlobeEntityData[];
   alerts: GeoAlert[];
-  /** Tapping a worldview marker opens its story. */
-  onAlertPress?: (id: string) => void;
   /** Located results from an AI news search to mark on the globe (empty = none). */
   askMarkers?: AskMarkerData[];
   /** Tap an ask marker → recenter the globe on it. */
@@ -959,6 +747,7 @@ export const GlobeScene = memo(function GlobeScene({
         label: string,
         detail: string,
         color: string,
+        extra?: Partial<Pick<ProjectedMarker, "category" | "severity" | "count" | "developing">>,
       ) => {
         _proj.set(dir.x * ALERT_RADIUS, dir.y * ALERT_RADIUS, dir.z * ALERT_RADIUS);
         _proj.applyMatrix4(g.matrix); // group local matrix == world matrix
@@ -974,19 +763,22 @@ export const GlobeScene = memo(function GlobeScene({
           detail,
           color,
           hovered: id === hoveredMarkerId,
+          ...extra,
         });
       };
       for (const m of askMarkers) {
         add(m.id, "ask", m.dir, m.label, m.detail ?? "", colors.accent);
       }
-      // Project the hovered AND focused alerts (deduped) so their bubble / card can render.
-      for (const aid of new Set([hoveredMarkerId, focusedMarkerId])) {
-        if (!aid) continue;
-        const ha = alerts.find((a) => a.id === aid);
-        if (!ha) continue; // an ask marker id (already added) or stale
-        const more = (ha.count ?? 1) - 1;
-        const detail = more > 0 ? `${ha.title}  ·  +${more} more here` : ha.title;
-        add(ha.id, "alert", ha.dir, "", detail, EVENT_CATEGORIES[ha.category].color);
+      // Every worldview EVENT is drawn as a legible icon chip in the 2D overlay (not an
+      // abstract 3D shape) — so project ALL of them (front hemisphere only). The chip's
+      // icon/colour/size come from the category + severity; the headline rides `detail`.
+      for (const a of alerts) {
+        add(a.id, "alert", a.dir, "", a.title, EVENT_CATEGORIES[a.category].color, {
+          category: a.category,
+          severity: a.severity,
+          count: a.count,
+          developing: a.developing,
+        });
       }
       onMarkersProject(out);
     }
@@ -1003,7 +795,10 @@ export const GlobeScene = memo(function GlobeScene({
       focusedMarkerId === null &&
       !refs.dragging.current &&
       !zoomAnchor.current;
-    const markersLive = alerts.length > 0 || askMarkers.length > 0;
+    // Only ASK pins still animate in 3D (pulsing). Worldview events are now static 2D icon
+    // chips in the overlay, so they DON'T need the loop awake while idle — the globe sleeps
+    // (0fps) with events on screen and only re-projects them on a gesture/data change.
+    const markersLive = askMarkers.length > 0;
     const locking = zoomAnchor.current !== null; // cursor-lock needs full-rate steering
     // Transient camera EASES move the whole globe and are loop-driven (no per-event driver
     // once kicked): the fly-to (auto focus/zoom), the scroll/pinch ZOOM ease (a wheel notch
@@ -1145,17 +940,9 @@ export const GlobeScene = memo(function GlobeScene({
             onHoverMove={onHoverMove}
           />
         ))}
-        {/* Worldview: category-SHAPED, gravity-sized event markers (tap to open,
-            hover for the headline; hovering blocks the country behind). HIDDEN while an
-            AI search is showing its own pins, so the answer's places stand alone. */}
-        {askMarkers.length === 0 && (
-          <Alerts
-            alerts={alerts}
-            onPress={onAlertPress}
-            onHover={onMarkerHover}
-            hoveredId={hoveredMarkerId}
-          />
-        )}
+        {/* Worldview EVENTS are no longer drawn in 3D — they're projected (above) to legible
+            2D icon CHIPS in the wrapper's overlay (crisp, constant on-screen size, tappable),
+            which reads far better than abstract shapes and lets the globe sleep when idle. */}
         {/* AI news-search results: accent pins on the places the answer is about. */}
         <AskMarkers
           markers={askMarkers}
