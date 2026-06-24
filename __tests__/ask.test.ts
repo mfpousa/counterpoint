@@ -56,6 +56,24 @@ describe("parseAsk", () => {
     expect(places).toHaveLength(0);
     expect(synopsis).toBe(raw);
   });
+
+  it("extracts INLINE 'Place (ISO2):' mentions from prose (no bullets/newlines)", () => {
+    // The model ignored the line format and inlined the mentions in one paragraph —
+    // but still tagged the (language-neutral) ISO codes, so we can still locate them.
+    const raw =
+      "Los artículos no mencionan ningún país nuevo en la OTAN; se centran en una cumbre. " +
+      "Alemania (DE): Las tropas neerlandesas realizan ejercicios militares. " +
+      "Turquía (TR): Arrestos masivos en Ankara antes de la cumbre de la OTAN.";
+    const { synopsis, places } = parseAsk(raw);
+    expect(places.map((p) => [p.label, p.iso2])).toEqual([
+      ["Alemania", "de"],
+      ["Turquía", "tr"],
+    ]);
+    expect(places[0].blurb).toContain("tropas neerlandesas");
+    expect(places[1].blurb).toContain("Ankara");
+    expect(synopsis).toContain("OTAN");
+    expect(synopsis).not.toContain("(DE)");
+  });
 });
 
 describe("pickIds (planner selection validation)", () => {

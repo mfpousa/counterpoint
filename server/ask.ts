@@ -190,6 +190,12 @@ async function selectRelevant(q: string, candidates: StoredItem[]): Promise<Stor
 const LIST_LINE = /^(?:[-*•]|\d+[.)])\s+(.+)$/;
 // A 2-letter ISO code anywhere in the line, in parens or brackets: (UA) or [UA].
 const CODE = /[([]([A-Za-z]{2})[)\]]/;
+// A located mention "Place (ISO2):" found ANYWHERE — bulleted, numbered, or INLINE in
+// prose. Models frequently ignore the line format but still tag the 2-letter ISO code,
+// which is language-neutral (so "Alemania (DE):" / "Turquía (TR):" still resolve). The
+// label is the capitalized run of words right before the code; the blurb (computed by
+// the caller) runs to the next such mention.
+const PLACE_MENTION = /([\p{Lu}][\p{L} '’\-]{0,40}?)\s*[([]([A-Za-z]{2})[)\]]\s*:\s*/gu;
 
 /** Strip light markdown (bold/italic/inline-code) without touching content. */
 function stripMd(s: string): string {
@@ -214,11 +220,19 @@ export function parseAsk(raw: string): { synopsis: string; places: AskPlace[] } 
   const text = raw.replace(/```+[ \t]*\w*/g, "").replace(/```+/g, "").trim();
   const synopsisParts: string[] = [];
   const places: AskPlace[] = [];
+  const seen = new Set<string>();
+  const addPlace = (label: string, iso2: string, blurb: string) => {
+    const clean = label.trim();
+    const key = `${iso2}|${clean.toLowerCase()}`;
+    if (!clean || seen.has(key) || places.length >= 8) return;
+    seen.add(key);
+    places.push({ label: clean, iso2, blurb: blurb.trim() });
+  };
   for (const rawLine of text.split(/\r?\n/)) {
     const line = stripMd(rawLine.trim());
     if (!line) continue;
     const lm = line.match(LIST_LINE);
-    if (lm && places.length < 8) {
+    if (lm) {
       const content = lm[1].trim();
       const cm = content.match(CODE);
       const iso2 = cm ? cm[1].toLowerCase() : "";
@@ -231,13 +245,33 @@ export function parseAsk(raw: string): { synopsis: string; places: AskPlace[] } 
       if (sep < 0) sep = noCode.search(/\s[–—-]\s/);
       const label = (sep >= 0 ? noCode.slice(0, sep) : noCode).replace(/[\s:–—-]+$/, "").trim();
       const blurb = (sep >= 0 ? noCode.slice(sep + 1) : "").replace(/^[–—:\-\s]+/, "").trim();
-      if (label) places.push({ label, iso2, blurb });
+      addPlace(label, iso2, blurb);
       continue;
     }
     // Non-list line: part of the synopsis (until/unless list items have started).
     if (places.length === 0) synopsisParts.push(line);
   }
-  return { synopsis: synopsisParts.join(" ").trim(), places };
+
+  let synopsis = synopsisParts.join(" ").trim();
+  // Many models ignore the line format and INLINE the located mentions in the prose
+  // ("…seguridad. Alemania (DE): … Turquía (TR): …"). Pull those out of the synopsis
+  // too (keyed on the language-neutral ISO code), each blurb running to the next
+  // mention, and trim them off the synopsis so it stays clean.
+  const inline = [...synopsis.matchAll(PLACE_MENTION)];
+  if (inline.length > 0) {
+    for (let i = 0; i < inline.length; i++) {
+      const m = inline[i];
+      const start = (m.index ?? 0) + m[0].length;
+      const end = i + 1 < inline.length ? (inline[i + 1].index ?? synopsis.length) : synopsis.length;
+      const blurb = synopsis.slice(start, end).replace(/\s*(?:[-*•]|\d+[.)])\s*$/, "").trim();
+      addPlace(m[1], m[2].toLowerCase(), blurb);
+    }
+    synopsis = synopsis
+      .slice(0, inline[0].index ?? 0)
+      .replace(/\s*(?:[-*•]|\d+[.)])\s*$/, "")
+      .trim();
+  }
+  return { synopsis, places };
 }
 
 /**

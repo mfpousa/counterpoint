@@ -223,29 +223,55 @@ export function buildOutline(features: GeoFeature[], radius = 1): Float32Array {
   return new Float32Array(seg);
 }
 
-/** Average direction of every vertex in a feature (good enough to anchor a pin). */
-function featureCentroidDir(f: GeoFeature): Vec3 | null {
-  const g = f.geometry;
-  if (!g) return null;
+/** Planar |shoelace| area of a ring in lon/lat — only used to COMPARE polygon sizes
+ *  (pick the biggest landmass), so projection distortion doesn't matter. */
+function ringArea(ring: Ring): number {
+  let a = 0;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    a += ring[j][0] * ring[i][1] - ring[i][0] * ring[j][1];
+  }
+  return Math.abs(a) / 2;
+}
+
+/** Average sphere direction of a ring's vertices. Uses 3D unit vectors, so it's
+ *  antimeridian-safe (no lon wrap discontinuity) — fine for anchoring a pin. */
+function ringCentroidDir(ring: Ring): Vec3 | null {
   let x = 0;
   let y = 0;
   let z = 0;
-  let n = 0;
-  const addRingset = (rings: Ring[]) => {
-    for (const ring of rings) {
-      for (const [lon, lat] of ring) {
-        const v = latLonToVec3(lat, lon);
-        x += v.x;
-        y += v.y;
-        z += v.z;
-        n += 1;
-      }
+  for (const [lon, lat] of ring) {
+    const v = latLonToVec3(lat, lon);
+    x += v.x;
+    y += v.y;
+    z += v.z;
+  }
+  return ring.length > 0 ? normalize({ x, y, z }) : null;
+}
+
+/** Anchor direction for a feature's pin: the centroid of its LARGEST polygon only.
+ *  Averaging EVERY vertex dragged countries with far-flung overseas parts out to sea
+ *  (e.g. France + French Guiana landed the France pin in the Atlantic west of Spain);
+ *  using just the biggest landmass keeps the pin on the mainland (France, contiguous
+ *  US over Alaska/Hawaii, mainland Norway over Svalbard, …). */
+function featureCentroidDir(f: GeoFeature): Vec3 | null {
+  const g = f.geometry;
+  if (!g) return null;
+  let best: Ring | null = null;
+  let bestArea = -1;
+  const consider = (outer: Ring | undefined) => {
+    if (!outer) return;
+    const area = ringArea(outer);
+    if (area > bestArea) {
+      bestArea = area;
+      best = outer;
     }
   };
-  if (g.type === "Polygon") addRingset(g.coordinates as Ring[]);
-  else if (g.type === "MultiPolygon") for (const poly of g.coordinates as Ring[][]) addRingset(poly);
-  if (n === 0) return null;
-  return normalize({ x, y, z });
+  if (g.type === "Polygon") {
+    consider((g.coordinates as Ring[])[0]);
+  } else if (g.type === "MultiPolygon") {
+    for (const poly of g.coordinates as Ring[][]) consider(poly[0]);
+  }
+  return best ? ringCentroidDir(best) : null;
 }
 
 /** Per-country + per-continent pin anchors (unit directions on the sphere). */

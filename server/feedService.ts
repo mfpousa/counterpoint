@@ -205,8 +205,8 @@ function poolLabel(worldId: string): string {
 
 /** Snapshot of build/analysis progress for a world, for the UI. */
 export function getStatus(worldId: string = DEFAULT_WORLD_ID): AnalysisStatus {
-  // Every status poll is a heartbeat that this pool is being watched — and the
-  // trigger that resumes a catch-up loop paused while the reader was away.
+  // Every status poll is a heartbeat that this pool is being watched — read only as the
+  // stop condition for an in-progress cold-fill chain (it never STARTS analysis here).
   markWatched(worldId);
   const state = ws(worldId);
   const st = getStore(worldId);
@@ -520,6 +520,12 @@ async function refreshSources(worldId: string): Promise<{ newCount: number }> {
   if (removed > 0) console.log(`[feed:${worldId}] pruned ${removed} stale item(s)`);
   st.save();
   state.lastBuildAt = Date.now();
+  // Fetch + first-chunk triage are done — return the phase to idle. If a backfill
+  // batch follows (cold fill / refresh), it re-sets the phase as it works; meanwhile
+  // getStatus still reports `active` via the scheduled timer / queue / in-flight pass.
+  // Without this, a refresh that does NO model work left the phase stuck non-idle and
+  // the UI showed the pool "refreshing" forever.
+  setPhase(state, "idle");
   console.log(
     `[feed:${worldId}] refresh done in ${state.lastBuildAt - started}ms ` +
       `(${state.prescreenQueue.length} queued for background prescreen)`,
@@ -1371,15 +1377,18 @@ function runBackfillBatch(worldId: string, chain: boolean): void {
 
 /**
  * Bring a world's store up to date (fetch + cheap triage) so PROVISIONAL items are
- * immediately servable, then advance deep analysis — PULL-BASED, never a background
- * drain triggered by mere navigation:
+ * immediately servable, then advance deep analysis:
  *  - COLD open (nothing analyzed yet): chain batches to FILL the pool you just opened
  *    (bounded by deepAnalyzeKeep), winding down when its backlog clears.
- *  - explicit REFRESH that found FEWER than `backfillMinNew` new articles: ONE batch
- *    backwards, so the reader discovers older news a batch at a time.
- *  - otherwise (plain TTL rebuild from navigation, or a refresh rich in new news):
- *    fetch + triage only — no model drain.
- * The cold-open response only waits on fetch + triage, never the (slow) analysis.
+ *  - NEW items fetched (any reload): deep-analyze the fresh HEAD right after prescreen.
+ *    Chained, but naturally bounded to the new news — deep analysis is capped per pool
+ *    (deepAnalyzeKeep, freshest-first) and the only un-prescreened items are the ones
+ *    this fetch just pulled, so it never digs into the OLDER backlog.
+ *  - explicit REFRESH that surfaced NOTHING new: ONE batch into the remaining backlog,
+ *    so the reader pulls older news a batch at a time.
+ *  - otherwise (a quiet background rebuild, nothing new): fetch + triage only.
+ * Navigation never RESUMES a drain (a status poll doesn't trigger analysis), so it
+ * can't pin the GPU. The cold-open response only waits on fetch + triage, never analysis.
  */
 async function buildPool(worldId: string, opts: { cold: boolean; force: boolean }): Promise<void> {
   const { newCount } = await refreshSources(worldId);
@@ -1388,12 +1397,14 @@ async function buildPool(worldId: string, opts: { cold: boolean; force: boolean 
     // isn't cut off before the client's first status poll lands.
     markWatched(worldId);
     runBackfillBatch(worldId, true); // fill the freshly-opened pool
-  } else if (opts.force && newCount < config.feed.backfillMinNew) {
-    runBackfillBatch(worldId, false); // explicit refresh, little new → one batch backwards
+  } else if (newCount > 0) {
+    // Fresh news arrived — analyze the head straight away (bounded to the new items).
+    runBackfillBatch(worldId, true);
+  } else if (opts.force) {
+    // Explicit refresh with nothing new → dig ONE batch into the remaining backlog.
+    runBackfillBatch(worldId, false);
   } else {
-    console.log(
-      `[feed:${worldId}] ${newCount} new article(s) — backlog left for a later refresh`,
-    );
+    console.log(`[feed:${worldId}] no new articles — pool already up to date`);
   }
 }
 

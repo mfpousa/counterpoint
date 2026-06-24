@@ -171,6 +171,7 @@ const CursorPin = forwardRef<
 const MarkerLayer = forwardRef<{ set: (items: ProjectedMarker[]) => void }, unknown>(
   function MarkerLayer(_props, ref) {
     const [items, setItems] = useState<ProjectedMarker[]>([]);
+    const [height, setHeight] = useState(0); // layer height (px), for bottom-anchoring bubbles
     const prevKey = useRef("");
     useImperativeHandle(
       ref,
@@ -186,27 +187,35 @@ const MarkerLayer = forwardRef<{ set: (items: ProjectedMarker[]) => void }, unkn
       }),
       [],
     );
-    if (items.length === 0) return null;
+    // Anchor each stack by its BOTTOM (just above the pin) using the layer's measured
+    // height, so a bubble grows UPWARD with its content instead of being clipped to a
+    // fixed-height box — the whole text shows.
     return (
-      <View style={StyleSheet.absoluteFill} pointerEvents="none">
-        {items.map((it) => (
-          <View key={it.id} style={[styles.markerTag, { left: it.x - 110, top: it.y - 104 }]}>
-            {it.hovered && it.detail ? (
-              <View style={[styles.markerBubble, { borderColor: it.color }]}>
-                <Text style={styles.markerBubbleText} numberOfLines={3}>
-                  {it.detail}
-                </Text>
-              </View>
-            ) : null}
-            {it.kind === "ask" && it.label ? (
-              <View style={[styles.markerChip, { borderColor: it.color }]}>
-                <Text style={styles.markerChipText} numberOfLines={1}>
-                  {it.label}
-                </Text>
-              </View>
-            ) : null}
-          </View>
-        ))}
+      <View
+        style={StyleSheet.absoluteFill}
+        pointerEvents="none"
+        onLayout={(e) => setHeight(e.nativeEvent.layout.height)}
+      >
+        {height > 0 &&
+          items.map((it) => (
+            <View
+              key={it.id}
+              style={[styles.markerTag, { left: it.x - 110, bottom: height - it.y + 12 }]}
+            >
+              {it.hovered && it.detail ? (
+                <View style={[styles.markerBubble, { borderColor: it.color }]}>
+                  <Text style={styles.markerBubbleText}>{it.detail}</Text>
+                </View>
+              ) : null}
+              {it.kind === "ask" && it.label ? (
+                <View style={[styles.markerChip, { borderColor: it.color }]}>
+                  <Text style={styles.markerChipText} numberOfLines={1}>
+                    {it.label}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+          ))}
       </View>
     );
   },
@@ -305,6 +314,11 @@ export function Globe({
   };
   const lastDrag = useRef({ x: 0, y: 0 });
   const pinchDist = useRef(0);
+  // True once a gesture has actually DRAGGED past the slop. Reset at the start of every
+  // gesture and read by the click handlers below, because r3f still fires onClick on
+  // pointer-up when the press began and ended over the same mesh — even mid-drag — so a
+  // drag-to-rotate that releases over a country/marker would otherwise count as a tap.
+  const didDrag = useRef(false);
   const canvasH = useRef(0); // measured canvas height (px) for surface-correct drag gain
   const canvasW = useRef(0); // measured canvas width (px) for the cursor-pin placement
   const pinRef = useRef<{ move: (x: number, y: number) => void }>(null);
@@ -546,6 +560,7 @@ export function Globe({
   // Tapping a beacon flies to that country.
   const onAskMarkerPress = useCallback(
     (id: string) => {
+      if (didDrag.current) return; // ignore the click that ends a drag-to-rotate
       const m = askMarkers.find((x) => x.id === id);
       if (!m) return;
       refs.target.current = {
@@ -870,12 +885,22 @@ export function Globe({
     [],
   );
 
+  // Tapping an event marker opens its story — but not when the press was a drag-to-rotate.
+  const handleAlertPress = useCallback(
+    (id: string) => {
+      if (didDrag.current) return;
+      onAlertPress?.(id);
+    },
+    [onAlertPress],
+  );
+
   const childById = (id: string): CoverageNode | undefined =>
     (view?.children ?? []).find((c) => c.nodeId === id);
 
   // Tap an entity: commit it as the feed if it has its own outlets AND drill in if
   // it has children (mirrors the chip navigator's behaviour exactly).
   const activate = (id: string) => {
+    if (didDrag.current) return; // a drag-to-rotate that ended here is not a tap
     const node = childById(id);
     if (!node) return;
     if (node.state === "ready") {
@@ -922,8 +947,14 @@ export function Globe({
   const panResponder = useMemo(
     () =>
       PanResponder.create({
-        // Only claim the gesture once the finger actually moves (so taps reach the
-        // canvas and select an entity), or immediately for a two-finger pinch.
+        // Reset the drag flag at the START of every gesture WITHOUT claiming it, so a
+        // stationary tap still falls through to the canvas and selects an entity.
+        onStartShouldSetPanResponder: () => {
+          didDrag.current = false;
+          return false;
+        },
+        // Only CLAIM the gesture once the finger actually moves (so taps reach the
+        // canvas and select), or immediately for a two-finger pinch.
         onMoveShouldSetPanResponder: (
           e: GestureResponderEvent,
           g: PanResponderGestureState,
@@ -932,6 +963,7 @@ export function Globe({
           (e.nativeEvent.touches?.length ?? 0) >= 2,
         onPanResponderGrant: () => {
           refs.dragging.current = true;
+          didDrag.current = true; // moved past the slop → this gesture is a drag, not a tap
           lastDrag.current = { x: 0, y: 0 };
           pinchDist.current = 0;
         },
@@ -998,7 +1030,7 @@ export function Globe({
             outline={regionOutline}
             gizmos={gizmos}
             alerts={alerts}
-            onAlertPress={onAlertPress}
+            onAlertPress={handleAlertPress}
             askMarkers={askMarkers}
             onAskMarkerPress={onAskMarkerPress}
             hoveredMarkerId={hoveredMarkerId}
@@ -1513,15 +1545,13 @@ const styles = StyleSheet.create({
     fontSize: font.small,
     fontWeight: "800",
   },
-  // Marker overlay: a fixed-size box anchored above each pin (left/top set inline to
-  // the projected position), content bottom-anchored + centred so it floats just over
-  // the pin. Detail bubble stacks above the always-on place chip.
+  // Marker overlay: a stack anchored by its BOTTOM just above each pin (left/bottom set
+  // inline to the projected position), centred, auto-height so the full bubble text
+  // shows. Detail bubble stacks above the always-on place chip.
   markerTag: {
     position: "absolute",
     width: 220,
-    height: 96,
     alignItems: "center",
-    justifyContent: "flex-end",
   },
   markerChip: {
     maxWidth: 200,

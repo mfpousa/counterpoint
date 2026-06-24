@@ -147,11 +147,6 @@ export const config = {
     recencyBucketHours: num("FEED_RECENCY_BUCKET_HOURS", 2),
     // Gap before a (pull-based) backfill batch runs after a refresh.
     catchUpDelayMs: num("FEED_CATCHUP_DELAY_MS", 1500),
-    // Pull-based backfill: a manual refresh only digs into OLDER news (one analysis
-    // batch) when it surfaced FEWER than this many genuinely-new articles. With more
-    // new than this the reader already has fresh news, so we don't spend the GPU
-    // grinding backwards — they refresh again to discover more.
-    backfillMinNew: num("FEED_BACKFILL_MIN_NEW", 8),
     // Headlines PRESCREENED (cheap title-only triage) per chunk. The cold-start
     // feed only WAITS on the FIRST chunk, so it lands fast even when a pool floods
     // with thousands of items; each pull-based backfill batch prescreens one more

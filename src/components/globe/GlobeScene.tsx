@@ -643,7 +643,12 @@ export function GlobeScene({
       refs.rot.current.yaw += dy * 0.12;
       refs.rot.current.pitch += (tgt.pitch - refs.rot.current.pitch) * 0.12;
       refs.zoom.current += (tgt.zoom - refs.zoom.current) * 0.12;
-    } else if (autoSpin && focusedId === null && !refs.dragging.current) {
+    } else if (
+      autoSpin &&
+      focusedId === null &&
+      hoveredMarkerId === null && // freeze the spin while a pin is hovered so its bubble is readable
+      !refs.dragging.current
+    ) {
       refs.rot.current.yaw += delta * 0.05; // idle auto-spin (landing only)
     }
     g.rotation.y = refs.rot.current.yaw;
@@ -805,13 +810,16 @@ export function GlobeScene({
           />
         ))}
         {/* Worldview: category-SHAPED, gravity-sized event markers (tap to open,
-            hover for the headline; hovering blocks the country behind). */}
-        <Alerts
-          alerts={alerts}
-          onPress={onAlertPress}
-          onHover={onMarkerHover}
-          hoveredId={hoveredMarkerId}
-        />
+            hover for the headline; hovering blocks the country behind). HIDDEN while an
+            AI search is showing its own pins, so the answer's places stand alone. */}
+        {askMarkers.length === 0 && (
+          <Alerts
+            alerts={alerts}
+            onPress={onAlertPress}
+            onHover={onMarkerHover}
+            hoveredId={hoveredMarkerId}
+          />
+        )}
         {/* AI news-search results: accent pins on the places the answer is about. */}
         <AskMarkers
           markers={askMarkers}
