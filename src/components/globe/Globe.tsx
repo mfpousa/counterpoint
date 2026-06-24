@@ -73,6 +73,7 @@ import {
   type GeoAlert,
   type TimeWindow,
 } from "../../lib/geoAlerts";
+import { countryLabel } from "../../lib/countries";
 import { searchPlaces, type PlaceHit } from "../../lib/placeSearch";
 import { appendAskStream, resetAskStream } from "../../lib/askStream";
 import { buildAskNameIndex, resolveAskPlace, scanCountries } from "../../lib/askLocate";
@@ -319,7 +320,7 @@ const MarkerLayer = forwardRef<
                 i.updatedAt ?? 0,
                 i.developing,
                 now,
-              )}:${i.linkKind ?? ""}:${i.fromCc ?? ""}:${i.label}:${i.detail}`,
+              )}:${i.linkKind ?? ""}:${i.fromCc ?? ""}:${i.toCc ?? ""}:${i.title ?? ""}:${i.label}:${i.detail}`,
           )
           .join("|");
         if (key === prevKey.current) return;
@@ -384,13 +385,41 @@ const MarkerLayer = forwardRef<
         // PHYSICAL LINK: a small badge riding the connection arc. An ATTACK flies the ORIGIN
         // country's FLAG; every other kind shows its category icon (medical, ship, people…),
         // tinted the arc's colour. The line carries colour + dash; this badge says WHAT it is.
-        // Non-interactive so globe drags/clicks fall through.
+        // HOVERING it reveals which STORY drew the link (route + kind + headline) and pauses
+        // the spin so the moving badge is easy to inspect.
         if (it.kind === "link") {
           const lk = (it.linkKind ?? "other") as LinkKind;
           const isAttack = lk === "attack" && !!it.fromCc;
+          const showBubble = hoverId === it.id && !!it.title;
+          const route =
+            `${it.fromCc ? countryLabel(it.fromCc) : "?"} → ` +
+            `${it.toCc ? countryLabel(it.toCc) : "?"} · ${LINK_KINDS[lk]?.label ?? "Link"}`;
           return (
-            <View key={it.id} ref={setNode(it.id)} style={anchorStyle} pointerEvents="none">
-              <View style={[styles.linkBadge, { backgroundColor: it.color }]}>
+            <View key={it.id} ref={setNode(it.id)} style={anchorStyle} pointerEvents="box-none">
+              {showBubble && (
+                <View style={[styles.markerStack, { bottom: 20 }]} pointerEvents="none">
+                  <View style={[styles.markerBubble, { borderColor: it.color }]}>
+                    <Text style={styles.linkBubbleRoute} numberOfLines={1}>
+                      {route}
+                    </Text>
+                    <Text style={styles.markerBubbleText} numberOfLines={2}>
+                      {it.title}
+                    </Text>
+                  </View>
+                </View>
+              )}
+              <Pressable
+                style={[styles.linkBadge, { backgroundColor: it.color }]}
+                onHoverIn={() => {
+                  setHoverId(it.id);
+                  onHoverMarker(it.id); // pause the auto-spin while the reader inspects
+                }}
+                onHoverOut={() => {
+                  setHoverId((h) => (h === it.id ? null : h));
+                  onHoverMarker(null);
+                }}
+                accessibilityLabel={it.title}
+              >
                 {isAttack ? (
                   <>
                     {/* The country CODE shows through if the flag image can't load (offline). */}
@@ -408,7 +437,7 @@ const MarkerLayer = forwardRef<
                     color="#0b0f14"
                   />
                 )}
-              </View>
+              </Pressable>
             </View>
           );
         }
@@ -824,6 +853,9 @@ export function Globe({
           dash: style.dash,
           kind: lk.kind,
           fromCc: lk.from,
+          toCc: lk.to,
+          storyId: s.id,
+          title: s.title,
         });
       }
     }
@@ -844,6 +876,15 @@ export function Globe({
       present.has(c),
     );
   }, [alerts]);
+
+  // The link KINDS currently on the globe, for the CONNECTIONS legend (stable order). Drawn
+  // from the time-windowed, capped relationshipArcs so it names only what's actually shown.
+  const legendLinkKinds = useMemo<LinkKind[]>(() => {
+    const present = new Set<string>();
+    for (const arc of relationshipArcs) if (arc.kind) present.add(arc.kind);
+    const order: LinkKind[] = ["attack", "spread", "trade", "migration", "aid", "transport"];
+    return order.filter((k) => present.has(k));
+  }, [relationshipArcs]);
 
   // Unified place search (continents + countries) over the bundled centroids. Picking
   // a result flies the globe there, commits it as the feed pool, and opens articles.
@@ -1888,7 +1929,7 @@ export function Globe({
         {/* Worldview LENS DOCK (bottom-right): a TIME scrubber over the category legend.
             Together they answer "what kind of events, happening when?" — narrow by recency
             window and isolate a category, while the chips themselves encode freshness. */}
-        {hero && legendCats.length > 0 && (
+        {hero && (legendCats.length > 0 || legendLinkKinds.length > 0) && (
           <View
             style={[
               styles.lensDock,
@@ -1896,57 +1937,89 @@ export function Globe({
             ]}
             pointerEvents="box-none"
           >
-            {/* TIME scrubber — narrow the worldview to a recency window. Fresh events still
-                pulse and stale ones fade on the map regardless; this hides what's outside. */}
-            <View style={styles.scrubber}>
-              {TIME_WINDOWS.map((w) => {
-                const on = timeWindow === w;
-                return (
-                  <Pressable
-                    key={w}
-                    style={[styles.scrubItem, on && styles.scrubItemOn]}
-                    onPress={() => setTimeWindow(w)}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: on }}
-                    accessibilityLabel={t(`globe.time.${w}`)}
-                  >
-                    <Text style={[styles.scrubText, on && styles.scrubTextOn]}>
-                      {t(`globe.time.${w}`)}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-            {/* Category legend = LENSES: tap one to isolate "just conflicts" / "just
-                disasters"; hidden ones dim. Icon + colour match the on-globe chips exactly. */}
-            <View style={styles.legend} pointerEvents="box-none">
-              {legendCats.map((cat) => {
-                const off = hiddenCats.has(cat);
-                return (
-                  <Pressable
-                    key={cat}
-                    style={[styles.legendItem, off && styles.legendItemOff]}
-                    onPress={() => toggleCat(cat)}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: !off }}
-                    accessibilityLabel={EVENT_CATEGORIES[cat].label}
-                  >
-                    <View
-                      style={[styles.legendDot, { backgroundColor: EVENT_CATEGORIES[cat].color }]}
-                    >
-                      <Ionicons
-                        name={EVENT_CATEGORIES[cat].icon as IoniconName}
-                        size={9}
-                        color="#0b0f14"
-                      />
+            {legendCats.length > 0 && (
+              <>
+                {/* TIME scrubber — narrow the worldview to a recency window. Fresh events
+                    still pulse and stale ones fade on the map regardless; this hides what's
+                    outside. */}
+                <View style={styles.scrubber}>
+                  {TIME_WINDOWS.map((w) => {
+                    const on = timeWindow === w;
+                    return (
+                      <Pressable
+                        key={w}
+                        style={[styles.scrubItem, on && styles.scrubItemOn]}
+                        onPress={() => setTimeWindow(w)}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: on }}
+                        accessibilityLabel={t(`globe.time.${w}`)}
+                      >
+                        <Text style={[styles.scrubText, on && styles.scrubTextOn]}>
+                          {t(`globe.time.${w}`)}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                {/* Category legend = LENSES: tap one to isolate "just conflicts" / "just
+                    disasters"; hidden ones dim. Icon + colour match the on-globe chips. */}
+                <View style={styles.legend} pointerEvents="box-none">
+                  {legendCats.map((cat) => {
+                    const off = hiddenCats.has(cat);
+                    return (
+                      <Pressable
+                        key={cat}
+                        style={[styles.legendItem, off && styles.legendItemOff]}
+                        onPress={() => toggleCat(cat)}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: !off }}
+                        accessibilityLabel={EVENT_CATEGORIES[cat].label}
+                      >
+                        <View
+                          style={[
+                            styles.legendDot,
+                            { backgroundColor: EVENT_CATEGORIES[cat].color },
+                          ]}
+                        >
+                          <Ionicons
+                            name={EVENT_CATEGORIES[cat].icon as IoniconName}
+                            size={9}
+                            color="#0b0f14"
+                          />
+                        </View>
+                        <Text style={[styles.legendText, off && styles.legendTextOff]}>
+                          {EVENT_CATEGORIES[cat].label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </>
+            )}
+            {/* CONNECTIONS legend — names each link KIND currently flowing on the globe and
+                tells the reader the travelling badges are hoverable (→ their story). Static,
+                not lenses: links aren't filtered. */}
+            {legendLinkKinds.length > 0 && (
+              <View style={styles.linkLegendWrap} pointerEvents="box-none">
+                <View style={styles.legend}>
+                  {legendLinkKinds.map((k) => (
+                    <View key={k} style={styles.legendItem}>
+                      <View
+                        style={[styles.legendDot, { backgroundColor: LINK_KINDS[k].color }]}
+                      >
+                        <Ionicons
+                          name={LINK_KINDS[k].icon as IoniconName}
+                          size={9}
+                          color="#0b0f14"
+                        />
+                      </View>
+                      <Text style={styles.legendText}>{LINK_KINDS[k].label}</Text>
                     </View>
-                    <Text style={[styles.legendText, off && styles.legendTextOff]}>
-                      {EVENT_CATEGORIES[cat].label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
+                  ))}
+                </View>
+                <Text style={styles.linkLegendHint}>{t("globe.links.hint")}</Text>
+              </View>
+            )}
           </View>
         )}
 
@@ -2190,6 +2263,23 @@ const styles = StyleSheet.create({
   // Flag image fills the badge (attack links); country code sits behind it as the fallback.
   linkFlagImg: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 },
   linkCode: { color: "#fff", fontSize: 10, fontWeight: "800" },
+  // Hover tooltip on a link badge: the route + kind (bold) over the story headline (dim).
+  linkBubbleRoute: {
+    color: colors.text,
+    fontSize: font.tiny,
+    fontWeight: "800",
+    marginBottom: 2,
+  },
+  // CONNECTIONS legend block (sits under the category lenses): the kind chips + a hover hint
+  // teaching that the travelling badges open their story.
+  linkLegendWrap: { marginTop: spacing.xs, alignItems: "flex-end", gap: 4 },
+  linkLegendHint: {
+    color: colors.textDim,
+    fontSize: font.tiny,
+    fontStyle: "italic",
+    maxWidth: 200,
+    textAlign: "right",
+  },
   topBar: {
     position: "absolute",
     top: spacing.sm,

@@ -284,6 +284,12 @@ export interface ArcData {
   kind?: string;
   /** Origin country ISO-2 (links only) — flies its flag when kind === "attack". */
   fromCc?: string;
+  /** Destination country ISO-2 (links only) — for the badge's hover-tooltip route. */
+  toCc?: string;
+  /** Id of the story this link came from (links only) — the handle back to its story. */
+  storyId?: string;
+  /** The story's neutral headline (links only) — shown in the badge's hover tooltip. */
+  title?: string;
 }
 
 const ARC_SEGMENTS = 56; // polyline resolution along the great circle
@@ -650,6 +656,10 @@ export interface ProjectedMarker {
   linkKind?: string;
   /** Origin country ISO-2 (links only) — flies its flag when linkKind === "attack". */
   fromCc?: string;
+  /** Destination country ISO-2 (links only) — for the badge's hover-tooltip route. */
+  toCc?: string;
+  /** Origin story's headline (links only) — shown in the badge's hover tooltip. */
+  title?: string;
 }
 
 // memo'd so the scene only re-renders when its OWN inputs change. Without this, every
@@ -979,6 +989,8 @@ export const GlobeScene = memo(function GlobeScene({
           hovered: false,
           linkKind: arc.kind,
           fromCc: arc.fromCc,
+          toCc: arc.toCc,
+          title: arc.title,
         });
       });
       onMarkersProject(out);
