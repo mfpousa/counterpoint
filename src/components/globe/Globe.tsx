@@ -397,7 +397,7 @@ export function Globe({
     const iso2ByName = new Map(
       worldGeo.centroids.countries.map((c) => [c.name.toLowerCase(), c.iso2] as const),
     );
-    return buildAlerts(
+    const raw = buildAlerts(
       stories,
       {
         centroidByIso2: worldGeo.centroids.byIso2,
@@ -405,8 +405,19 @@ export function Globe({
         zoneToIso2: ZONE_ISO2,
         iso2ByName,
       },
-      { minSeverity: 0.4, max: 40 },
+      { minSeverity: 0.4, max: 80 },
     );
+    // DECLUTTER: many stories about the same country resolve to the IDENTICAL centroid
+    // and would stack into one blob. Collapse by location — keep the strongest as the
+    // pin (raw is severity-desc) and count the rest for a "+N more" affordance.
+    const byLoc = new Map<string, GeoAlert>();
+    for (const a of raw) {
+      const key = `${a.dir.x.toFixed(2)}|${a.dir.y.toFixed(2)}|${a.dir.z.toFixed(2)}`;
+      const ex = byLoc.get(key);
+      if (ex) ex.count = (ex.count ?? 1) + 1;
+      else byLoc.set(key, { ...a, count: 1 });
+    }
+    return [...byLoc.values()].slice(0, 40);
   }, [worldGeo, stories]);
 
   // The categories actually present, for the on-globe legend (in a stable order).

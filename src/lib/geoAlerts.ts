@@ -108,6 +108,9 @@ export interface GeoAlert {
   /** ISO-2 (lowercase) of the subject NATION, when the story is about a country —
    *  so the UI can show its flag. Absent for sub-national / non-country subjects. */
   iso2?: string;
+  /** How many events collapsed onto this same location (1 = just this one). Lets the
+   *  UI show "+N more" instead of stacking many pins on one country's centroid. */
+  count?: number;
 }
 
 /** Lookups used to geolocate a story (all built from the bundled country borders). */

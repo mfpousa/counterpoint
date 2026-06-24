@@ -296,21 +296,21 @@ function outwardQuat(dir: Vec3): [number, number, number, number] {
 function CategoryGeometry({ category, r }: { category: EventCategory; r: number }) {
   switch (category) {
     case "conflict":
-      return <coneGeometry args={[r * 1.05, r * 3, 4]} />; // 4-sided spike
+      return <coneGeometry args={[r * 1.0, r * 2.3, 4]} />; // 4-sided spike
     case "disaster":
-      return <tetrahedronGeometry args={[r * 1.5]} />; // jagged shard
+      return <tetrahedronGeometry args={[r * 1.35]} />; // jagged shard
     case "health":
-      return <octahedronGeometry args={[r * 1.4]} />; // gem
+      return <octahedronGeometry args={[r * 1.3]} />; // gem
     case "diplomacy":
-      return <torusGeometry args={[r * 1.1, r * 0.4, 10, 18]} />; // ring
+      return <torusGeometry args={[r * 1.0, r * 0.38, 10, 18]} />; // ring
     case "unrest":
-      return <boxGeometry args={[r * 1.6, r * 1.6, r * 1.6]} />; // cube
+      return <boxGeometry args={[r * 1.4, r * 1.4, r * 1.4]} />; // cube
     case "tech":
-      return <icosahedronGeometry args={[r * 1.35, 0]} />; // faceted ball
+      return <icosahedronGeometry args={[r * 1.25, 0]} />; // faceted ball
     case "economy":
-      return <cylinderGeometry args={[r * 0.85, r * 0.85, r * 2.6, 12]} />; // bar
+      return <cylinderGeometry args={[r * 0.8, r * 0.8, r * 2.1, 12]} />; // bar
     default:
-      return <sphereGeometry args={[r * 1.15, 14, 14]} />; // generic dot
+      return <sphereGeometry args={[r * 1.05, 14, 14]} />; // generic dot
   }
 }
 
@@ -396,7 +396,7 @@ function AlertMarker({
   const core = useRef<Mesh>(null);
   const ring = useRef<Mesh>(null);
   const ringMat = useRef<MeshBasicMaterial>(null);
-  const r = 0.014 + alert.severity * 0.02;
+  const r = 0.008 + alert.severity * 0.011; // smaller: a dense cluster of countries stays legible
   const color = EVENT_CATEGORIES[alert.category].color;
   const phase = (hashId(alert.id) % 1000) / 1000;
   const quat = useMemo(
@@ -428,7 +428,7 @@ function AlertMarker({
         />
       </mesh>
       <PingRing inner={r * 1.3} outer={r * 1.75} color={color} ringRef={ring} matRef={ringMat} />
-      <MarkerHit id={alert.id} radius={Math.max(r * 3, 0.06)} y={r} onPress={onPress} onHover={onHover} />
+      <MarkerHit id={alert.id} radius={Math.max(r * 2.6, 0.04)} y={r} onPress={onPress} onHover={onHover} />
     </group>
   );
 }
@@ -515,12 +515,12 @@ function AskMarker({
       position={[data.dir.x * ALERT_RADIUS, data.dir.y * ALERT_RADIUS, data.dir.z * ALERT_RADIUS]}
       quaternion={quat}
     >
-      <mesh position={[0, 0.03, 0]}>
-        <cylinderGeometry args={[0.0035, 0.0035, 0.06, 6]} />
+      <mesh position={[0, 0.02, 0]}>
+        <cylinderGeometry args={[0.0025, 0.0025, 0.04, 6]} />
         <meshBasicMaterial color={c} />
       </mesh>
-      <mesh ref={head} position={[0, 0.078, 0]}>
-        <sphereGeometry args={[0.021, 16, 16]} />
+      <mesh ref={head} position={[0, 0.05, 0]}>
+        <sphereGeometry args={[0.014, 16, 16]} />
         <meshStandardMaterial
           color={c}
           emissive={c}
@@ -529,8 +529,8 @@ function AskMarker({
           roughness={0.3}
         />
       </mesh>
-      <PingRing inner={0.02} outer={0.03} color={c} ringRef={ring} matRef={ringMat} />
-      <MarkerHit id={data.id} radius={0.07} y={0.06} onPress={onPress} onHover={onHover} />
+      <PingRing inner={0.013} outer={0.02} color={c} ringRef={ring} matRef={ringMat} />
+      <MarkerHit id={data.id} radius={0.05} y={0.04} onPress={onPress} onHover={onHover} />
     </group>
   );
 }
@@ -721,7 +721,9 @@ export function GlobeScene({
       if (hoveredMarkerId) {
         const ha = alerts.find((a) => a.id === hoveredMarkerId);
         if (ha) {
-          add(ha.id, "alert", ha.dir, "", ha.title, EVENT_CATEGORIES[ha.category].color, ha.iso2);
+          const more = (ha.count ?? 1) - 1;
+          const detail = more > 0 ? `${ha.title}  ·  +${more} more here` : ha.title;
+          add(ha.id, "alert", ha.dir, "", detail, EVENT_CATEGORIES[ha.category].color, ha.iso2);
         }
       }
       onMarkersProject(out);
