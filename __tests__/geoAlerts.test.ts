@@ -3,6 +3,8 @@ import {
   classifyEvent,
   locatePlace,
   locateStory,
+  recencyOf,
+  withinWindow,
   type AlertPlaceIndex,
 } from "../src/lib/geoAlerts";
 import { latLonToVec3 } from "../src/lib/globeLayout";
@@ -116,6 +118,49 @@ describe("geoAlerts (locate ongoing stories on the globe)", () => {
     ];
     expect(buildAlerts(stories, IDX, { minSeverity: 0.5 }).map((a) => a.id)).toEqual(["hi"]);
     expect(buildAlerts(stories, IDX, { max: 1 }).map((a) => a.id)).toEqual(["hi"]);
+  });
+
+  it("carries the story's time fields onto the alert (for the recency treatment)", () => {
+    const [alert] = buildAlerts(
+      [story({ title: "Ukraine", severity: 0.9, updatedAt: 1700, startedAt: 900 })],
+      IDX,
+    );
+    expect(alert.updatedAt).toBe(1700);
+    expect(alert.startedAt).toBe(900);
+  });
+});
+
+describe("time dimension (recency band + window scrubber)", () => {
+  const NOW = 1_000_000_000_000;
+  const H = 60 * 60 * 1000;
+  const D = 24 * H;
+
+  describe("recencyOf", () => {
+    it("is fresh within 6h, recent within 24h, week within 7d, then stale", () => {
+      expect(recencyOf(NOW - 1 * H, false, NOW)).toBe("fresh");
+      expect(recencyOf(NOW - 6 * H, false, NOW)).toBe("fresh"); // boundary inclusive
+      expect(recencyOf(NOW - 12 * H, false, NOW)).toBe("recent");
+      expect(recencyOf(NOW - 3 * D, false, NOW)).toBe("week");
+      expect(recencyOf(NOW - 30 * D, false, NOW)).toBe("stale");
+    });
+
+    it("never lets an ONGOING issue fade to stale (it stays at least 'week')", () => {
+      expect(recencyOf(NOW - 30 * D, true, NOW)).toBe("week");
+    });
+  });
+
+  describe("withinWindow", () => {
+    it("'all' admits everything", () => {
+      expect(withinWindow(NOW - 365 * D, "all", NOW)).toBe(true);
+    });
+    it("narrows to now (6h) / day (24h) / week (7d)", () => {
+      expect(withinWindow(NOW - 3 * H, "now", NOW)).toBe(true);
+      expect(withinWindow(NOW - 9 * H, "now", NOW)).toBe(false);
+      expect(withinWindow(NOW - 12 * H, "day", NOW)).toBe(true);
+      expect(withinWindow(NOW - 2 * D, "day", NOW)).toBe(false);
+      expect(withinWindow(NOW - 5 * D, "week", NOW)).toBe(true);
+      expect(withinWindow(NOW - 10 * D, "week", NOW)).toBe(false);
+    });
   });
 });
 

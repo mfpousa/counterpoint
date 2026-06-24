@@ -24,6 +24,8 @@ import React, {
 } from "react";
 import {
   ActivityIndicator,
+  Animated,
+  Easing,
   Keyboard,
   PanResponder,
   Platform,
@@ -61,9 +63,13 @@ import {
 } from "../../lib/geoShapes";
 import {
   EVENT_CATEGORIES,
+  RECENCY_OPACITY,
   buildAlerts,
+  recencyOf,
+  withinWindow,
   type EventCategory,
   type GeoAlert,
+  type TimeWindow,
 } from "../../lib/geoAlerts";
 import { searchPlaces, type PlaceHit } from "../../lib/placeSearch";
 import { appendAskStream, resetAskStream } from "../../lib/askStream";
@@ -89,6 +95,10 @@ const clamp = (v: number, lo: number, hi: number) =>
 type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
 const ZOOM_MIN = 0.6;
 const ZOOM_MAX = 2.6;
+// Worldview time scrubber, widest → narrowest. "all" is the default (the recency is still
+// encoded passively on each chip: fresh ones pulse, stale ones fade); the rest NARROW the
+// map to events seen within that span, answering "what's happening right now?".
+const TIME_WINDOWS: TimeWindow[] = ["all", "week", "day", "now"];
 const WORLD_ZOOM = 0.9; // zoomed-OUT scale for the world landing (whole globe in view)
 // Pixels→radians drag gain: 2·cameraZ·tan(fov/2) = the world height the viewport spans
 // at the globe's distance. Dividing by (zoom·canvasHeightPx) makes a drag STICK to the
@@ -165,6 +175,41 @@ const CursorPin = forwardRef<
     </View>
   );
 });
+
+/** A breathing "live" halo behind a FRESH event chip (≤6h old) — a soft ring that scales out
+ *  and fades on a loop, so the eye is pulled to what's breaking right now. Mounted only for
+ *  fresh chips, so the animation cost is bounded to the handful of genuinely live events. */
+function PulseRing({ color, r }: { color: string; r: number }) {
+  const v = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.timing(v, {
+        toValue: 1,
+        duration: 1600,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: Platform.OS !== "web", // UI-thread on native; rAF on web
+      }),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [v]);
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: "absolute",
+        left: -r,
+        top: -r,
+        width: r * 2,
+        height: r * 2,
+        borderRadius: r,
+        backgroundColor: color,
+        opacity: v.interpolate({ inputRange: [0, 1], outputRange: [0.5, 0] }),
+        transform: [{ scale: v.interpolate({ inputRange: [0, 1], outputRange: [1, 2.4] }) }],
+      }}
+    />
+  );
+}
 
 /** 2D overlay that floats event chips / labels / cards ON the globe's markers. GlobeScene's
  *  frame loop drives `set` (projected world→screen) which writes each marker's transform
@@ -247,15 +292,20 @@ const MarkerLayer = forwardRef<
           moveNode(nodes.current.get(it.id), it.x, it.y);
         }
         for (const id of [...pos.current.keys()]) if (!seen.has(id)) pos.current.delete(id);
-        // Re-render ONLY when the set, a chip's static content, or its hovered flag changes
-        // (NOT its position — that's imperative). `hovered` flips on a hover action, never
-        // per-frame, so it's cheap to include and it drives the ask-pin bubble.
+        // Re-render ONLY when the set, a chip's static content, its hovered flag, OR its
+        // recency BAND changes (NOT its position — that's imperative; NOT per-frame, since the
+        // band only flips at the 6h/24h/7d thresholds). The band drives the fade + the pulse.
+        const now = Date.now();
         const key = next
           .map(
             (i) =>
               `${i.id}:${i.kind}:${i.category ?? ""}:${i.count ?? 1}:${Math.round(
                 (i.severity ?? 0) * 20,
-              )}:${i.hovered ? 1 : 0}:${i.label}:${i.detail}`,
+              )}:${i.hovered ? 1 : 0}:${recencyOf(
+                i.updatedAt ?? 0,
+                i.developing,
+                now,
+              )}:${i.label}:${i.detail}`,
           )
           .join("|");
         if (key === prevKey.current) return;
@@ -325,6 +375,13 @@ const MarkerLayer = forwardRef<
           const cr = Math.round(11 + (it.severity ?? 0.4) * 7); // chip RADIUS (px)
           const showBubble = !isFocused && hoverId === it.id && !!it.detail;
           const more = (it.count ?? 1) - 1;
+          // RECENCY treatment: a fresh event (≤6h) wears a live pulse; older settled ones fade
+          // so the map foregrounds what's happening now. Hovered/focused chips show at full
+          // strength so inspecting one never makes it look stale.
+          const recency = recencyOf(it.updatedAt ?? 0, it.developing);
+          const fresh = recency === "fresh";
+          const chipOpacity =
+            isFocused || hoverId === it.id ? 1 : RECENCY_OPACITY[recency];
           return (
             <View key={it.id} ref={setNode(it.id)} style={anchorStyle} pointerEvents="box-none">
               {isFocused ? (
@@ -342,6 +399,7 @@ const MarkerLayer = forwardRef<
                   </View>
                 </View>
               ) : null}
+              {fresh && <PulseRing color={it.color} r={cr} />}
               <Pressable
                 style={[
                   styles.eventChip,
@@ -352,6 +410,7 @@ const MarkerLayer = forwardRef<
                     height: cr * 2,
                     borderRadius: cr,
                     backgroundColor: it.color,
+                    opacity: chipOpacity,
                   },
                 ]}
                 onPress={() => onPressMarker(it.id)}
@@ -511,6 +570,9 @@ export function Globe({
   // map), so the globe answers "where are the {conflicts|disasters|…}?" by filtering. Empty
   // = show everything. Toggling a legend chip flips its category in/out.
   const [hiddenCats, setHiddenCats] = useState<Set<EventCategory>>(() => new Set());
+  // Worldview TIME scrubber: narrow the map to events seen within a recency window
+  // ("all" = no time filter; recency is still encoded on every chip regardless).
+  const [timeWindow, setTimeWindow] = useState<TimeWindow>("all");
   const toggleCat = useCallback((c: EventCategory) => {
     setHiddenCats((prev) => {
       const next = new Set(prev);
@@ -642,6 +704,8 @@ export function Globe({
       if (ex) {
         ex.count = (ex.count ?? 1) + 1;
         ex.stacked!.push({ id: a.id, title: a.title }); // keep each collapsed story for fan-out
+        ex.updatedAt = Math.max(ex.updatedAt, a.updatedAt); // FRESHEST drives the pulse
+        ex.developing = ex.developing || a.developing; // ongoing if ANY collapsed issue is
       } else {
         byLoc.set(key, { ...a, count: 1, stacked: [{ id: a.id, title: a.title }] });
       }
@@ -799,13 +863,13 @@ export function Globe({
   // What the globe actually paints as event chips: the located events MINUS any category
   // the reader toggled off (the legend lenses). While an AI search is showing its own pins,
   // we drop the worldview events entirely so the answer's places stand alone.
-  const visibleAlerts = useMemo<GeoAlert[]>(
-    () =>
-      askMarkers.length > 0
-        ? []
-        : alerts.filter((a) => !hiddenCats.has(a.category)),
-    [alerts, hiddenCats, askMarkers.length],
-  );
+  const visibleAlerts = useMemo<GeoAlert[]>(() => {
+    if (askMarkers.length > 0) return [];
+    const now = Date.now();
+    return alerts.filter(
+      (a) => !hiddenCats.has(a.category) && withinWindow(a.updatedAt, timeWindow, now),
+    );
+  }, [alerts, hiddenCats, timeWindow, askMarkers.length]);
 
   // When an answer lands with locations, orient the globe to frame them (averaged
   // direction), zoomed out enough to take in the spread.
@@ -1693,43 +1757,68 @@ export function Globe({
           </View>
         )}
 
-        {/* Worldview legend = LENSES: the categories on the map, each a tappable filter. Tap
-            one to hide/show that category (so you can isolate "just conflicts" or "just
-            disasters"); hidden ones dim. The icon + colour match the on-globe chips exactly. */}
+        {/* Worldview LENS DOCK (bottom-right): a TIME scrubber over the category legend.
+            Together they answer "what kind of events, happening when?" — narrow by recency
+            window and isolate a category, while the chips themselves encode freshness. */}
         {hero && legendCats.length > 0 && (
           <View
             style={[
-              styles.legend,
+              styles.lensDock,
               { bottom: 98 + bottomInset, right: rightInset + spacing.lg },
             ]}
             pointerEvents="box-none"
           >
-            {legendCats.map((cat) => {
-              const off = hiddenCats.has(cat);
-              return (
-                <Pressable
-                  key={cat}
-                  style={[styles.legendItem, off && styles.legendItemOff]}
-                  onPress={() => toggleCat(cat)}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: !off }}
-                  accessibilityLabel={EVENT_CATEGORIES[cat].label}
-                >
-                  <View
-                    style={[styles.legendDot, { backgroundColor: EVENT_CATEGORIES[cat].color }]}
+            {/* TIME scrubber — narrow the worldview to a recency window. Fresh events still
+                pulse and stale ones fade on the map regardless; this hides what's outside. */}
+            <View style={styles.scrubber}>
+              {TIME_WINDOWS.map((w) => {
+                const on = timeWindow === w;
+                return (
+                  <Pressable
+                    key={w}
+                    style={[styles.scrubItem, on && styles.scrubItemOn]}
+                    onPress={() => setTimeWindow(w)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: on }}
+                    accessibilityLabel={t(`globe.time.${w}`)}
                   >
-                    <Ionicons
-                      name={EVENT_CATEGORIES[cat].icon as IoniconName}
-                      size={9}
-                      color="#0b0f14"
-                    />
-                  </View>
-                  <Text style={[styles.legendText, off && styles.legendTextOff]}>
-                    {EVENT_CATEGORIES[cat].label}
-                  </Text>
-                </Pressable>
-              );
-            })}
+                    <Text style={[styles.scrubText, on && styles.scrubTextOn]}>
+                      {t(`globe.time.${w}`)}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            {/* Category legend = LENSES: tap one to isolate "just conflicts" / "just
+                disasters"; hidden ones dim. Icon + colour match the on-globe chips exactly. */}
+            <View style={styles.legend} pointerEvents="box-none">
+              {legendCats.map((cat) => {
+                const off = hiddenCats.has(cat);
+                return (
+                  <Pressable
+                    key={cat}
+                    style={[styles.legendItem, off && styles.legendItemOff]}
+                    onPress={() => toggleCat(cat)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: !off }}
+                    accessibilityLabel={EVENT_CATEGORIES[cat].label}
+                  >
+                    <View
+                      style={[styles.legendDot, { backgroundColor: EVENT_CATEGORIES[cat].color }]}
+                    >
+                      <Ionicons
+                        name={EVENT_CATEGORIES[cat].icon as IoniconName}
+                        size={9}
+                        color="#0b0f14"
+                      />
+                    </View>
+                    <Text style={[styles.legendText, off && styles.legendTextOff]}>
+                      {EVENT_CATEGORIES[cat].label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
           </View>
         )}
 
@@ -1867,11 +1956,35 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     flexShrink: 1,
   },
-  legend: {
+  // Bottom-right dock stacking the TIME scrubber over the category legend. Anchored with
+  // a fixed left edge (and inline right/bottom) so the legend has room to wrap, and centred.
+  lensDock: {
     position: "absolute",
     left: spacing.lg,
-    right: spacing.lg,
-    bottom: 98,
+    alignItems: "center",
+    rowGap: spacing.xs,
+  },
+  // Segmented TIME scrubber pill row (All · Week · 24h · Now).
+  scrubber: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    padding: 3,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface + "E6",
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  scrubItem: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+  },
+  scrubItemOn: { backgroundColor: colors.accent },
+  scrubText: { color: colors.textDim, fontSize: font.tiny, fontWeight: "800" },
+  scrubTextOn: { color: "#0b0f14" },
+  legend: {
+    alignSelf: "stretch",
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "center",

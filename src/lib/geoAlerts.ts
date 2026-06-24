@@ -101,6 +101,11 @@ export interface GeoAlert {
   category: EventCategory;
   /** True for an ongoing/developing issue (vs a single settled event). */
   developing: boolean;
+  /** Most recent contributing article time (epoch ms) — drives the RECENCY treatment
+   *  (fresh chips pulse, stale ones fade) and the time-window scrubber. */
+  updatedAt: number;
+  /** Earliest contributing article time (epoch ms) — when the story/issue began. */
+  startedAt?: number;
   /** 0..1 gravity — drives marker size + colour intensity. */
   severity: number;
   /** Unit direction on the sphere for the marker. */
@@ -197,6 +202,8 @@ export function buildAlerts(
       topic: s.topic,
       category: classifyEvent(s),
       developing: !!s.developing,
+      updatedAt: s.updatedAt,
+      startedAt: s.startedAt,
       severity,
       dir,
       iso2,
@@ -205,3 +212,57 @@ export function buildAlerts(
   out.sort((a, b) => b.severity - a.severity);
   return typeof opts.max === "number" ? out.slice(0, opts.max) : out;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TIME DIMENSION — encode WHEN an event happened so the map distinguishes "right
+// now" from "ongoing" from "fading", and let the reader scrub to a recency window.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Time-window lens for the worldview scrubber: "all" shows everything, the rest
+ *  narrow the map to events whose latest article lands inside the span. */
+export type TimeWindow = "all" | "week" | "day" | "now";
+
+/** Max age (ms, vs an event's `updatedAt`) admitted by each narrowing window. The
+ *  "now" span doubles as the FRESH threshold that makes a chip pulse. */
+export const TIME_WINDOW_MS: Record<Exclude<TimeWindow, "all">, number> = {
+  week: 7 * 24 * 60 * 60 * 1000,
+  day: 24 * 60 * 60 * 1000,
+  now: 6 * 60 * 60 * 1000,
+};
+
+/** True when an event (by its `updatedAt`) falls inside the chosen window. */
+export function withinWindow(
+  updatedAt: number,
+  win: TimeWindow,
+  now = Date.now(),
+): boolean {
+  return win === "all" || now - updatedAt <= TIME_WINDOW_MS[win];
+}
+
+/** Recency band of an event, driving the chip's time treatment:
+ *  - `fresh`  (≤6h)         → a live pulse (breaking right now)
+ *  - `recent` (≤24h)        → full strength, no pulse
+ *  - `week`   (≤7d OR ongoing) → steady, slightly dimmer
+ *  - `stale`  (older + settled) → faded out (history, not news) */
+export type Recency = "fresh" | "recent" | "week" | "stale";
+
+export function recencyOf(
+  updatedAt: number,
+  developing = false,
+  now = Date.now(),
+): Recency {
+  const age = now - updatedAt;
+  if (age <= TIME_WINDOW_MS.now) return "fresh";
+  if (age <= TIME_WINDOW_MS.day) return "recent";
+  if (age <= TIME_WINDOW_MS.week || developing) return "week";
+  return "stale";
+}
+
+/** Chip opacity for a recency band — fresh/recent at full strength, older ones fade
+ *  so the eye is drawn to what's happening now without losing the ongoing context. */
+export const RECENCY_OPACITY: Record<Recency, number> = {
+  fresh: 1,
+  recent: 1,
+  week: 0.85,
+  stale: 0.45,
+};

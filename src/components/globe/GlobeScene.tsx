@@ -502,6 +502,9 @@ export interface ProjectedMarker {
   count?: number;
   /** Ongoing issue vs single event (alerts only) — for the time treatment. */
   developing?: boolean;
+  /** Most recent contributing article time (epoch ms, alerts only) — drives the chip's
+   *  recency treatment: a live pulse when fresh, a fade when stale. */
+  updatedAt?: number;
 }
 
 // memo'd so the scene only re-renders when its OWN inputs change. Without this, every
@@ -747,7 +750,12 @@ export const GlobeScene = memo(function GlobeScene({
         label: string,
         detail: string,
         color: string,
-        extra?: Partial<Pick<ProjectedMarker, "category" | "severity" | "count" | "developing">>,
+        extra?: Partial<
+          Pick<
+            ProjectedMarker,
+            "category" | "severity" | "count" | "developing" | "updatedAt"
+          >
+        >,
       ) => {
         _proj.set(dir.x * ALERT_RADIUS, dir.y * ALERT_RADIUS, dir.z * ALERT_RADIUS);
         _proj.applyMatrix4(g.matrix); // group local matrix == world matrix
@@ -778,6 +786,7 @@ export const GlobeScene = memo(function GlobeScene({
           severity: a.severity,
           count: a.count,
           developing: a.developing,
+          updatedAt: a.updatedAt,
         });
       }
       onMarkersProject(out);
