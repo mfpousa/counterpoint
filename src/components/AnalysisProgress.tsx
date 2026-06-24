@@ -17,8 +17,11 @@ export function AnalysisProgress({ status }: { status: AnalysisStatus | null }) 
   const t = useT();
   if (!status) return null;
   const { phase, active, done, total, pending, analyzed, label } = status;
-  // Nothing happening and no backlog — stay out of the way.
-  if (!active && pending === 0) return null;
+  // Show ONLY while work is actually running. With pull-based backfill a big backlog can
+  // sit dormant between refreshes (nothing drains it), so keying visibility off `pending`
+  // kept this card up forever reading "Updating …" while the pool was idle. When idle the
+  // map pill hides too, so "finished refreshing" means no indicator at all.
+  if (!active) return null;
 
   const place = label || t("geo.world");
   const phaseLabel = t(`analysis.${phase}`);

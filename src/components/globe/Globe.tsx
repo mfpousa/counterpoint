@@ -68,7 +68,7 @@ import { searchPlaces, type PlaceHit } from "../../lib/placeSearch";
 import { appendAskStream, resetAskStream } from "../../lib/askStream";
 import { buildAskNameIndex, resolveAskPlace, scanCountries } from "../../lib/askLocate";
 import type { AnalysisStatus, AskResult, Story } from "../../types";
-import countries110m from "../../data/world/countries-110m.json";
+import worldLand from "../../data/world/countries-50m.json";
 import { useApp, useT } from "../../store/AppContext";
 import { colors, font, radius, spacing } from "../../theme";
 import { AskPanel, renderCited } from "./AskPanel";
@@ -395,7 +395,7 @@ export function Globe({
     countryOutline: Float32Array;
   } | null>(() => {
     try {
-      const geo = countries110m as unknown as Parameters<
+      const geo = worldLand as unknown as Parameters<
         typeof buildCountryShapes
       >[0];
       return {

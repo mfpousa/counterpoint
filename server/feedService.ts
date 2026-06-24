@@ -222,11 +222,17 @@ export function getStatus(worldId: string = DEFAULT_WORLD_ID): AnalysisStatus {
   // drained — "N pending" stuck forever even though the server was done. Mirroring
   // pendingForAnalysis makes the indicator reach completion when the analyzer does.
   const pending = state.prescreenQueue.length + pendingForAnalysis(worldId).length;
+  // "active" must mean work is ACTUALLY running/scheduled right now — NOT merely that a
+  // backlog exists. With pull-based backfill the prescreen queue sits FULL but dormant
+  // between refreshes (nothing drains it), so keying `active` off `prescreenQueue.length`
+  // left the "Updating <place>" indicator stuck on at phase "idle" (the bug: header said
+  // "Updating" while the sub-line said "Up to date"). Only a live build/analysis/embed or
+  // a scheduled catch-up batch counts.
   const active =
     state.status.phase !== "idle" ||
     state.buildInFlight !== null ||
     state.analyzeInFlight !== null ||
-    state.prescreenQueue.length > 0 ||
+    state.embedInFlight !== null ||
     state.catchUpTimer !== null;
   // Worlds no longer block each other (model passes share the bounded request gate
   // in ai.ts but each world builds independently), so nothing is ever "busy with" another world.
