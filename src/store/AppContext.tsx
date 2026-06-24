@@ -194,12 +194,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (!handle) fallback(); // SSE unsupported in this runtime
   }, []);
 
-  // Coalesce overlapping non-forced refreshes (e.g. the world-change effect and
-  // the pool-empty effect both firing on a switch) into a single fetch.
-  const fetchingRef = useRef(false);
+  // Every feed load gets a sequence number; ONLY the latest result is applied, and
+  // ONLY when it's still for the CURRENT place. This kills the race where switching
+  // places rapidly lets an earlier (slower) response land its items over the place you
+  // actually ended on — and (unlike the old in-flight boolean) it never DROPS the new
+  // place's fetch. `refreshSeq` gates the foreground spinner separately so a silent
+  // background reloadPool can't strand it. Shared `feedSeq` lets refreshFeed and
+  // reloadPool supersede each other cleanly.
+  const feedSeq = useRef(0);
+  const refreshSeq = useRef(0);
   const refreshFeed = useCallback(async (opts: { force?: boolean } = {}) => {
-    if (fetchingRef.current && !opts.force) return;
-    fetchingRef.current = true;
+    const reqWorld = worldRef.current;
+    const reqInterest = interestRef.current;
+    const fSeq = ++feedSeq.current;
+    const rSeq = ++refreshSeq.current;
     setLoadingFeed(true);
     setFeedError(null);
     try {
@@ -208,23 +216,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       // ever see it.
       const res = await fetchRankedFeed({
         force: opts.force,
-        interest: interestRef.current,
-        world: worldRef.current,
+        interest: reqInterest,
+        world: reqWorld,
       });
-      setBusyWorld(res.busyWith ?? null);
-      if (res.items.length === 0 && !res.busyWith) {
-        setFeedError(
-          "The backend returned no items. Make sure the server is running (npm run server) " +
-            "and your local model is loaded.",
-        );
+      // Drop a superseded/stale response: a newer load started, OR the place changed
+      // while this was in flight (so its items belong to a place we've left).
+      if (fSeq === feedSeq.current && reqWorld === worldRef.current) {
+        setBusyWorld(res.busyWith ?? null);
+        if (res.items.length === 0 && !res.busyWith) {
+          setFeedError(
+            "The backend returned no items. Make sure the server is running (npm run server) " +
+              "and your local model is loaded.",
+          );
+        }
+        setPool(res.items);
+        void loadBriefing();
       }
-      setPool(res.items);
-      void loadBriefing();
     } catch (e) {
-      setFeedError(e instanceof Error ? e.message : "Failed to load the feed.");
+      if (rSeq === refreshSeq.current) {
+        setFeedError(e instanceof Error ? e.message : "Failed to load the feed.");
+      }
     } finally {
-      setLoadingFeed(false);
-      fetchingRef.current = false;
+      // Only the latest refresh owns the spinner (a stale one must not clear it early).
+      if (rSeq === refreshSeq.current) setLoadingFeed(false);
     }
   }, [loadBriefing]);
 
@@ -291,11 +305,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Silently pull newly-analyzed items into the pool (no loading banner), used
   // when the backend finishes an analysis chunk in the background.
   const reloadPool = useCallback(async () => {
+    const reqWorld = worldRef.current;
+    const fSeq = ++feedSeq.current;
     try {
       const res = await fetchRankedFeed({
         interest: interestRef.current,
-        world: worldRef.current,
+        world: reqWorld,
       });
+      // Same guard as refreshFeed: ignore if superseded or the place changed mid-flight.
+      if (fSeq !== feedSeq.current || reqWorld !== worldRef.current) return;
       setBusyWorld(res.busyWith ?? null);
       if (res.items.length > 0) setPool(res.items);
     } catch {

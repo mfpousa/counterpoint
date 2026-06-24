@@ -171,14 +171,23 @@ export function buildAlerts(
   for (const s of stories) {
     const severity = typeof s.severity === "number" ? s.severity : 0.5;
     if (severity < minSeverity) continue;
-    // PROTAGONIST first: if the analysis named a NATION as the story's protagonist and
-    // we know its centroid, anchor the pin THERE and fly its flag — so the globe shows a
-    // country's influence at a glance (its flag appears wherever it's the protagonist).
-    // Otherwise fall back to geolocating where the story is happening.
+    // A FLAG flies ONLY when the analysis named a NATION as the story's protagonist:
+    // anchor the pin on that country and tag its iso2 (so the globe shows a country's
+    // influence at a glance). Otherwise geolocate where the story is happening and fly
+    // NO flag — the located country isn't necessarily what the story is "about".
     const protoIso = s.protagonist?.iso2;
     const protoDir = protoIso ? idx.centroidByIso2.get(protoIso) : undefined;
-    const loc = protoDir ? { dir: protoDir, iso2: protoIso } : locatePlace(s, idx);
-    if (!loc) continue;
+    let dir: Vec3;
+    let iso2: string | undefined;
+    if (protoDir) {
+      dir = protoDir;
+      iso2 = protoIso;
+    } else {
+      const loc = locatePlace(s, idx);
+      if (!loc) continue;
+      dir = loc.dir;
+      iso2 = undefined; // located, not a national protagonist → pin only, no flag
+    }
     out.push({
       id: s.id,
       title: s.title,
@@ -186,8 +195,8 @@ export function buildAlerts(
       category: classifyEvent(s),
       developing: !!s.developing,
       severity,
-      dir: loc.dir,
-      iso2: loc.iso2 ?? undefined,
+      dir,
+      iso2,
     });
   }
   out.sort((a, b) => b.severity - a.severity);

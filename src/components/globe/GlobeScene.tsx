@@ -436,12 +436,8 @@ function AlertMarker({
         />
       </mesh>
       <PingRing inner={r * 1.3} outer={r * 1.75} color={color} ringRef={ring} matRef={ringMat} />
-      {/* When the story's protagonist is a NATION, fly its flag above the marker. */}
-      {alert.iso2 && (
-        <group position={[0, 0.055, 0]}>
-          <FlagModel iso2={alert.iso2} />
-        </group>
-      )}
+      {/* Only when the story's PROTAGONIST is a nation: a flag planted on the pin. */}
+      {alert.iso2 && <FlagModel iso2={alert.iso2} />}
       <MarkerHit id={alert.id} radius={Math.max(r * 2.6, 0.04)} y={r} onPress={onPress} onHover={onHover} />
     </group>
   );
@@ -490,14 +486,15 @@ export interface AskMarkerData {
 
 // Loaded flag textures, cached by ISO-2 so each country's PNG is fetched once.
 const _flagTextures = new Map<string, Texture>();
-const FLAG_W = 0.06;
-const FLAG_H = 0.04;
+const _camLocal = new Vector3(); // reused scratch for the flag's yaw-to-camera
+const FLAG_W = 0.038;
+const FLAG_H = 0.024;
 
-/** A little 3D FLAG on a pole, textured with the country's flag image (flagcdn.com).
- *  It billboards to the camera so the cloth is always visible from space, and the cloth
- *  gently WAVES. Rendered for a pin whose subject is a nation — so a country's influence
- *  reads at a glance across the globe. Degrades to nothing if the texture can't load
- *  (e.g. offline, or a runtime without remote TextureLoader). */
+/** A little 3D FLAG PLANTED on a pin, textured with the country's flag image
+ *  (flagcdn.com). The pole stays along the surface NORMAL (it's anchored to the pin, not
+ *  a screen-facing gizmo); it only YAWS around that pole so the cloth turns toward the
+ *  camera, and the cloth WAVES. Rendered only for a pin whose story protagonist is a
+ *  nation. Degrades to nothing if the texture can't load (offline / no remote loader). */
 function FlagModel({ iso2 }: { iso2: string }) {
   const grp = useRef<Group>(null);
   const cloth = useRef<Mesh>(null);
@@ -532,21 +529,25 @@ function FlagModel({ iso2 }: { iso2: string }) {
   }, [iso2]);
 
   useFrame((state) => {
-    // Billboard the whole flag to the camera (independent of the globe's spin), then
-    // flip so the texture's FRONT faces us. lookAt accounts for the parent transform.
-    if (grp.current) {
-      grp.current.lookAt(camera.position);
-      grp.current.rotateY(Math.PI);
+    const g = grp.current;
+    if (g && g.parent) {
+      // Keep the pole PLANTED (along the marker's outward axis) but spin the cloth around
+      // it to face the camera. Project the camera into the marker's local frame and yaw
+      // so the cloth normal (+Z) turns toward it — anchored, never a floating billboard.
+      _camLocal.copy(camera.position);
+      g.parent.worldToLocal(_camLocal);
+      g.rotation.set(0, Math.atan2(_camLocal.x, _camLocal.z), 0);
     }
-    // Ripple the cloth: vertices near the pole (x = -FLAG_W/2) stay put; the free edge waves most.
+    // Ripple the cloth: vertices at the pole (local x = -FLAG_W/2) stay put; the free edge
+    // waves most. Generous amplitude so the motion still reads when the flag is far/small.
     const geo = cloth.current?.geometry;
     if (geo) {
       const pos = geo.attributes.position;
-      const t = state.clock.elapsedTime * 3;
+      const t = state.clock.elapsedTime * 2.6;
       for (let i = 0; i < pos.count; i++) {
         const x = pos.getX(i);
         const f = (x + FLAG_W / 2) / FLAG_W;
-        pos.setZ(i, Math.sin(x * 90 + t) * 0.005 * f);
+        pos.setZ(i, Math.sin(x * 70 + t) * 0.011 * f);
       }
       pos.needsUpdate = true;
     }
@@ -555,12 +556,14 @@ function FlagModel({ iso2 }: { iso2: string }) {
   if (!tex) return null;
   return (
     <group ref={grp}>
-      <mesh position={[-FLAG_W / 2 - 0.003, FLAG_H * 0.15, 0]}>
-        <cylinderGeometry args={[0.0014, 0.0014, FLAG_H * 2.4, 6]} />
-        <meshBasicMaterial color="#d8dee8" />
+      {/* Pole: on the outward axis (x=0), base at the marker, extending up. */}
+      <mesh position={[0, FLAG_H, 0]}>
+        <cylinderGeometry args={[0.001, 0.001, FLAG_H * 2, 6]} />
+        <meshBasicMaterial color="#e2e8f0" />
       </mesh>
-      <mesh ref={cloth} position={[0, FLAG_H * 0.55, 0]}>
-        <planeGeometry args={[FLAG_W, FLAG_H, 12, 2]} />
+      {/* Cloth: flies out from the pole (+X), near the pole's top, and waves. */}
+      <mesh ref={cloth} position={[FLAG_W / 2, FLAG_H * 1.55, 0]}>
+        <planeGeometry args={[FLAG_W, FLAG_H, 14, 2]} />
         <meshBasicMaterial map={tex} side={DoubleSide} toneMapped={false} />
       </mesh>
     </group>
@@ -616,12 +619,6 @@ function AskMarker({
         />
       </mesh>
       <PingRing inner={0.013} outer={0.02} color={c} ringRef={ring} matRef={ringMat} />
-      {/* Search results are countries — fly the flag above the beacon. */}
-      {data.iso2 && (
-        <group position={[0, 0.11, 0]}>
-          <FlagModel iso2={data.iso2} />
-        </group>
-      )}
       <MarkerHit id={data.id} radius={0.05} y={0.04} onPress={onPress} onHover={onHover} />
     </group>
   );

@@ -1377,18 +1377,17 @@ function runBackfillBatch(worldId: string, chain: boolean): void {
 
 /**
  * Bring a world's store up to date (fetch + cheap triage) so PROVISIONAL items are
- * immediately servable, then advance deep analysis:
- *  - COLD open (nothing analyzed yet): chain batches to FILL the pool you just opened
- *    (bounded by deepAnalyzeKeep), winding down when its backlog clears.
- *  - NEW items fetched (any reload): deep-analyze the fresh HEAD right after prescreen.
- *    Chained, but naturally bounded to the new news — deep analysis is capped per pool
- *    (deepAnalyzeKeep, freshest-first) and the only un-prescreened items are the ones
- *    this fetch just pulled, so it never digs into the OLDER backlog.
- *  - explicit REFRESH that surfaced NOTHING new: ONE batch into the remaining backlog,
- *    so the reader pulls older news a batch at a time.
- *  - otherwise (a quiet background rebuild, nothing new): fetch + triage only.
- * Navigation never RESUMES a drain (a status poll doesn't trigger analysis), so it
- * can't pin the GPU. The cold-open response only waits on fetch + triage, never analysis.
+ * immediately servable. Deep analysis is PULL-based and only ever started by a human
+ * action — NEVER by an automatic/TTL fetch — so the UI's periodic reloads (the status
+ * poll re-fetching as items graduate) can't kick off or sustain a backfill loop:
+ *  - COLD open (you just navigated to a pool with nothing analyzed): chain batches to
+ *    FILL it, winding down when its backlog clears or you leave.
+ *  - explicit REFRESH (pull-to-refresh / refresh button, force=true): ONE batch —
+ *    analyzes the freshest unanalyzed items (the new head), or digs one batch backward
+ *    when nothing new. Refresh again to advance further.
+ *  - everything else (a quiet TTL rebuild / live reload that fetched new items): fetch +
+ *    triage only. The new items show provisionally; they deep-analyze on the next refresh.
+ * A status poll never resumes a drain, so navigating/idling can't pin the GPU.
  */
 async function buildPool(worldId: string, opts: { cold: boolean; force: boolean }): Promise<void> {
   const { newCount } = await refreshSources(worldId);
@@ -1397,14 +1396,17 @@ async function buildPool(worldId: string, opts: { cold: boolean; force: boolean 
     // isn't cut off before the client's first status poll lands.
     markWatched(worldId);
     runBackfillBatch(worldId, true); // fill the freshly-opened pool
-  } else if (newCount > 0) {
-    // Fresh news arrived — analyze the head straight away (bounded to the new items).
-    runBackfillBatch(worldId, true);
   } else if (opts.force) {
-    // Explicit refresh with nothing new → dig ONE batch into the remaining backlog.
+    // Explicit, human-initiated refresh: ONE batch (analyze the fresh head, freshest
+    // first, or dig one batch into the older backlog when nothing new arrived).
     runBackfillBatch(worldId, false);
   } else {
-    console.log(`[feed:${worldId}] no new articles — pool already up to date`);
+    // Automatic / TTL fetch (live reload, navigation re-fetch): NO model work — just the
+    // fetch + first-chunk triage above. This is what stops periodic UI refreshes from
+    // triggering (and re-triggering) backfills.
+    if (newCount > 0) {
+      console.log(`[feed:${worldId}] ${newCount} new (auto fetch) — analysis deferred to a refresh`);
+    }
   }
 }
 

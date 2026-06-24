@@ -72,9 +72,10 @@ describe("geoAlerts (locate ongoing stories on the globe)", () => {
     });
   });
 
-  it("buildAlerts tags the located nation's iso2 on the alert", () => {
+  it("buildAlerts does NOT flag a story located only by name (no national protagonist)", () => {
     const [alert] = buildAlerts([story({ title: "War in Ukraine grinds on", severity: 0.9 })], IDX);
-    expect(alert.iso2).toBe("ua");
+    expect(alert.dir).toBe(uaDir); // still pinned where it's happening
+    expect(alert.iso2).toBeUndefined(); // …but no flag without a national protagonist
   });
 
   it("buildAlerts anchors on the analyzed PROTAGONIST nation over geolocation", () => {
