@@ -995,6 +995,16 @@ export function Globe({
   const atRoot = browse === GEO_ROOT_ID;
   const nodeLabel = view?.node.label ?? t("geo.world");
 
+  // The globe's "Updating" pill must name the place the globe is FOCUSED on — not the
+  // selected feed pool, which diverges whenever you browse to a place you haven't committed
+  // to (e.g. drilling into a continent while the feed still serves a country). `status` only
+  // describes the feed pool, so we surface the pill ONLY when the focused node IS that feed —
+  // then it can never name a place other than the one in view. Front page (no geo override)
+  // ⇒ the feed is the world, matched at the root; otherwise match the committed geo pool.
+  const focusIsFeed = activePoolId
+    ? poolIdForNode(browse) === activePoolId
+    : atRoot;
+
   // Float the place pin AT the cursor. The position is pushed IMPERATIVELY to the pin
   // (NDC -1..1 → px in the measured canvas) so per-move updates re-render only the pin,
   // never the globe scene + its hundreds of country meshes.
@@ -1396,8 +1406,10 @@ export function Globe({
           </View>
         </View>
 
-        {/* Compact "what's updating" pill so backend work is visible over the globe too. */}
-        {hero && status?.active && (
+        {/* Compact "what's updating" pill so backend work is visible over the globe too.
+            Labelled with the FOCUSED node and gated on focusIsFeed so it always agrees with
+            the place in view (never the stale/other feed pool). */}
+        {hero && status?.active && focusIsFeed && (
           <View
             style={[
               styles.statusWrap,
@@ -1408,9 +1420,7 @@ export function Globe({
             <View style={styles.statusPill}>
               <ActivityIndicator size="small" color={colors.accent} />
               <Text style={styles.statusText} numberOfLines={1}>
-                {t("analysis.updating", {
-                  place: status.label || t("geo.world"),
-                })}
+                {t("analysis.updating", { place: nodeLabel })}
               </Text>
             </View>
           </View>
