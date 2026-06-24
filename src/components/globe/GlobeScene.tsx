@@ -757,9 +757,13 @@ export const GlobeScene = memo(function GlobeScene({
     const g = group.current;
     if (!g) return;
     // SOLE rule for the idle spin: spin while the pointer is OFF the globe, freeze while it
-    // hovers the globe — ocean (overOcean), land (focusedId), or a marker (hoveredMarkerId).
+    // hovers the globe — ocean (overOcean), land (focusedId), or a marker (hoveredMarkerId) —
+    // OR while a pin's card is open (focusedMarkerId), so the open card never drifts.
     const pointerOverGlobe =
-      overOcean.current || focusedId !== null || hoveredMarkerId !== null;
+      overOcean.current ||
+      focusedId !== null ||
+      hoveredMarkerId !== null ||
+      focusedMarkerId !== null;
     if (refs.dragging.current) refs.target.current = null; // manual control cancels focus
     // A drag or a fly-to overrides the scroll-zoom cursor lock (the user took the wheel).
     if (refs.dragging.current || refs.target.current) zoomAnchor.current = null;
