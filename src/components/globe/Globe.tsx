@@ -341,6 +341,8 @@ export function Globe({
     zoom: useRef(1),
     dragging: useRef(false),
     target: useRef<{ yaw: number; pitch: number; zoom: number } | null>(null),
+    // Assigned by GlobeScene once mounted; gestures call it to wake the on-demand loop.
+    wake: useRef<() => void>(() => {}),
   };
   const lastDrag = useRef({ x: 0, y: 0 });
   const pinchDist = useRef(0);
@@ -489,6 +491,7 @@ export function Globe({
       pitch: clamp(Math.atan2(d.y, Math.hypot(d.x, d.z)), -1.2, 1.2),
       zoom: hit.level === "continent" ? 1.4 : 1.9,
     };
+    refs.wake.current?.(); // kick the fly-to animation
     navTo(hit.nodeId);
     onSelect(poolIdForNode(hit.nodeId));
     onPlace?.(hit.label);
@@ -604,6 +607,7 @@ export function Globe({
       pitch: clamp(Math.atan2(avg.y, Math.hypot(avg.x, avg.z)), -1.2, 1.2),
       zoom: askMarkers.length > 1 ? 1.05 : 1.5,
     };
+    refs.wake.current?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [askMarkers]);
 
@@ -617,6 +621,7 @@ export function Globe({
         pitch: clamp(Math.atan2(m.dir.y, Math.hypot(m.dir.x, m.dir.z)), -1.2, 1.2),
         zoom: 1.7,
       };
+      refs.wake.current?.();
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [askMarkers],
@@ -918,6 +923,7 @@ export function Globe({
   useEffect(() => {
     if (!view || !worldGeo) {
       refs.target.current = null;
+      refs.wake.current?.();
       return;
     }
     const n = view.node;
@@ -942,6 +948,7 @@ export function Globe({
       // unbounded, and ease OUT so the WHOLE world shows, undoing any prior zoom-in.
       refs.target.current = null;
       refs.zoom.current = WORLD_ZOOM;
+      refs.wake.current?.();
       return;
     }
     const fy = Math.atan2(-dir.x, dir.z);
@@ -950,6 +957,7 @@ export function Globe({
       Math.min(1.2, Math.atan2(dir.y, Math.hypot(dir.x, dir.z))),
     );
     refs.target.current = { yaw: fy, pitch: fp, zoom };
+    refs.wake.current?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, worldGeo]);
 
@@ -1038,6 +1046,7 @@ export function Globe({
 
   const zoomBy = (factor: number) => {
     refs.zoom.current = clamp(refs.zoom.current * factor, ZOOM_MIN, ZOOM_MAX);
+    refs.wake.current?.();
   };
 
   const panResponder = useMemo(
@@ -1062,11 +1071,13 @@ export function Globe({
           didDrag.current = true; // moved past the slop → this gesture is a drag, not a tap
           lastDrag.current = { x: 0, y: 0 };
           pinchDist.current = 0;
+          refs.wake.current?.(); // start the render loop for the drag
         },
         onPanResponderMove: (
           e: GestureResponderEvent,
           g: PanResponderGestureState,
         ) => {
+          refs.wake.current?.(); // ref-only mutation → keep the loop awake while moving
           const touches = e.nativeEvent.touches;
           if (touches && touches.length >= 2) {
             const dx = touches[0].pageX - touches[1].pageX;
@@ -1090,9 +1101,11 @@ export function Globe({
         },
         onPanResponderRelease: () => {
           refs.dragging.current = false;
+          refs.wake.current?.(); // render through the post-release settle
         },
         onPanResponderTerminate: () => {
           refs.dragging.current = false;
+          refs.wake.current?.();
         },
       }),
     // refs are stable; create the responder once.
@@ -1117,6 +1130,11 @@ export function Globe({
       >
         <Canvas
           camera={{ position: [0, 0, 3.2], fov: 45 }}
+          // Render on demand (GlobeScene drives a throttled ~30fps loop while animating,
+          // 0fps when idle) and cap the pixel ratio so high-DPI phones don't render 3x+
+          // the pixels — both big cuts to the globe's sustained GPU/CPU load (heat).
+          frameloop="demand"
+          dpr={[1, 1.75]}
           onPointerMissed={() => setFocusedId(null)}
         >
           <GlobeScene
@@ -1237,6 +1255,7 @@ export function Globe({
                   pitch: clamp(Math.atan2(dir.y, Math.hypot(dir.x, dir.z)), -1.2, 1.2),
                   zoom: 1.8,
                 };
+                refs.wake.current?.();
               }}
             />
           </View>

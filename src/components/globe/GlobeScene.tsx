@@ -12,6 +12,7 @@
 
 import React, { memo, useEffect, useMemo, useRef, useState } from "react";
 import type { MutableRefObject } from "react";
+import { AppState } from "react-native";
 import { useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import {
   AdditiveBlending,
@@ -51,6 +52,10 @@ export interface GlobeViewRefs {
   /** When set, the globe eases to face + zoom this orientation (drill-in focus);
    *  cleared the moment the reader drags so manual control always wins. */
   target: MutableRefObject<{ yaw: number; pitch: number; zoom: number } | null>;
+  /** Wake the on-demand render loop (gestures call this so a ref-only mutation —
+   *  which never re-renders React — still kicks the throttled frame loop). Assigned
+   *  by GlobeScene; a no-op until the scene mounts. */
+  wake: MutableRefObject<() => void>;
 }
 
 const PLANET_RADIUS = 0.975; // ocean sphere — a small gap below the land (1.0) so the flat triangles don't clip through, while still hugging
@@ -60,6 +65,10 @@ const ZOOM_MIN = 0.6; // matches the wrapper's gesture/button clamp
 const ZOOM_MAX = 2.6;
 const WHEEL_PULL = 0.14; // how strongly scroll-zoom-in pulls the cursor's point to centre
 const OFF = "#000000";
+// On-demand render budget: cap the animation loop at ~30fps (instead of the display's
+// 60). Halves the per-second GPU/CPU work for spin/pulse/flag-wave with no visible loss
+// on a globe, and the loop sleeps entirely (0fps) when nothing is moving.
+const FRAME_MS = 1000 / 30;
 // Markers (pins + flags) ride on the globe group, which scales with zoom — so without
 // this they'd balloon when zoomed in. Counter-scale a marker by min(1, CAP/zoom) so its
 // on-screen size grows with zoom only until the group hits CAP, then plateaus.
@@ -761,6 +770,68 @@ export function GlobeScene({
   // by the same pixels, so the focused country on the near surface lands exactly on the
   // visible centre instead of overshooting.
   const offsetPx = useRef(0);
+
+  // --- Render governor (on-demand rendering) ---------------------------------
+  // The <Canvas> runs frameloop="demand": it only paints when invalidate() is called.
+  // We self-drive a ~30fps loop from the frame below WHILE something is animating, and
+  // stop scheduling once everything settles so the GPU idles at 0fps. Gestures and prop
+  // changes call wake() to resume; the app backgrounding pauses it entirely.
+  const invalidate = useThree((s) => s.invalidate);
+  const nextFrame = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pausedRef = useRef(false);
+  const settleUntil = useRef(0);
+
+  useEffect(() => {
+    refs.wake.current = () => {
+      settleUntil.current = Date.now() + 500; // render through short eases after a kick
+      if (!pausedRef.current) invalidate();
+    };
+    return () => {
+      refs.wake.current = () => {};
+    };
+  }, [invalidate, refs]);
+
+  // Pause rendering while the app is backgrounded — no GPU/CPU burn off-screen.
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (st) => {
+      if (st === "active") {
+        pausedRef.current = false;
+        invalidate();
+      } else {
+        pausedRef.current = true;
+        if (nextFrame.current) {
+          clearTimeout(nextFrame.current);
+          nextFrame.current = null;
+        }
+      }
+    });
+    return () => sub.remove();
+  }, [invalidate]);
+
+  useEffect(
+    () => () => {
+      if (nextFrame.current) clearTimeout(nextFrame.current);
+    },
+    [],
+  );
+
+  // Re-arm the loop (and render through the ease) when focus / layout / data changes —
+  // demand mode otherwise paints a single frame per commit, cutting eases short.
+  useEffect(() => {
+    refs.wake.current?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    focusedId,
+    hoveredMarkerId,
+    focusedMarkerId,
+    rightInset,
+    alerts,
+    askMarkers,
+    gizmos,
+    countries,
+    regions,
+  ]);
+
   useFrame((_, delta) => {
     const g = group.current;
     if (!g) return;
@@ -850,6 +921,37 @@ export function GlobeScene({
       }
       onMarkersProject(out);
     }
+
+    // Keep the on-demand loop alive at ~30fps only while something is actually moving;
+    // when the orientation/zoom/offset have settled AND no markers are pulsing, stop
+    // scheduling so the GPU drops to 0fps. Gestures/prop-changes call wake() to resume.
+    const easingZoom = Math.abs(refs.zoom.current - g.scale.x) > 1e-3;
+    const easingOffset = Math.abs(rightInset / 2 - offsetPx.current) > 0.5;
+    const spinning =
+      autoSpin &&
+      focusedId === null &&
+      hoveredMarkerId === null &&
+      focusedMarkerId === null &&
+      !refs.dragging.current;
+    const markersLive = alerts.length > 0 || askMarkers.length > 0;
+    const needsMore =
+      refs.dragging.current ||
+      refs.target.current !== null ||
+      spinning ||
+      easingZoom ||
+      easingOffset ||
+      markersLive ||
+      Date.now() < settleUntil.current;
+    if (nextFrame.current) {
+      clearTimeout(nextFrame.current);
+      nextFrame.current = null;
+    }
+    if (needsMore && !pausedRef.current) {
+      nextFrame.current = setTimeout(() => {
+        nextFrame.current = null;
+        invalidate();
+      }, FRAME_MS);
+    }
   });
 
   // Scroll-wheel zoom that pulls the point under the cursor toward the view centre as it
@@ -869,6 +971,7 @@ export function GlobeScene({
       refs.rot.current.yaw -= e.pointer.x * WHEEL_PULL;
       refs.rot.current.pitch += e.pointer.y * WHEEL_PULL;
     }
+    refs.wake.current?.(); // ref-only mutation → kick the on-demand loop
   };
 
   return (
