@@ -10,11 +10,19 @@
 // zoom are driven by refs the wrapper mutates from gestures, applied here in the
 // per-frame loop so the gesture layer never has to re-render React.
 
-import React, { memo, useMemo, useRef } from "react";
+import React, { memo, useEffect, useMemo, useRef, useState } from "react";
 import type { MutableRefObject } from "react";
 import { useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
-import { AdditiveBlending, BackSide, DoubleSide, Quaternion, Vector3 } from "three";
-import type { Group, Mesh, MeshBasicMaterial, PerspectiveCamera } from "three";
+import {
+  AdditiveBlending,
+  BackSide,
+  DoubleSide,
+  Quaternion,
+  SRGBColorSpace,
+  TextureLoader,
+  Vector3,
+} from "three";
+import type { Group, Mesh, MeshBasicMaterial, PerspectiveCamera, Texture } from "three";
 import { colors } from "../../theme";
 import { hashId, type Vec3 } from "../../lib/globeLayout";
 import { EVENT_CATEGORIES, type EventCategory, type GeoAlert } from "../../lib/geoAlerts";
@@ -428,6 +436,12 @@ function AlertMarker({
         />
       </mesh>
       <PingRing inner={r * 1.3} outer={r * 1.75} color={color} ringRef={ring} matRef={ringMat} />
+      {/* When the story's protagonist is a NATION, fly its flag above the marker. */}
+      {alert.iso2 && (
+        <group position={[0, 0.055, 0]}>
+          <FlagModel iso2={alert.iso2} />
+        </group>
+      )}
       <MarkerHit id={alert.id} radius={Math.max(r * 2.6, 0.04)} y={r} onPress={onPress} onHover={onHover} />
     </group>
   );
@@ -474,11 +488,83 @@ export interface AskMarkerData {
   iso2?: string;
 }
 
-/** Emoji flag for an ISO 3166-1 alpha-2 code ("us" → 🇺🇸), or "" if not a valid code. */
-function flagEmoji(iso2: string | undefined): string {
-  const cc = (iso2 ?? "").trim().toUpperCase();
-  if (!/^[A-Z]{2}$/.test(cc)) return "";
-  return String.fromCodePoint(...[...cc].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65));
+// Loaded flag textures, cached by ISO-2 so each country's PNG is fetched once.
+const _flagTextures = new Map<string, Texture>();
+const FLAG_W = 0.06;
+const FLAG_H = 0.04;
+
+/** A little 3D FLAG on a pole, textured with the country's flag image (flagcdn.com).
+ *  It billboards to the camera so the cloth is always visible from space, and the cloth
+ *  gently WAVES. Rendered for a pin whose subject is a nation — so a country's influence
+ *  reads at a glance across the globe. Degrades to nothing if the texture can't load
+ *  (e.g. offline, or a runtime without remote TextureLoader). */
+function FlagModel({ iso2 }: { iso2: string }) {
+  const grp = useRef<Group>(null);
+  const cloth = useRef<Mesh>(null);
+  const camera = useThree((s) => s.camera);
+  const [tex, setTex] = useState<Texture | null>(() => _flagTextures.get(iso2) ?? null);
+
+  useEffect(() => {
+    if (!iso2) return;
+    const cached = _flagTextures.get(iso2);
+    if (cached) {
+      setTex(cached);
+      return;
+    }
+    let cancelled = false;
+    try {
+      new TextureLoader().load(
+        `https://flagcdn.com/w80/${iso2}.png`,
+        (t) => {
+          t.colorSpace = SRGBColorSpace;
+          _flagTextures.set(iso2, t);
+          if (!cancelled) setTex(t);
+        },
+        undefined,
+        () => {}, // 404 / network / unsupported loader → just no flag
+      );
+    } catch {
+      /* TextureLoader unavailable in this runtime — no flag */
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [iso2]);
+
+  useFrame((state) => {
+    // Billboard the whole flag to the camera (independent of the globe's spin), then
+    // flip so the texture's FRONT faces us. lookAt accounts for the parent transform.
+    if (grp.current) {
+      grp.current.lookAt(camera.position);
+      grp.current.rotateY(Math.PI);
+    }
+    // Ripple the cloth: vertices near the pole (x = -FLAG_W/2) stay put; the free edge waves most.
+    const geo = cloth.current?.geometry;
+    if (geo) {
+      const pos = geo.attributes.position;
+      const t = state.clock.elapsedTime * 3;
+      for (let i = 0; i < pos.count; i++) {
+        const x = pos.getX(i);
+        const f = (x + FLAG_W / 2) / FLAG_W;
+        pos.setZ(i, Math.sin(x * 90 + t) * 0.005 * f);
+      }
+      pos.needsUpdate = true;
+    }
+  });
+
+  if (!tex) return null;
+  return (
+    <group ref={grp}>
+      <mesh position={[-FLAG_W / 2 - 0.003, FLAG_H * 0.15, 0]}>
+        <cylinderGeometry args={[0.0014, 0.0014, FLAG_H * 2.4, 6]} />
+        <meshBasicMaterial color="#d8dee8" />
+      </mesh>
+      <mesh ref={cloth} position={[0, FLAG_H * 0.55, 0]}>
+        <planeGeometry args={[FLAG_W, FLAG_H, 12, 2]} />
+        <meshBasicMaterial map={tex} side={DoubleSide} toneMapped={false} />
+      </mesh>
+    </group>
+  );
 }
 
 function AskMarker({
@@ -530,6 +616,12 @@ function AskMarker({
         />
       </mesh>
       <PingRing inner={0.013} outer={0.02} color={c} ringRef={ring} matRef={ringMat} />
+      {/* Search results are countries — fly the flag above the beacon. */}
+      {data.iso2 && (
+        <group position={[0, 0.11, 0]}>
+          <FlagModel iso2={data.iso2} />
+        </group>
+      )}
       <MarkerHit id={data.id} radius={0.05} y={0.04} onPress={onPress} onHover={onHover} />
     </group>
   );
@@ -574,8 +666,6 @@ export interface ProjectedMarker {
   detail: string;
   /** Tag/bubble accent colour. */
   color: string;
-  /** Subject nation's flag emoji ("" when not a country). */
-  flag: string;
   hovered: boolean;
 }
 
@@ -700,7 +790,6 @@ export function GlobeScene({
         label: string,
         detail: string,
         color: string,
-        iso2: string | undefined,
       ) => {
         _proj.set(dir.x * ALERT_RADIUS, dir.y * ALERT_RADIUS, dir.z * ALERT_RADIUS);
         _proj.applyMatrix4(g.matrix); // group local matrix == world matrix
@@ -715,12 +804,11 @@ export function GlobeScene({
           label,
           detail,
           color,
-          flag: flagEmoji(iso2), // subject nation's flag, when it's a country
           hovered: id === hoveredMarkerId,
         });
       };
       for (const m of askMarkers) {
-        add(m.id, "ask", m.dir, m.label, m.detail ?? "", colors.accent, m.iso2);
+        add(m.id, "ask", m.dir, m.label, m.detail ?? "", colors.accent);
       }
       // Project the hovered AND focused alerts (deduped) so their bubble / card can render.
       for (const aid of new Set([hoveredMarkerId, focusedMarkerId])) {
@@ -729,7 +817,7 @@ export function GlobeScene({
         if (!ha) continue; // an ask marker id (already added) or stale
         const more = (ha.count ?? 1) - 1;
         const detail = more > 0 ? `${ha.title}  ·  +${more} more here` : ha.title;
-        add(ha.id, "alert", ha.dir, "", detail, EVENT_CATEGORIES[ha.category].color, ha.iso2);
+        add(ha.id, "alert", ha.dir, "", detail, EVENT_CATEGORIES[ha.category].color);
       }
       onMarkersProject(out);
     }

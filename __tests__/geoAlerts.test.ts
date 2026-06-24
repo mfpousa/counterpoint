@@ -77,6 +77,22 @@ describe("geoAlerts (locate ongoing stories on the globe)", () => {
     expect(alert.iso2).toBe("ua");
   });
 
+  it("buildAlerts anchors on the analyzed PROTAGONIST nation over geolocation", () => {
+    // Story is located in Ukraine (zone) but its protagonist is Sudan → pin + flag = Sudan.
+    const [alert] = buildAlerts(
+      [
+        story({
+          severity: 0.9,
+          sources: [{ zone: "ukraine" } as never],
+          protagonist: { name: "Sudan", iso2: "sd" },
+        }),
+      ],
+      IDX,
+    );
+    expect(alert.iso2).toBe("sd");
+    expect(alert.dir).toBe(sdDir);
+  });
+
   it("buildAlerts keeps locatable MAJOR events (developing or not), strongest first", () => {
     const alerts = buildAlerts(
       [

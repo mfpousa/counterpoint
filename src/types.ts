@@ -409,6 +409,12 @@ export interface Story {
   angles: StoryAngle[];
   /** Notable factual contradictions/disagreements across outlets. */
   contradictions: string[];
+  /**
+   * The central actor/subject the story is most about, as tagged by the analysis —
+   * with its ISO 3166-1 alpha-2 code when that protagonist is a NATION (so the globe
+   * can fly its flag to show a country's influence at a glance).
+   */
+  protagonist?: { name: string; iso2?: string };
   /** Ids of related stories (other clusters), for cross-linking. */
   relatedIds: string[];
   /** Most recent contributing article time (epoch ms). */

@@ -171,7 +171,13 @@ export function buildAlerts(
   for (const s of stories) {
     const severity = typeof s.severity === "number" ? s.severity : 0.5;
     if (severity < minSeverity) continue;
-    const loc = locatePlace(s, idx);
+    // PROTAGONIST first: if the analysis named a NATION as the story's protagonist and
+    // we know its centroid, anchor the pin THERE and fly its flag — so the globe shows a
+    // country's influence at a glance (its flag appears wherever it's the protagonist).
+    // Otherwise fall back to geolocating where the story is happening.
+    const protoIso = s.protagonist?.iso2;
+    const protoDir = protoIso ? idx.centroidByIso2.get(protoIso) : undefined;
+    const loc = protoDir ? { dir: protoDir, iso2: protoIso } : locatePlace(s, idx);
     if (!loc) continue;
     out.push({
       id: s.id,

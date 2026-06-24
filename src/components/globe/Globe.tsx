@@ -231,16 +231,12 @@ const MarkerLayer = forwardRef<
             <View key={it.id} style={[styles.markerTag, pos]} pointerEvents="none">
               {it.hovered && it.detail ? (
                 <View style={[styles.markerBubble, { borderColor: it.color }]}>
-                  <Text style={styles.markerBubbleText}>
-                    {it.flag ? `${it.flag}  ` : ""}
-                    {it.detail}
-                  </Text>
+                  <Text style={styles.markerBubbleText}>{it.detail}</Text>
                 </View>
               ) : null}
               {it.kind === "ask" && it.label ? (
                 <View style={[styles.markerChip, { borderColor: it.color }]}>
                   <Text style={styles.markerChipText} numberOfLines={1}>
-                    {it.flag ? `${it.flag}  ` : ""}
                     {it.label}
                   </Text>
                 </View>
@@ -643,7 +639,6 @@ export function Globe({
         return (
           <>
             <Text style={styles.markerCardText} selectable>
-              {it.flag ? `${it.flag}  ` : ""}
               {it.detail}
             </Text>
             {onAlertPress && (
@@ -670,7 +665,6 @@ export function Globe({
             accessibilityRole="button"
           >
             <Text style={styles.markerCardLabel} selectable>
-              {it.flag ? `${it.flag}  ` : ""}
               {it.label}
             </Text>
             <Ionicons name="locate" size={13} color={colors.accent} />

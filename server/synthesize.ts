@@ -56,8 +56,14 @@ const SYNTH_SCHEMA: JsonSchema = {
         },
       },
       contradictions: { type: "array", items: { type: "string" } },
+      protagonist: {
+        type: "object",
+        properties: { name: { type: "string" }, iso2: { type: "string" } },
+        required: ["name", "iso2"],
+        additionalProperties: false,
+      },
     },
-    required: ["title", "summary", "synthesis", "angles", "sides", "contradictions"],
+    required: ["title", "summary", "synthesis", "angles", "sides", "contradictions", "protagonist"],
     additionalProperties: false,
   },
 };
@@ -73,9 +79,12 @@ const SYNTH_RULES =
   '  "synthesis": ["3 to 5 short neutral paragraphs combining what the outlets agree on and report"],\n' +
   '  "angles": [ { "outlet": "<exact outlet name>", "framing": "ONE sentence on how THIS outlet framed/emphasized it" } ],\n' +
   '  "sides": [ { "label": "<short side label, e.g. \'Western media\', \'Russian media\', \'Ukrainian media\'>", "outlets": ["<exact outlet names on this side>"], "framing": "1-2 sentences on how THIS side frames/emphasizes the story" } ],\n' +
-  '  "contradictions": ["specific points where the outlets disagree or report differently; [] if none are evident"]\n' +
+  '  "contradictions": ["specific points where the outlets disagree or report differently; [] if none are evident"],\n' +
+  '  "protagonist": { "name": "the central actor/subject the story is MOST about (a country, organisation, or person)", "iso2": "if that protagonist IS a country or a national government/actor, its ISO 3166-1 alpha-2 code in lowercase (e.g. us, es, ua); otherwise an empty string" }\n' +
   "}\n" +
-  "Each outlet has a geographic/affiliation 'zone'. For 'sides', GROUP the outlets into the " +
+  "For 'protagonist', pick the single entity the story most centres on and name it; set 'iso2' ONLY " +
+  "when that protagonist is a nation/national actor (use \"\" for organisations, people, or anything " +
+  "non-national). Each outlet has a geographic/affiliation 'zone'. For 'sides', GROUP the outlets into the " +
   "opposing vantage points actually PRESENT (by zone) and describe how each side frames the story " +
   "\u2014 e.g. Western vs Ukrainian vs Russian media. Do NOT invent sides: use only zones present in " +
   "the reports, and return [] when all outlets share one vantage point. " +
@@ -168,6 +177,19 @@ function coerceStringArray(raw: unknown, max: number): string[] {
     if (out.length >= max) break;
   }
   return out;
+}
+
+/** Parse the model's `protagonist` ({ name, iso2 }) — the central actor and, when it's
+ *  a nation, its ISO 3166-1 alpha-2 code (so the globe can fly its flag). Returns
+ *  undefined when there's no usable name. */
+function coerceProtagonist(raw: unknown): { name: string; iso2?: string } | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const r = raw as Record<string, unknown>;
+  const name = sanitizeModelText(r["name"]);
+  if (!name) return undefined;
+  const code = typeof r["iso2"] === "string" ? r["iso2"].trim().toLowerCase() : "";
+  const iso2 = /^[a-z]{2}$/.test(code) ? code : undefined;
+  return iso2 ? { name, iso2 } : { name };
 }
 
 /** Resolve an outlet name the model returned back to a contributing member. */
@@ -346,6 +368,7 @@ export async function buildStory(members: StoredItem[], lang: Lang = "en"): Prom
     angles,
     ...(sides ? { sides } : {}),
     contradictions,
+    ...(coerceProtagonist(obj["protagonist"]) ? { protagonist: coerceProtagonist(obj["protagonist"]) } : {}),
     relatedIds: [],
     updatedAt: Math.max(...members.map((m) => m.item.publishedAt)),
     generatedAt: Date.now(),
@@ -404,8 +427,24 @@ const DEVELOPING_SCHEMA: JsonSchema = {
         },
       },
       contradictions: { type: "array", items: { type: "string" } },
+      protagonist: {
+        type: "object",
+        properties: { name: { type: "string" }, iso2: { type: "string" } },
+        required: ["name", "iso2"],
+        additionalProperties: false,
+      },
     },
-    required: ["title", "summary", "status", "synthesis", "timeline", "spectrum", "sides", "contradictions"],
+    required: [
+      "title",
+      "summary",
+      "status",
+      "synthesis",
+      "timeline",
+      "spectrum",
+      "sides",
+      "contradictions",
+      "protagonist",
+    ],
     additionalProperties: false,
   },
 };
@@ -425,8 +464,11 @@ const DEVELOPING_RULES =
   '  "timeline": [ { "event": <the integer index>, "title": "<= 8 word milestone label", "detail": "ONE sentence on what changed" } ],\n' +
   '  "spectrum": { "left": "how left-leaning outlets frame it", "center": "how centrist outlets frame it", "right": "how right-leaning outlets frame it" },\n' +
   '  "sides": [ { "label": "<short side label, e.g. \'Western media\', \'Russian media\', \'Ukrainian media\'>", "outlets": ["<exact outlet names on this side>"], "framing": "1-2 sentences on how THIS side frames the issue" } ],\n' +
-  '  "contradictions": ["specific points where coverage disagrees; [] if none are evident"]\n' +
+  '  "contradictions": ["specific points where coverage disagrees; [] if none are evident"],\n' +
+  '  "protagonist": { "name": "the central actor/subject the issue is MOST about (a country, organisation, or person)", "iso2": "if that protagonist IS a country or a national government/actor, its ISO 3166-1 alpha-2 code in lowercase (e.g. us, es, ua); otherwise an empty string" }\n' +
   "}\n" +
+  "For 'protagonist', pick the single entity the issue most centres on and name it; set 'iso2' ONLY " +
+  "when it is a nation/national actor (use \"\" otherwise). " +
   "Provide ONE timeline entry per provided event, reusing its exact 'event' index. For any spectrum " +
   "side with no outlets present, use an empty string. For 'sides', GROUP the roster outlets into the " +
   "opposing geographic/affiliation vantage points actually PRESENT (by 'zone') and describe how each " +
@@ -577,5 +619,6 @@ export async function buildDevelopingStory(
     timeline,
     spectrum,
     ...(sides ? { sides } : {}),
+    ...(coerceProtagonist(obj["protagonist"]) ? { protagonist: coerceProtagonist(obj["protagonist"]) } : {}),
   };
 }
