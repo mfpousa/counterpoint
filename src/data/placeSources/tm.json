@@ -1,16 +1,5 @@
 [
   {
-    "id": "tm-tmb-tv",
-    "title": "TMB TV",
-    "url": "http://www.tmb.tv/feed",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "tk"
-  },
-  {
     "id": "tm-turkmenistan-state-news-agency",
     "title": "Turkmenistan State News Agency",
     "url": "http://tdh.gov.tm/rss.xml",

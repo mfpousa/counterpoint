@@ -193,45 +193,6 @@
     "regionLabel": "Nyland"
   },
   {
-    "id": "fi-ita-savo",
-    "title": "Itä-Savo",
-    "url": "https://www.ita-savo.fi/feed/rss",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "sv",
-    "region": "FI-04",
-    "regionLabel": "Södra Savolax"
-  },
-  {
-    "id": "fi-kirkko-ja-kaupunki",
-    "title": "Kirkko ja kaupunki",
-    "url": "https://aikuistenkasvatuslaitos.libsyn.com/rss",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "sv",
-    "region": "FI-18",
-    "regionLabel": "Nyland"
-  },
-  {
-    "id": "fi-ita-hame",
-    "title": "Itä-Häme",
-    "url": "https://www.itahame.fi/feed/rss",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "sv",
-    "region": "FI-16",
-    "regionLabel": "Päijänne-Tavastland"
-  },
-  {
     "id": "fi-lansi-savo",
     "title": "Länsi-Savo",
     "url": "https://www.lansi-savo.fi/feed/rss",
@@ -247,7 +208,7 @@
   {
     "id": "fi-ny-tid-finland",
     "title": "Ny Tid (Finland)",
-    "url": "http://nytid.fi/feed",
+    "url": "http://nytid.fi/feed/",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -369,17 +330,17 @@
     "lang": "sv"
   },
   {
-    "id": "fi-etela-suomen-sanomat",
-    "title": "Etelä-Suomen Sanomat",
-    "url": "https://www.ess.fi/feed/rss",
+    "id": "fi-demokraatti",
+    "title": "Demokraatti",
+    "url": "https://demokraatti.fi/feed",
     "kind": "news",
     "topic": "world",
     "lean": null,
     "confidence": 0.4,
     "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
     "lang": "sv",
-    "region": "FI-16",
-    "regionLabel": "Päijänne-Tavastland"
+    "region": "FI-18",
+    "regionLabel": "Nyland"
   },
   {
     "id": "fi-forssan-lehti",
@@ -395,9 +356,35 @@
     "regionLabel": "Egentliga Tavastland"
   },
   {
-    "id": "fi-demokraatti",
-    "title": "Demokraatti",
-    "url": "https://demokraatti.fi/feed",
+    "id": "fi-etela-suomen-sanomat",
+    "title": "Etelä-Suomen Sanomat",
+    "url": "https://www.ess.fi/feed/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "sv",
+    "region": "FI-16",
+    "regionLabel": "Päijänne-Tavastland"
+  },
+  {
+    "id": "fi-lieksan-lehti",
+    "title": "Lieksan Lehti",
+    "url": "https://www.lieksanlehti.fi/feed/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "sv",
+    "region": "FI-13",
+    "regionLabel": "Norra Karelen"
+  },
+  {
+    "id": "fi-loviisan-sanomat",
+    "title": "Loviisan Sanomat",
+    "url": "https://www.loviisansanomat.fi/feed/rss",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -406,6 +393,17 @@
     "lang": "sv",
     "region": "FI-18",
     "regionLabel": "Nyland"
+  },
+  {
+    "id": "fi-radio-sputnik",
+    "title": "Radio Sputnik",
+    "url": "https://sk4.fi/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "sv"
   },
   {
     "id": "fi-pitajalainen",
@@ -441,43 +439,6 @@
     "lang": "sv"
   },
   {
-    "id": "fi-radio-sputnik",
-    "title": "Radio Sputnik",
-    "url": "https://sk4.fi/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "sv"
-  },
-  {
-    "id": "fi-lieksan-lehti",
-    "title": "Lieksan Lehti",
-    "url": "https://www.lieksanlehti.fi/feed/rss",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "sv",
-    "region": "FI-13",
-    "regionLabel": "Norra Karelen"
-  },
-  {
-    "id": "fi-loviisan-sanomat",
-    "title": "Loviisan Sanomat",
-    "url": "https://www.loviisansanomat.fi/feed/rss",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "sv",
-    "region": "FI-18",
-    "regionLabel": "Nyland"
-  },
-  {
     "id": "fi-puruvesi",
     "title": "Puruvesi",
     "url": "https://www.puruvesi.net/feed/rss",
@@ -500,6 +461,19 @@
     "lang": "sv",
     "region": "FI-14",
     "regionLabel": "Norra Österbotten"
+  },
+  {
+    "id": "fi-tyokansan-sanomat",
+    "title": "Työkansan Sanomat",
+    "url": "https://www.ktpkom.fi/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "sv",
+    "region": "FI-18",
+    "regionLabel": "Nyland"
   },
   {
     "id": "fi-uutis-jousi",
@@ -539,19 +513,6 @@
     "regionLabel": "Norra Karelen"
   },
   {
-    "id": "fi-tyokansan-sanomat",
-    "title": "Työkansan Sanomat",
-    "url": "https://www.ktpkom.fi/feed",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "sv",
-    "region": "FI-18",
-    "regionLabel": "Nyland"
-  },
-  {
     "id": "fi-joutseno",
     "title": "Joutseno",
     "url": "https://www.joutsenolehti.fi/feed/rss",
@@ -563,6 +524,19 @@
     "lang": "sv",
     "region": "FI-02",
     "regionLabel": "Södra Karelen"
+  },
+  {
+    "id": "fi-ita-savo",
+    "title": "Itä-Savo",
+    "url": "https://www.ita-savo.fi/feed/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "sv",
+    "region": "FI-04",
+    "regionLabel": "Södra Savolax"
   },
   {
     "id": "fi-iisalmen-sanomat",
@@ -652,6 +626,17 @@
     "regionLabel": "Nyland"
   },
   {
+    "id": "fi-keski-uusimaa",
+    "title": "Keski-Uusimaa",
+    "url": "https://www.keski-uusimaa.fi/feed/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "sv"
+  },
+  {
     "id": "fi-radio-dei",
     "title": "Radio Dei",
     "url": "http://www.radiodei.fi/feed",
@@ -689,17 +674,6 @@
     "lang": "sv",
     "region": "FI-18",
     "regionLabel": "Nyland"
-  },
-  {
-    "id": "fi-keski-uusimaa",
-    "title": "Keski-Uusimaa",
-    "url": "https://www.keski-uusimaa.fi/feed/rss",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "sv"
   },
   {
     "id": "fi-alfa-tv",
@@ -805,6 +779,32 @@
     "lang": "sv"
   },
   {
+    "id": "fi-kirkko-ja-kaupunki",
+    "title": "Kirkko ja kaupunki",
+    "url": "https://aikuistenkasvatuslaitos.libsyn.com/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "sv",
+    "region": "FI-18",
+    "regionLabel": "Nyland"
+  },
+  {
+    "id": "fi-ita-hame",
+    "title": "Itä-Häme",
+    "url": "https://www.itahame.fi/feed/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "sv",
+    "region": "FI-16",
+    "regionLabel": "Päijänne-Tavastland"
+  },
+  {
     "id": "fi-karjalan-heili",
     "title": "Karjalan Heili",
     "url": "https://www.heili.fi/feed/rss",
@@ -832,6 +832,28 @@
     "id": "fi-seurakuntalainen",
     "title": "Seurakuntalainen",
     "url": "https://www.seurakuntalainen.fi/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "sv"
+  },
+  {
+    "id": "fi-sipoon-sanomat",
+    "title": "Sipoon Sanomat",
+    "url": "https://www.sipoonsanomat.fi/feed/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "sv"
+  },
+  {
+    "id": "fi-radio-kaleva",
+    "title": "Radio Kaleva",
+    "url": "https://www.radiokaleva.fi/feed/",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -964,17 +986,6 @@
     "id": "fi-pieksamaenlehti-fi",
     "title": "pieksamaenlehti.fi",
     "url": "https://www.pieksamaenlehti.fi/feed/rss",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "sv"
-  },
-  {
-    "id": "fi-sipoonsanomat-fi",
-    "title": "sipoonsanomat.fi",
-    "url": "https://www.sipoonsanomat.fi/feed/rss",
     "kind": "news",
     "topic": "world",
     "lean": null,

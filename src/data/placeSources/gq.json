@@ -1,0 +1,24 @@
+[
+  {
+    "id": "gq-diariorombe-es",
+    "title": "diariorombe.es",
+    "url": "https://diariorombe.es/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "pt"
+  },
+  {
+    "id": "gq-losanuncios-net",
+    "title": "losanuncios.net",
+    "url": "https://www.losanuncios.net/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "pt"
+  }
+]

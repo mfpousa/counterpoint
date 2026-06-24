@@ -1,0 +1,156 @@
+[
+  {
+    "id": "sl-ayvnews-com",
+    "title": "ayvnews.com",
+    "url": "https://ayvnews.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "sl-thecalabashnewspaper-com",
+    "title": "thecalabashnewspaper.com",
+    "url": "https://thecalabashnewspaper.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "sl-footballsierraleone-net",
+    "title": "footballsierraleone.net",
+    "url": "https://footballsierraleone.net/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "sl-sierraleonepress-com",
+    "title": "sierraleonepress.com",
+    "url": "https://www.sierraleonepress.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "sl-wordpress-com",
+    "title": "wordpress.com",
+    "url": "https://wordpress.com/es/blog/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "sl-cocorioko-net",
+    "title": "cocorioko.net",
+    "url": "https://cocorioko.net/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "sl-thesierraleonetelegraph-com",
+    "title": "thesierraleonetelegraph.com",
+    "url": "https://www.thesierraleonetelegraph.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "sl-statehouse-gov-sl",
+    "title": "statehouse.gov.sl",
+    "url": "https://statehouse.gov.sl/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "sl-globaltimes-sl-com",
+    "title": "globaltimes-sl.com",
+    "url": "https://globaltimes-sl.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "sl-thisissierraleone-com",
+    "title": "thisissierraleone.com",
+    "url": "https://www.thisissierraleone.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "sl-slpublicopinion-wordpress-com",
+    "title": "slpublicopinion.wordpress.com",
+    "url": "https://slpublicopinion.wordpress.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "sl-critiqueecho-com",
+    "title": "critiqueecho.com",
+    "url": "http://www.critiqueecho.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "sl-expotimesonline-net",
+    "title": "expotimesonline.net",
+    "url": "https://www.expotimesonline.net/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "sl-theorganiser-net",
+    "title": "theorganiser.net",
+    "url": "https://theorganiser.net/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  }
+]

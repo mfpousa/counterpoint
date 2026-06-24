@@ -1,0 +1,200 @@
+[
+  {
+    "id": "cm-africa-presse",
+    "title": "Africa Presse",
+    "url": "https://africapresse.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "cm-237online-com",
+    "title": "237online.com",
+    "url": "https://www.237online.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "cm-camer-be",
+    "title": "camer.be",
+    "url": "https://www.camer.be/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "cm-camfoot-com",
+    "title": "camfoot.com",
+    "url": "https://www.camfoot.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "cm-237actu-com",
+    "title": "237actu.com",
+    "url": "https://237actu.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "cm-journalducameroun-com",
+    "title": "journalducameroun.com",
+    "url": "https://fr.journalducameroun.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "cm-cameroonconcordnews-com",
+    "title": "cameroonconcordnews.com",
+    "url": "https://www.cameroonconcordnews.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "cm-newsducamer-com",
+    "title": "newsducamer.com",
+    "url": "https://www.newsducamer.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "cm-rdpcpdm-cm",
+    "title": "rdpcpdm.cm",
+    "url": "http://www.rdpcpdm.cm/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "cm-cameroonnewsagency-com",
+    "title": "cameroonnewsagency.com",
+    "url": "https://cameroonnewsagency.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "cm-cameroononline-org",
+    "title": "cameroononline.org",
+    "url": "https://www.cameroononline.org/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "cm-bonaberi-com",
+    "title": "bonaberi.com",
+    "url": "http://www.bonaberi.com/syndication/rssfeed.php?rid=4&out=rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "cm-germinalnewspaper-com",
+    "title": "germinalnewspaper.com",
+    "url": "http://germinalnewspaper.com/index.php?format=feed&amp;type=rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "cm-lebledparle-com",
+    "title": "lebledparle.com",
+    "url": "https://www.lebledparle.com/en/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "cm-actucameroun-com",
+    "title": "actucameroun.com",
+    "url": "https://actucameroun.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "cm-cameroonnewsline-com",
+    "title": "cameroonnewsline.com",
+    "url": "http://www.cameroonnewsline.com/?feed=rss2",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "cm-radiomaria-cm",
+    "title": "radiomaria.cm",
+    "url": "http://www.radiomaria.cm/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "cm-cameroonweekly-com",
+    "title": "cameroonweekly.com",
+    "url": "http://www.cameroonweekly.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  }
+]

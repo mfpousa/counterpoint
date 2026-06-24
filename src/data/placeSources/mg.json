@@ -1,0 +1,46 @@
+[
+  {
+    "id": "mg-newsmada-com",
+    "title": "newsmada.com",
+    "url": "https://newsmada.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "mg"
+  },
+  {
+    "id": "mg-midi-madagasikara-mg",
+    "title": "midi-madagasikara.mg",
+    "url": "http://www.midi-madagasikara.mg/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "mg"
+  },
+  {
+    "id": "mg-madamagazine-com",
+    "title": "madamagazine.com",
+    "url": "https://www.madamagazine.com/en/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "mg"
+  },
+  {
+    "id": "mg-tiatanindrazana-com",
+    "title": "tiatanindrazana.com",
+    "url": "https://tiatanindrazana.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "mg"
+  }
+]

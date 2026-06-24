@@ -220,17 +220,6 @@
     "lang": "und"
   },
   {
-    "id": "gr-crete-tv",
-    "title": "Crete TV",
-    "url": "https://www.cretetv.gr/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "und"
-  },
-  {
     "id": "gr-athens-voice",
     "title": "Athens Voice",
     "url": "http://www.athensvoice.gr/rss/news",
@@ -278,6 +267,17 @@
     "id": "gr-keedoo",
     "title": "Keedoo",
     "url": "https://keedoo.gr/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "und"
+  },
+  {
+    "id": "gr-crete-tv",
+    "title": "Crete TV",
+    "url": "https://www.cretetv.gr/feed/",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -1052,6 +1052,17 @@
     "id": "gr-ditiki-gr",
     "title": "ditiki.gr",
     "url": "https://ditiki.gr/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "und"
+  },
+  {
+    "id": "gr-proinanea-gr",
+    "title": "proinanea.gr",
+    "url": "https://www.proinanea.gr/feed/",
     "kind": "news",
     "topic": "world",
     "lean": null,

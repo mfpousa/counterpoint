@@ -1,0 +1,57 @@
+[
+  {
+    "id": "na-kanaal-7-channel-7",
+    "title": "Kanaal 7/Channel 7",
+    "url": "https://www.k7.com.na/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "na-observer24-com-na",
+    "title": "observer24.com.na",
+    "url": "https://observer24.com.na/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "na-economist-com-na",
+    "title": "economist.com.na",
+    "url": "http://www.economist.com.na/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "na-southernafrican-news",
+    "title": "southernafrican.news",
+    "url": "https://southernafrican.org/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "na-web-na",
+    "title": "web.na",
+    "url": "http://www.informante.web.na/?feed=rss2",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  }
+]

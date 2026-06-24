@@ -26,31 +26,9 @@
     "regionLabel": "Bakı"
   },
   {
-    "id": "az-az-rtac",
-    "title": "AzərTAc",
-    "url": "https://azertag.az/en/rss",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "az"
-  },
-  {
-    "id": "az-tmb-tv",
-    "title": "TMB TV",
-    "url": "http://www.tmb.tv/feed",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "az"
-  },
-  {
     "id": "az-butov-az-rbaycan",
     "title": "Bütöv Azərbaycan",
-    "url": "https://butov.az/rss.xml",
+    "url": "http://www.butov.az/rss.xml",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -59,17 +37,6 @@
     "lang": "az",
     "region": "AZ-BA",
     "regionLabel": "Bakı"
-  },
-  {
-    "id": "az-k-p-z-televiziyas",
-    "title": "Kəpəz Televiziyası",
-    "url": "http://www.kepeztv.az/rss.xml",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "az"
   },
   {
     "id": "az-qafqaz-tv",
@@ -96,9 +63,31 @@
     "lang": "az"
   },
   {
+    "id": "az-azadl-q-radiosu",
+    "title": "Azadlıq Radiosu",
+    "url": "https://www.azadliq.org/api/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "az"
+  },
+  {
     "id": "az-zerkalo",
     "title": "Zerkalo",
     "url": "http://www.zerkalo.az/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "az"
+  },
+  {
+    "id": "az-k-p-z-televiziyas",
+    "title": "Kəpəz Televiziyası",
+    "url": "http://www.kepeztv.az/rss.xml",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -120,17 +109,6 @@
     "regionLabel": "Bakı"
   },
   {
-    "id": "az-azadl-q-radiosu",
-    "title": "Azadlıq Radiosu",
-    "url": "https://www.azadliq.org/api/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "az"
-  },
-  {
     "id": "az-qafqazinfo",
     "title": "Qafqazinfo",
     "url": "http://qafqazinfo.az/rss",
@@ -146,7 +124,7 @@
   {
     "id": "az-cbc-sport",
     "title": "CBC Sport",
-    "url": "http://www.cbcsport.az/feed/",
+    "url": "http://www.cbcsport.az/feed",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -481,17 +459,6 @@
     "id": "az-metbuat-az",
     "title": "metbuat.az",
     "url": "http://metbuat.az/rss.xml",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "az"
-  },
-  {
-    "id": "az-oxu-az",
-    "title": "oxu.az",
-    "url": "http://ru.oxu.az/feed",
     "kind": "news",
     "topic": "world",
     "lean": null,

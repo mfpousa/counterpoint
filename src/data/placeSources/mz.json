@@ -1,0 +1,59 @@
+[
+  {
+    "id": "mz-radio-mocambique",
+    "title": "Rádio Moçambique",
+    "url": "https://www.rm.co.mz/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "pt",
+    "region": "MZ-MPM",
+    "regionLabel": "Maputo"
+  },
+  {
+    "id": "mz-sapo-pt",
+    "title": "sapo.pt",
+    "url": "http://www.sapo.pt/rss/destaques",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "pt"
+  },
+  {
+    "id": "mz-mmo-co-mz",
+    "title": "mmo.co.mz",
+    "url": "http://www.mmo.co.mz/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "pt"
+  },
+  {
+    "id": "mz-stop-co-mz",
+    "title": "stop.co.mz",
+    "url": "http://www.stop.co.mz/?format=feed&amp;type=rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "pt"
+  },
+  {
+    "id": "mz-savana-co-mz",
+    "title": "savana.co.mz",
+    "url": "https://savana.co.mz/?feed=rss2",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "pt"
+  }
+]

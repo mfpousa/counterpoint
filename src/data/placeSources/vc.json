@@ -1,0 +1,57 @@
+[
+  {
+    "id": "vc-searchlight",
+    "title": "Searchlight",
+    "url": "https://www.searchlight.vc/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "vc-stvincenttribune-com",
+    "title": "stvincenttribune.com",
+    "url": "http://www.stvincenttribune.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "vc-nbcsvg-com",
+    "title": "nbcsvg.com",
+    "url": "https://www.nbcsvg.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "vc-iwnsvg-com",
+    "title": "iwnsvg.com",
+    "url": "https://www.iwnsvg.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "vc-999wefm-com",
+    "title": "999wefm.com",
+    "url": "https://999wefm.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  }
+]

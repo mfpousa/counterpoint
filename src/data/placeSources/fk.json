@@ -1,0 +1,24 @@
+[
+  {
+    "id": "fk-falkland-islands-television",
+    "title": "Falkland Islands Television",
+    "url": "http://www.fitv.co.fk/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "fk-mercopress-com",
+    "title": "mercopress.com",
+    "url": "http://mercopress.com/rss/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  }
+]

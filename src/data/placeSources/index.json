@@ -728,5 +728,400 @@
     "label": "United Kingdom",
     "continent": "europe",
     "continentLabel": "Europe"
+  },
+  "ao": {
+    "label": "Angola",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "bf": {
+    "label": "Burkina Faso",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "bi": {
+    "label": "Burundi",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "bj": {
+    "label": "Benin",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "bw": {
+    "label": "Botswana",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "cd": {
+    "label": "Democratic Republic of the Congo",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "cf": {
+    "label": "Central African Republic",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "cg": {
+    "label": "Republic of the Congo",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "ci": {
+    "label": "Ivory Coast",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "cm": {
+    "label": "Cameroon",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "cv": {
+    "label": "Cape Verde",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "dg": {
+    "label": "Diego Garcia",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "dj": {
+    "label": "Djibouti",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "ar": {
+    "label": "Argentina",
+    "continent": "south-america",
+    "continentLabel": "South America"
+  },
+  "bo": {
+    "label": "Bolivia",
+    "continent": "south-america",
+    "continentLabel": "South America"
+  },
+  "dz": {
+    "label": "Algeria",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "eg": {
+    "label": "Egypt",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "eh": {
+    "label": "Western Sahara",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "er": {
+    "label": "Eritrea",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "et": {
+    "label": "Ethiopia",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "ga": {
+    "label": "Gabon",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "gh": {
+    "label": "Ghana",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "gm": {
+    "label": "The Gambia",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "gn": {
+    "label": "Guinea",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "gq": {
+    "label": "Equatorial Guinea",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "gw": {
+    "label": "Guinea-Bissau",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "io": {
+    "label": "British Indian Ocean Territory",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "br": {
+    "label": "Brazil",
+    "continent": "south-america",
+    "continentLabel": "South America"
+  },
+  "ke": {
+    "label": "Kenya",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "km": {
+    "label": "Comoros",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "lr": {
+    "label": "Liberia",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "ls": {
+    "label": "Lesotho",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "ly": {
+    "label": "Libya",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "cl": {
+    "label": "Chile",
+    "continent": "south-america",
+    "continentLabel": "South America"
+  },
+  "ma": {
+    "label": "Morocco",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "mg": {
+    "label": "Madagascar",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "ml": {
+    "label": "Mali",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "co": {
+    "label": "Colombia",
+    "continent": "south-america",
+    "continentLabel": "South America"
+  },
+  "mr": {
+    "label": "Mauritania",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "ec": {
+    "label": "Ecuador",
+    "continent": "south-america",
+    "continentLabel": "South America"
+  },
+  "fk": {
+    "label": "Falkland Islands",
+    "continent": "south-america",
+    "continentLabel": "South America"
+  },
+  "gf": {
+    "label": "French Guiana",
+    "continent": "south-america",
+    "continentLabel": "South America"
+  },
+  "gs": {
+    "label": "South Georgia and the South Sandwich Islands",
+    "continent": "south-america",
+    "continentLabel": "South America"
+  },
+  "mu": {
+    "label": "Mauritius",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "gy": {
+    "label": "Guyana",
+    "continent": "south-america",
+    "continentLabel": "South America"
+  },
+  "mw": {
+    "label": "Malawi",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "mz": {
+    "label": "Mozambique",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "na": {
+    "label": "Namibia",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "pe": {
+    "label": "Peru",
+    "continent": "south-america",
+    "continentLabel": "South America"
+  },
+  "ne": {
+    "label": "Niger",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "py": {
+    "label": "Paraguay",
+    "continent": "south-america",
+    "continentLabel": "South America"
+  },
+  "sr": {
+    "label": "Suriname",
+    "continent": "south-america",
+    "continentLabel": "South America"
+  },
+  "uy": {
+    "label": "Uruguay",
+    "continent": "south-america",
+    "continentLabel": "South America"
+  },
+  "ng": {
+    "label": "Nigeria",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "re": {
+    "label": "Réunion",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "rw": {
+    "label": "Rwanda",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "sc": {
+    "label": "Seychelles",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "ve": {
+    "label": "Venezuela",
+    "continent": "south-america",
+    "continentLabel": "South America"
+  },
+  "sd": {
+    "label": "Sudan",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "sh": {
+    "label": "Saint Helena, Ascension and Tristan da Cunha",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "sl": {
+    "label": "Sierra Leone",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "sn": {
+    "label": "Senegal",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "us": {
+    "label": "United States",
+    "continent": "north-america",
+    "continentLabel": "North America"
+  },
+  "vc": {
+    "label": "Saint Vincent and the Grenadines",
+    "continent": "north-america",
+    "continentLabel": "North America"
+  },
+  "so": {
+    "label": "Somalia",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "ss": {
+    "label": "South Sudan",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "st": {
+    "label": "São Tomé and Príncipe",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "sz": {
+    "label": "Eswatini",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "td": {
+    "label": "Chad",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "tf": {
+    "label": "French Southern and Antarctic Lands",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "vg": {
+    "label": "British Virgin Islands",
+    "continent": "north-america",
+    "continentLabel": "North America"
+  },
+  "tg": {
+    "label": "Togo",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "tn": {
+    "label": "Tunisia",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "tz": {
+    "label": "Tanzania",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "ug": {
+    "label": "Uganda",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "yt": {
+    "label": "Mayotte",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "za": {
+    "label": "South Africa",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "zm": {
+    "label": "Zambia",
+    "continent": "africa",
+    "continentLabel": "Africa"
+  },
+  "zw": {
+    "label": "Zimbabwe",
+    "continent": "africa",
+    "continentLabel": "Africa"
   }
 }

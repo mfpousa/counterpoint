@@ -64,16 +64,5 @@
     "confidence": 0.4,
     "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
     "lang": "nl"
-  },
-  {
-    "id": "sx-pearlfmradio-sx",
-    "title": "pearlfmradio.sx",
-    "url": "http://pearlfmradio.sx/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "nl"
   }
 ]

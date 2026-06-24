@@ -24,6 +24,17 @@
     "lang": "ps"
   },
   {
+    "id": "af-src-3",
+    "title": "سپوږمۍ اېف اېم راډیو",
+    "url": "https://www.spogmairadio.com/?feed=rss2",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ps"
+  },
+  {
     "id": "af-azadiradio-com",
     "title": "azadiradio.com",
     "url": "http://da.azadiradio.com/api/",
@@ -126,6 +137,17 @@
     "id": "af-shamshadtv-tv",
     "title": "shamshadtv.tv",
     "url": "http://www.shamshadtv.tv/index.php?format=feed&amp;type=rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ps"
+  },
+  {
+    "id": "af-larawbar-net",
+    "title": "larawbar.net",
+    "url": "https://larawbar.net/feed",
     "kind": "news",
     "topic": "world",
     "lean": null,

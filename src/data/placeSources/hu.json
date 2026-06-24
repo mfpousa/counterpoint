@@ -155,6 +155,17 @@
     "lang": "hu"
   },
   {
+    "id": "hu-hocipo",
+    "title": "Hócipő",
+    "url": "http://www.hocipo.hu/rss/generate",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "hu"
+  },
+  {
     "id": "hu-index-hu",
     "title": "Index.hu",
     "url": "http://www.index.hu/24ora/rss/",
@@ -166,6 +177,28 @@
     "lang": "hu",
     "region": "HU-BU",
     "regionLabel": "Budapest"
+  },
+  {
+    "id": "hu-kiskegyed",
+    "title": "Kiskegyed",
+    "url": "https://www.kiskegyed.hu/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "hu"
+  },
+  {
+    "id": "hu-garfield-magazin",
+    "title": "Garfield magazin",
+    "url": "https://garfieldmagazin.hu/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "hu"
   },
   {
     "id": "hu-mozgo-vilag",
@@ -182,52 +215,6 @@
     "id": "hu-merleg",
     "title": "Mérleg",
     "url": "https://www.merleg.org/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "hu"
-  },
-  {
-    "id": "hu-kossuth-radio",
-    "title": "Kossuth Rádió",
-    "url": "http://www.mr1-kossuth.hu/feed",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "hu",
-    "region": "HU-BU",
-    "regionLabel": "Budapest"
-  },
-  {
-    "id": "hu-garfield-magazin",
-    "title": "Garfield magazin",
-    "url": "https://garfieldmagazin.hu/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "hu"
-  },
-  {
-    "id": "hu-hocipo",
-    "title": "Hócipő",
-    "url": "http://www.hocipo.hu/rss/generate",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "hu"
-  },
-  {
-    "id": "hu-kiskegyed",
-    "title": "Kiskegyed",
-    "url": "https://www.kiskegyed.hu/rss",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -286,15 +273,17 @@
     "regionLabel": "Veszprém vármegye"
   },
   {
-    "id": "hu-hir-tv",
-    "title": "Hír TV",
-    "url": "https://hirtv.origo.hu/publicapi/hu/rss/hirtv/articles",
+    "id": "hu-kossuth-radio",
+    "title": "Kossuth Rádió",
+    "url": "http://www.mr1-kossuth.hu/feed",
     "kind": "news",
     "topic": "world",
     "lean": null,
     "confidence": 0.4,
     "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "hu"
+    "lang": "hu",
+    "region": "HU-BU",
+    "regionLabel": "Budapest"
   },
   {
     "id": "hu-rozsdakupac",
@@ -330,17 +319,26 @@
     "lang": "hu"
   },
   {
-    "id": "hu-444-hu",
-    "title": "444.hu",
-    "url": "https://444.hu/feed",
+    "id": "hu-atlatszo",
+    "title": "Átlátszó",
+    "url": "https://atlatszo.hu/feed/",
     "kind": "news",
     "topic": "world",
     "lean": null,
     "confidence": 0.4,
     "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "hu",
-    "region": "HU-BU",
-    "regionLabel": "Budapest"
+    "lang": "hu"
+  },
+  {
+    "id": "hu-hir-tv",
+    "title": "Hír TV",
+    "url": "https://hirtv.origo.hu/publicapi/hu/rss/hirtv/articles",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "hu"
   },
   {
     "id": "hu-viasat-3",
@@ -356,15 +354,17 @@
     "regionLabel": "Budapest"
   },
   {
-    "id": "hu-atlatszo",
-    "title": "Átlátszó",
-    "url": "https://atlatszo.hu/feed/",
+    "id": "hu-444-hu",
+    "title": "444.hu",
+    "url": "https://444.hu/feed",
     "kind": "news",
     "topic": "world",
     "lean": null,
     "confidence": 0.4,
     "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "hu"
+    "lang": "hu",
+    "region": "HU-BU",
+    "regionLabel": "Budapest"
   },
   {
     "id": "hu-vilaggazdasag",
@@ -394,41 +394,6 @@
     "id": "hu-forbes",
     "title": "Forbes",
     "url": "http://forbes.hu/feed",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "hu"
-  },
-  {
-    "id": "hu-mandiner-hu",
-    "title": "Mandiner.hu",
-    "url": "https://mandiner.hu/publicapi/hu/rss/mandiner/articles",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "hu",
-    "region": "HU-BU",
-    "regionLabel": "Budapest"
-  },
-  {
-    "id": "hu-telex-hu",
-    "title": "Telex.hu",
-    "url": "https://telex.hu/rss",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "hu"
-  },
-  {
-    "id": "hu-g7-hu",
-    "title": "g7.hu",
-    "url": "https://g7.hu/rss",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -490,6 +455,41 @@
     "id": "hu-hwsw",
     "title": "HWSW",
     "url": "http://hwsw.hu/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "hu"
+  },
+  {
+    "id": "hu-mandiner-hu",
+    "title": "Mandiner.hu",
+    "url": "https://mandiner.hu/publicapi/hu/rss/mandiner/articles",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "hu",
+    "region": "HU-BU",
+    "regionLabel": "Budapest"
+  },
+  {
+    "id": "hu-telex-hu",
+    "title": "Telex.hu",
+    "url": "https://telex.hu/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "hu"
+  },
+  {
+    "id": "hu-g7-hu",
+    "title": "g7.hu",
+    "url": "https://g7.hu/rss",
     "kind": "news",
     "topic": "world",
     "lean": null,

@@ -221,7 +221,7 @@
   {
     "id": "md-estcurier-md",
     "title": "estcurier.md",
-    "url": "http://estcurier.md/feed/",
+    "url": "http://estcurier.md/feed",
     "kind": "news",
     "topic": "world",
     "lean": null,

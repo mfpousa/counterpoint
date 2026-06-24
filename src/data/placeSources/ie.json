@@ -72,6 +72,28 @@
     "lang": "ga"
   },
   {
+    "id": "ie-clare-fm",
+    "title": "Clare FM",
+    "url": "https://www.clare.fm/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ga"
+  },
+  {
+    "id": "ie-103-2-dublin-city-fm",
+    "title": "103.2 Dublin City FM",
+    "url": "https://dublincityfm.ie/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ga"
+  },
+  {
     "id": "ie-limerick-leader",
     "title": "Limerick Leader",
     "url": "https://www.limerickleader.ie/rss",
@@ -131,31 +153,9 @@
     "lang": "ga"
   },
   {
-    "id": "ie-clare-fm",
-    "title": "Clare FM",
-    "url": "https://www.clare.fm/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "ga"
-  },
-  {
-    "id": "ie-103-2-dublin-city-fm",
-    "title": "103.2 Dublin City FM",
-    "url": "https://dublincityfm.ie/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "ga"
-  },
-  {
     "id": "ie-flirt-fm",
     "title": "Flirt FM",
-    "url": "http://www.flirtfm.ie/feed",
+    "url": "http://www.flirtfm.ie/rss",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -265,6 +265,17 @@
     "lang": "ga"
   },
   {
+    "id": "ie-thejournal-ie",
+    "title": "TheJournal.ie",
+    "url": "http://www.thejournal.ie/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ga"
+  },
+  {
     "id": "ie-the-echo",
     "title": "The Echo",
     "url": "https://www.echo.ie/feed/",
@@ -315,7 +326,7 @@
   {
     "id": "ie-tipperary-mid-west-community-radio",
     "title": "Tipperary Mid-West Community Radio",
-    "url": "http://www.tippmidwestradio.com/feed",
+    "url": "http://www.tippmidwestradio.com/?feed=rss2",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -338,17 +349,6 @@
     "id": "ie-wlr-fm",
     "title": "WLR FM",
     "url": "http://wlrfm.com/feed",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "ga"
-  },
-  {
-    "id": "ie-thejournal-ie",
-    "title": "TheJournal.ie",
-    "url": "http://www.thejournal.ie/feed/",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -412,6 +412,19 @@
     "lang": "ga",
     "region": "IE-C",
     "regionLabel": "Cúige Chonnacht"
+  },
+  {
+    "id": "ie-raidio-pobail-chathair-chorcai",
+    "title": "Raidió Pobail Chathair Chorcaí",
+    "url": "https://cr.ie/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ga",
+    "region": "IE-M",
+    "regionLabel": "Cúige Mumhan"
   },
   {
     "id": "ie-ireland-s-classic-hits-radio",

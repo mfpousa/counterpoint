@@ -325,17 +325,6 @@
     "lang": "es"
   },
   {
-    "id": "cr-eljornalcr-com",
-    "title": "eljornalcr.com",
-    "url": "https://eljornalcr.com/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "es"
-  },
-  {
     "id": "cr-elcolectivo506-com",
     "title": "elcolectivo506.com",
     "url": "https://elcolectivo506.com/feed",

@@ -1,0 +1,46 @@
+[
+  {
+    "id": "dj-rtd-1",
+    "title": "RTD 1",
+    "url": "https://rtd.dj/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "dj-adi-dj",
+    "title": "adi.dj",
+    "url": "https://www.adi.dj/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "dj-laprosperiteonline-net",
+    "title": "laprosperiteonline.net",
+    "url": "http://laprosperiteonline.net/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "dj-djibnet-com",
+    "title": "djibnet.com",
+    "url": "https://www.dahaboo.com/feeds/rss.php",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  }
+]

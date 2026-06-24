@@ -1,34 +1,8 @@
 [
   {
-    "id": "sk-ta3",
-    "title": "TA3",
-    "url": "https://www.ta3.com/rss/top-spravy",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "sk",
-    "region": "SK-BL",
-    "regionLabel": "Bratislavský kraj"
-  },
-  {
     "id": "sk-sme",
     "title": "SME",
     "url": "https://www.sme.sk/rss",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "sk",
-    "region": "SK-BL",
-    "regionLabel": "Bratislavský kraj"
-  },
-  {
-    "id": "sk-the-slovak-spectator",
-    "title": "The Slovak Spectator",
-    "url": "http://spectator.sme.sk/rss",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -52,9 +26,9 @@
     "regionLabel": "Košický kraj"
   },
   {
-    "id": "sk-slovenska-tlacova-agentura",
-    "title": "Slovenská tlačová agentúra",
-    "url": "https://www.sita.sk/feed",
+    "id": "sk-ta3",
+    "title": "TA3",
+    "url": "https://www.ta3.com/rss/top-spravy",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -349,17 +323,6 @@
     "id": "sk-tvpoprad-sk",
     "title": "tvpoprad.sk",
     "url": "https://www.tvpoprad.sk/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "sk"
-  },
-  {
-    "id": "sk-webnoviny-sk",
-    "title": "webnoviny.sk",
-    "url": "http://webnoviny.sk/feed",
     "kind": "news",
     "topic": "world",
     "lean": null,

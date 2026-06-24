@@ -120,6 +120,17 @@
     "regionLabel": "Моравички управни округ"
   },
   {
+    "id": "rs-belle-amie",
+    "title": "Belle Amie",
+    "url": "https://belami.rs/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "sr"
+  },
+  {
     "id": "rs-european-western-balkans",
     "title": "European Western Balkans",
     "url": "http://europeanwesternbalkans.com/feed/",
@@ -157,17 +168,6 @@
     "lang": "sr",
     "region": "RS-00",
     "regionLabel": "Град Београд"
-  },
-  {
-    "id": "rs-belle-amie",
-    "title": "Belle Amie",
-    "url": "https://belami.rs/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "sr"
   },
   {
     "id": "rs-src-8",
@@ -603,6 +603,17 @@
     "lang": "sr"
   },
   {
+    "id": "rs-glasamerike-net",
+    "title": "glasamerike.net",
+    "url": "http://glasamerike.net/api/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "sr"
+  },
+  {
     "id": "rs-svet-rs",
     "title": "svet.rs",
     "url": "https://svet-scandal.rs/feed/",
@@ -738,6 +749,17 @@
     "id": "rs-radiostoplus-com",
     "title": "radiostoplus.com",
     "url": "http://www.radiostoplus.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "sr"
+  },
+  {
+    "id": "rs-somborskenovine-co-rs",
+    "title": "somborskenovine.co.rs",
+    "url": "http://www.somborskenovine.co.rs/atom.xml",
     "kind": "news",
     "topic": "world",
     "lean": null,

@@ -1,6 +1,19 @@
 [
   {
     "id": "il-src",
+    "title": "ישראל היום",
+    "url": "https://www.israelhayom.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "he",
+    "region": "IL-TA",
+    "regionLabel": "מחוז תל אביב"
+  },
+  {
+    "id": "il-src-2",
     "title": "גלובס",
     "url": "https://www.globes.co.il/webservice/rss/rssfeeder.asmx/FeederNode?iID=585",
     "kind": "news",
@@ -13,7 +26,7 @@
     "regionLabel": "מחוז תל אביב"
   },
   {
-    "id": "il-src-2",
+    "id": "il-src-3",
     "title": "רדיו קול חי",
     "url": "https://www.93fm.co.il/feed",
     "kind": "news",
@@ -39,7 +52,7 @@
     "regionLabel": "מחוז ירושלים"
   },
   {
-    "id": "il-src-3",
+    "id": "il-src-4",
     "title": "פוליסה (עיתון)",
     "url": "https://polisa.news/feed/",
     "kind": "news",
@@ -50,7 +63,7 @@
     "lang": "he"
   },
   {
-    "id": "il-src-4",
+    "id": "il-src-5",
     "title": "טבע הדברים",
     "url": "https://tevahadvarim.co.il/feed/",
     "kind": "news",
@@ -61,7 +74,7 @@
     "lang": "he"
   },
   {
-    "id": "il-src-5",
+    "id": "il-src-6",
     "title": "זו הדרך",
     "url": "https://zoha.org.il/feed/",
     "kind": "news",
@@ -72,9 +85,9 @@
     "lang": "he"
   },
   {
-    "id": "il-src-6",
+    "id": "il-src-7",
     "title": "דבר",
-    "url": "https://en.davar1.co.il/feed",
+    "url": "https://en.davar1.co.il/feed/",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -85,7 +98,7 @@
     "regionLabel": "מחוז תל אביב"
   },
   {
-    "id": "il-src-7",
+    "id": "il-src-8",
     "title": "רדיו חיפה",
     "url": "https://1075.fm/feed/",
     "kind": "news",
@@ -96,7 +109,7 @@
     "lang": "he"
   },
   {
-    "id": "il-src-8",
+    "id": "il-src-9",
     "title": "פרוויה רדיו",
     "url": "https://www.891fm.co.il/feed/",
     "kind": "news",
@@ -120,7 +133,7 @@
     "lang": "he"
   },
   {
-    "id": "il-src-9",
+    "id": "il-src-10",
     "title": "בחדרי חרדים",
     "url": "http://www.bhol.co.il/feed",
     "kind": "news",
@@ -131,7 +144,7 @@
     "lang": "he"
   },
   {
-    "id": "il-src-10",
+    "id": "il-src-11",
     "title": "רדיו קול ברמה",
     "url": "http://www.kol-barama.co.il/feed",
     "kind": "news",
@@ -153,7 +166,7 @@
     "lang": "he"
   },
   {
-    "id": "il-src-11",
+    "id": "il-src-12",
     "title": "אותיות וילדים",
     "url": "https://otiyotveyeladim.co.il/feed/",
     "kind": "news",
@@ -164,7 +177,7 @@
     "lang": "he"
   },
   {
-    "id": "il-src-12",
+    "id": "il-src-13",
     "title": "א-סנארה (אתר אינטרנט)",
     "url": "https://sonara.net/feed/",
     "kind": "news",
@@ -175,7 +188,7 @@
     "lang": "he"
   },
   {
-    "id": "il-src-13",
+    "id": "il-src-14",
     "title": "אפוק טיימס ישראל",
     "url": "https://epoch.org.il/feed",
     "kind": "news",
@@ -186,7 +199,7 @@
     "lang": "he"
   },
   {
-    "id": "il-src-14",
+    "id": "il-src-15",
     "title": "סרוגים",
     "url": "https://www.srugim.co.il/feed",
     "kind": "news",
@@ -208,7 +221,7 @@
     "lang": "he"
   },
   {
-    "id": "il-src-15",
+    "id": "il-src-16",
     "title": "ערוץ מוסאווא",
     "url": "http://www.musawachannel.com/rss.xml",
     "kind": "news",
@@ -230,7 +243,7 @@
     "lang": "he"
   },
   {
-    "id": "il-src-16",
+    "id": "il-src-17",
     "title": "רדיו זה רוק",
     "url": "https://zerockradio.com/feed/",
     "kind": "news",
@@ -241,9 +254,9 @@
     "lang": "he"
   },
   {
-    "id": "il-src-17",
+    "id": "il-src-18",
     "title": "זמן ישראל",
-    "url": "https://www.zman.co.il/feed",
+    "url": "https://www.zman.co.il/feed/",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -252,7 +265,7 @@
     "lang": "he"
   },
   {
-    "id": "il-src-18",
+    "id": "il-src-19",
     "title": "ג'ייפיד - חדשות ישראל",
     "url": "https://a.jfeed.com/v1/rss/articles/latest/rss2",
     "kind": "news",

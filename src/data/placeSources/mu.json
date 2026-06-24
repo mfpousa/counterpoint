@@ -1,0 +1,112 @@
+[
+  {
+    "id": "mu-le-mauricien",
+    "title": "Le Mauricien",
+    "url": "http://lemauricien.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "mu-radio-plus",
+    "title": "Radio Plus",
+    "url": "https://live.radioplus.mu/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "mu-defimedia-info",
+    "title": "defimedia.info",
+    "url": "http://defimedia.info/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "mu-maurice-info-mu",
+    "title": "maurice-info.mu",
+    "url": "https://maurice-info.mu/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "mu-ionnews-mu",
+    "title": "ionnews.mu",
+    "url": "https://ionnews.mu/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "mu-mauritiustimes-com",
+    "title": "mauritiustimes.com",
+    "url": "https://www.mauritiustimes.com/mt/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "mu-starpress-info",
+    "title": "starpress.info",
+    "url": "https://starpress.info/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "mu-ecoaustral-com",
+    "title": "ecoaustral.com",
+    "url": "https://ecoaustral.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "mu-peoplepress-co",
+    "title": "peoplepress.co",
+    "url": "https://peoplepress.co/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "mu-ilemaurice-tourisme-info",
+    "title": "ilemaurice-tourisme.info",
+    "url": "https://www.ilemaurice-tourisme.info/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  }
+]

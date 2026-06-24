@@ -1,0 +1,145 @@
+[
+  {
+    "id": "gn-agence-guineenne-de-presse",
+    "title": "Agence guinéenne de presse",
+    "url": "https://agpguinee.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fr"
+  },
+  {
+    "id": "gn-guineenews",
+    "title": "Guinéenews",
+    "url": "https://guineenews.org/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fr"
+  },
+  {
+    "id": "gn-mediaguinee",
+    "title": "Mediaguinee",
+    "url": "https://mediaguinee.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fr"
+  },
+  {
+    "id": "gn-kadi-fm",
+    "title": "Kadi FM",
+    "url": "https://www.kadifm.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fr"
+  },
+  {
+    "id": "gn-vision-guinee",
+    "title": "Vision Guinee",
+    "url": "https://www.visionguinee.info/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fr"
+  },
+  {
+    "id": "gn-africaguinee",
+    "title": "Africaguinee",
+    "url": "https://www.africaguinee.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fr"
+  },
+  {
+    "id": "gn-guinee360-com",
+    "title": "guinee360.com",
+    "url": "https://www.guinee360.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fr"
+  },
+  {
+    "id": "gn-guinee7-com",
+    "title": "guinee7.com",
+    "url": "https://www.guinee7.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fr"
+  },
+  {
+    "id": "gn-lelynx-net",
+    "title": "lelynx.net",
+    "url": "https://lelynx.net/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fr"
+  },
+  {
+    "id": "gn-lejourguinee-com",
+    "title": "lejourguinee.com",
+    "url": "https://www.lejourguinee.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fr"
+  },
+  {
+    "id": "gn-conakryonline-com",
+    "title": "conakryonline.com",
+    "url": "https://www.conakryonline.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fr"
+  },
+  {
+    "id": "gn-aminata-com",
+    "title": "aminata.com",
+    "url": "https://aminata.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fr"
+  },
+  {
+    "id": "gn-guineepresse-info",
+    "title": "guineepresse.info",
+    "url": "http://guineepresse.info/index.php?format=feed&amp;type=rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fr"
+  }
+]

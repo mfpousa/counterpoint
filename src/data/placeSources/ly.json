@@ -1,0 +1,92 @@
+[
+  {
+    "id": "ly-src",
+    "title": "ليبيا الأحرار",
+    "url": "https://libyaalahrar.tv/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "ly-src-2",
+    "title": "قناة ليبيا",
+    "url": "https://libyaschannel.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "ly-src-3",
+    "title": "قناة ليبيا بانوراما",
+    "url": "https://www.lpc.ly/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "ly-aljamahiriya-tv",
+    "title": "Aljamahiriya TV",
+    "url": "https://www.lj-bc.tv/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "ly-libya-alrasmia-channel",
+    "title": "Libya Alrasmia Channel",
+    "url": "https://alrasmia.ly/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar",
+    "region": "LY-TB",
+    "regionLabel": "شعبية طرابلس"
+  },
+  {
+    "id": "ly-akhbarlibya24-net",
+    "title": "akhbarlibya24.net",
+    "url": "https://akhbarlibya24.net/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "ly-libyaherald-com",
+    "title": "libyaherald.com",
+    "url": "https://libyaherald.com/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "ly-arungmedia-com",
+    "title": "arungmedia.com",
+    "url": "https://arungmedia.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  }
+]

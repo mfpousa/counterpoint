@@ -139,30 +139,15 @@
     "regionLabel": "Chihuahua"
   },
   {
-    "id": "mx-la-prensa-mexico",
-    "title": "La Prensa (México)",
-    "url": "http://www.la-prensa.com.mx/rss",
+    "id": "mx-unomasuno",
+    "title": "unomásuno",
+    "url": "https://unomasuno.com.mx/feed/",
     "kind": "news",
     "topic": "world",
     "lean": null,
     "confidence": 0.4,
     "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "es",
-    "region": "MX-CHH",
-    "regionLabel": "Chihuahua"
-  },
-  {
-    "id": "mx-juarez-hoy",
-    "title": "Juárez Hoy",
-    "url": "https://juarezhoy.com.mx/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "es",
-    "region": "MX-CHH",
-    "regionLabel": "Chihuahua"
+    "lang": "es"
   },
   {
     "id": "mx-hidrocalido",
@@ -373,7 +358,7 @@
   {
     "id": "mx-noticias-de-chiapas",
     "title": "Noticias de Chiapas",
-    "url": "http://noticiasdechiapas.com.mx/feed",
+    "url": "https://noticiasdechiapas.com.mx/feed/",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -486,19 +471,6 @@
     "lang": "es",
     "region": "MX-COA",
     "regionLabel": "Coahuila de Zaragoza"
-  },
-  {
-    "id": "mx-el-sol-de-sinaloa",
-    "title": "El Sol de Sinaloa",
-    "url": "http://www.elsoldesinaloa.com.mx/rss",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "es",
-    "region": "MX-SIN",
-    "regionLabel": "Sinaloa"
   },
   {
     "id": "mx-xhltn-fm",
@@ -635,43 +607,6 @@
     "lang": "es"
   },
   {
-    "id": "mx-la-opinion-de-poza-rica",
-    "title": "La Opinión De Poza Rica",
-    "url": "http://www.laopinion.com.mx/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "es",
-    "region": "MX-VER",
-    "regionLabel": "Estado de Veracruz"
-  },
-  {
-    "id": "mx-el-diario-de-juarez",
-    "title": "El Diario de Juárez",
-    "url": "https://diario.mx/rss/feed.xml",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "es"
-  },
-  {
-    "id": "mx-el-diario-de-chihuahua",
-    "title": "El Diario de Chihuahua",
-    "url": "https://www.eldiariodechihuahua.mx/rss/feed.xml",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "es",
-    "region": "MX-CHH",
-    "regionLabel": "Chihuahua"
-  },
-  {
     "id": "mx-sdpnoticias",
     "title": "SDPNoticias",
     "url": "https://www.sdpnoticias.com/arc/outboundfeeds/rss/?outputType=xml",
@@ -705,6 +640,19 @@
     "lang": "es",
     "region": "MX-CHH",
     "regionLabel": "Chihuahua"
+  },
+  {
+    "id": "mx-xhfaj-fm",
+    "title": "XHFAJ-FM",
+    "url": "https://alfaenlinea.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "es",
+    "region": "MX-CMX",
+    "regionLabel": "Ciudad de México"
   },
   {
     "id": "mx-cinco-radio",
@@ -768,9 +716,22 @@
     "lang": "es"
   },
   {
-    "id": "mx-xhle-fm",
-    "title": "XHLE-FM",
-    "url": "http://www.grupomiradio.mx/rss.xml",
+    "id": "mx-xeun-am",
+    "title": "XEUN-AM",
+    "url": "http://www.radiounam.unam.mx/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "es",
+    "region": "MX-CMX",
+    "regionLabel": "Ciudad de México"
+  },
+  {
+    "id": "mx-radio-teocelo",
+    "title": "Radio Teocelo",
+    "url": "http://radioteocelo.org.mx/feed/",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -781,17 +742,96 @@
     "regionLabel": "Estado de Veracruz"
   },
   {
-    "id": "mx-xhemy-fm",
-    "title": "XHEMY-FM",
-    "url": "https://ort.com.mx/feed/",
+    "id": "mx-xhbak-fm",
+    "title": "XHBAK-FM",
+    "url": "https://achlequilcop.org/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "es"
+  },
+  {
+    "id": "mx-xheli-fm",
+    "title": "XHELI-FM",
+    "url": "http://uvaq.edu.mx/feed",
     "kind": "news",
     "topic": "world",
     "lean": null,
     "confidence": 0.4,
     "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
     "lang": "es",
-    "region": "MX-TAM",
-    "regionLabel": "Tamaulipas"
+    "region": "MX-MIC",
+    "regionLabel": "Michoacán"
+  },
+  {
+    "id": "mx-xear-am",
+    "title": "XEAR-AM",
+    "url": "http://www.grupoasradio.com/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "es",
+    "region": "MX-VER",
+    "regionLabel": "Estado de Veracruz"
+  },
+  {
+    "id": "mx-xebg-am",
+    "title": "XEBG-AM",
+    "url": "https://cadenanoticias.com/feed/principal",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "es"
+  },
+  {
+    "id": "mx-xhbj-fm",
+    "title": "XHBJ-FM",
+    "url": "http://ort.com.mx/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "es"
+  },
+  {
+    "id": "mx-xhck-fm",
+    "title": "XHCK-FM",
+    "url": "http://maspopfm.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "es"
+  },
+  {
+    "id": "mx-xhdrd-fm",
+    "title": "XHDRD-FM",
+    "url": "https://radioramadurango.mx/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "es"
+  },
+  {
+    "id": "mx-xehi-am",
+    "title": "XEHI-AM",
+    "url": "http://www.grupomiradio.mx/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "es"
   },
   {
     "id": "mx-xeprs-am",
@@ -825,19 +865,6 @@
     "confidence": 0.4,
     "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
     "lang": "es"
-  },
-  {
-    "id": "mx-xerrt-am",
-    "title": "XERRT-AM",
-    "url": "http://www.grupoasradio.com/rss.xml",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "es",
-    "region": "MX-TAM",
-    "regionLabel": "Tamaulipas"
   },
   {
     "id": "mx-xhrlk-fm",
@@ -877,44 +904,9 @@
     "lang": "es"
   },
   {
-    "id": "mx-xhemm-fm",
-    "title": "XHEMM-FM",
-    "url": "http://mixfm.mx/feed",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "es",
-    "region": "MX-MIC",
-    "regionLabel": "Michoacán"
-  },
-  {
-    "id": "mx-xebg-am",
-    "title": "XEBG-AM",
-    "url": "https://cadenanoticias.com/feed/principal",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "es"
-  },
-  {
-    "id": "mx-xhck-fm",
-    "title": "XHCK-FM",
-    "url": "http://maspopfm.com/feed",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "es"
-  },
-  {
-    "id": "mx-xhdrd-fm",
-    "title": "XHDRD-FM",
-    "url": "https://radioramadurango.mx/feed/",
+    "id": "mx-xetra-fm",
+    "title": "XETRA-FM",
+    "url": "https://www.91x.com/feed/",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -1045,19 +1037,6 @@
     "regionLabel": "Ciudad de México"
   },
   {
-    "id": "mx-xel-am",
-    "title": "XEL-AM",
-    "url": "https://lacomadre.mx/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "es",
-    "region": "MX-MEX",
-    "regionLabel": "Estado de México"
-  },
-  {
     "id": "mx-xhrr-fm",
     "title": "XHRR-FM",
     "url": "https://clublaley1025.com/feed/",
@@ -1071,22 +1050,35 @@
     "regionLabel": "Tamaulipas"
   },
   {
-    "id": "mx-xeq-fm",
-    "title": "XEQ-FM",
-    "url": "http://www.kebuena.com.mx/feed",
+    "id": "mx-xhkh-fm",
+    "title": "XHKH-FM",
+    "url": "https://topmusic.mx/feed/",
     "kind": "news",
     "topic": "world",
     "lean": null,
     "confidence": 0.4,
     "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
     "lang": "es",
-    "region": "MX-CMX",
-    "regionLabel": "Ciudad de México"
+    "region": "MX-QUE",
+    "regionLabel": "Querétaro"
   },
   {
-    "id": "mx-radio-sonora",
-    "title": "Radio Sonora",
-    "url": "https://www.radiosonora.com.mx/feed/",
+    "id": "mx-xhgv-fm",
+    "title": "XHGV-FM",
+    "url": "http://mixfm.mx/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "es",
+    "region": "MX-QUE",
+    "regionLabel": "Querétaro"
+  },
+  {
+    "id": "mx-xhlh-fm",
+    "title": "XHLH-FM",
+    "url": "http://www.lapatrona981fm.com/feed",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -1095,35 +1087,22 @@
     "lang": "es"
   },
   {
-    "id": "mx-radio-unam",
-    "title": "Radio UNAM",
-    "url": "https://www.radio.unam.mx/feed/",
+    "id": "mx-xhen-fm",
+    "title": "XHEN-FM",
+    "url": "https://manybackgrounds.com/image/feed",
     "kind": "news",
     "topic": "world",
     "lean": null,
     "confidence": 0.4,
     "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
     "lang": "es",
-    "region": "MX-CMX",
-    "regionLabel": "Ciudad de México"
+    "region": "MX-COA",
+    "regionLabel": "Coahuila de Zaragoza"
   },
   {
-    "id": "mx-radio-teocelo",
-    "title": "Radio Teocelo",
-    "url": "http://radioteocelo.org.mx/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "es",
-    "region": "MX-VER",
-    "regionLabel": "Estado de Veracruz"
-  },
-  {
-    "id": "mx-xhbak-fm",
-    "title": "XHBAK-FM",
-    "url": "https://achlequilcop.org/feed/",
+    "id": "mx-xhrpo-fm",
+    "title": "XHRPO-FM",
+    "url": "http://lazradio.com.mx/oaxaca/feed",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -1132,59 +1111,44 @@
     "lang": "es"
   },
   {
-    "id": "mx-xheli-fm",
-    "title": "XHELI-FM",
-    "url": "http://uvaq.edu.mx/feed",
+    "id": "mx-xhiu-fm",
+    "title": "XHIU-FM",
+    "url": "http://amorfm.mx/feed",
     "kind": "news",
     "topic": "world",
     "lean": null,
     "confidence": 0.4,
     "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
     "lang": "es",
-    "region": "MX-MIC",
-    "regionLabel": "Michoacán"
-  },
-  {
-    "id": "mx-xhkt-fm",
-    "title": "XHKT-FM",
-    "url": "https://californiamedios.com/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "es"
-  },
-  {
-    "id": "mx-xhm-fm",
-    "title": "XHM-FM",
-    "url": "https://889noticias.mx/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "es",
-    "region": "MX-CMX",
-    "regionLabel": "Ciudad de México"
-  },
-  {
-    "id": "mx-xhsh-fm",
-    "title": "XHSH-FM",
-    "url": "https://amorfm.mx/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "es",
-    "region": "MX-CMX",
-    "regionLabel": "Ciudad de México"
+    "region": "MX-OAX",
+    "regionLabel": "Estado de Oaxaca"
   },
   {
     "id": "mx-tvazteca-com",
     "title": "tvazteca.com",
     "url": "https://www.tvazteca.com/index.rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "es"
+  },
+  {
+    "id": "mx-diario-mx",
+    "title": "diario.mx",
+    "url": "https://diario.mx/rss/feed.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "es"
+  },
+  {
+    "id": "mx-eldiariodechihuahua-mx",
+    "title": "eldiariodechihuahua.mx",
+    "url": "https://www.eldiariodechihuahua.mx/rss/feed.xml",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -1493,17 +1457,6 @@
     "id": "mx-yucatanalamano-com",
     "title": "yucatanalamano.com",
     "url": "https://yucatanalamano.com/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "es"
-  },
-  {
-    "id": "mx-elvigia-com-mx",
-    "title": "elvigia.com.mx",
-    "url": "https://elvigia.com.mx/feed/",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -1864,6 +1817,17 @@
     "lang": "es"
   },
   {
+    "id": "mx-juarezhoy-com-mx",
+    "title": "juarezhoy.com.mx",
+    "url": "https://juarezhoy.com.mx/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "es"
+  },
+  {
     "id": "mx-soldelsurtenerife-com",
     "title": "soldelsurtenerife.com",
     "url": "https://www.soldelsurtenerife.com/rss/",
@@ -1998,7 +1962,7 @@
   {
     "id": "mx-chilango-com",
     "title": "chilango.com",
-    "url": "http://www.chilango.com/rss",
+    "url": "http://www.chilango.com/feed",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -2032,17 +1996,6 @@
     "id": "mx-telemax-com-mx",
     "title": "telemax.com.mx",
     "url": "https://telemax.com.mx/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "es"
-  },
-  {
-    "id": "mx-unomasuno-com-mx",
-    "title": "unomasuno.com.mx",
-    "url": "https://unomasuno.com.mx/feed/",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -2109,17 +2062,6 @@
     "id": "mx-gentedelbalsas-mx",
     "title": "gentedelbalsas.mx",
     "url": "http://gentedelbalsas.mx/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "es"
-  },
-  {
-    "id": "mx-noticiasperfil-com",
-    "title": "noticiasperfil.com",
-    "url": "https://www.noticiasperfil.com/index/feed/",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -2425,17 +2367,6 @@
     "lang": "es"
   },
   {
-    "id": "mx-mundodehoy-com",
-    "title": "mundodehoy.com",
-    "url": "https://mundodehoy.com/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "es"
-  },
-  {
     "id": "mx-horaceronl-com",
     "title": "horaceronl.com",
     "url": "https://horaceronl.com/feed/",
@@ -2612,6 +2543,17 @@
     "lang": "es"
   },
   {
+    "id": "mx-la-prensa-com-mx",
+    "title": "la-prensa.com.mx",
+    "url": "http://www.la-prensa.com.mx/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "es"
+  },
+  {
     "id": "mx-hoylaredo-net",
     "title": "hoylaredo.net",
     "url": "https://www.hoylaredo.net/feed/",
@@ -2777,17 +2719,6 @@
     "lang": "es"
   },
   {
-    "id": "mx-elregionaldesonora-com-mx",
-    "title": "elregionaldesonora.com.mx",
-    "url": "https://bumpwy.in.net/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "es"
-  },
-  {
     "id": "mx-diariodezihuatanejo-mx",
     "title": "diariodezihuatanejo.mx",
     "url": "http://www.diariodezihuatanejo.mx/feeds/posts/default",
@@ -2876,6 +2807,17 @@
     "lang": "es"
   },
   {
+    "id": "mx-elsoldesinaloa-com-mx",
+    "title": "elsoldesinaloa.com.mx",
+    "url": "http://www.elsoldesinaloa.com.mx/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "es"
+  },
+  {
     "id": "mx-akronoticias-com",
     "title": "akronoticias.com",
     "url": "https://www.akronoticias.com/feed",
@@ -2933,7 +2875,7 @@
   {
     "id": "mx-abcdelatarde-com",
     "title": "abcdelatarde.com",
-    "url": "http://www.abcdelatarde.com/feed/",
+    "url": "https://abcdelatarde.com/feed/",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -3010,7 +2952,7 @@
   {
     "id": "mx-maspormas-com",
     "title": "maspormas.com",
-    "url": "http://www.maspormas.com/rss",
+    "url": "http://www.maspormas.com/feed/",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -3022,17 +2964,6 @@
     "id": "mx-capitalhidalgo-com-mx",
     "title": "capitalhidalgo.com.mx",
     "url": "https://www.capitalhidalgo.com.mx/feeds/posts/default",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "es"
-  },
-  {
-    "id": "mx-cronicatierrablanca-com-mx",
-    "title": "cronicatierrablanca.com.mx",
-    "url": "http://www.cronicatierrablanca.com.mx/feed",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -3085,6 +3016,17 @@
     "lang": "es"
   },
   {
+    "id": "mx-laopinion-com-mx",
+    "title": "laopinion.com.mx",
+    "url": "http://www.laopinion.com.mx/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "es"
+  },
+  {
     "id": "mx-elsoldetulancingo-com-mx",
     "title": "elsoldetulancingo.com.mx",
     "url": "http://www.elsoldetulancingo.com.mx/rss",
@@ -3110,17 +3052,6 @@
     "id": "mx-capitalcoahuila-com-mx",
     "title": "capitalcoahuila.com.mx",
     "url": "https://capitalcoahuila.com.mx/feed",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "es"
-  },
-  {
-    "id": "mx-eltiempodenayarit-mx",
-    "title": "eltiempodenayarit.mx",
-    "url": "https://noticias.eltiempodenayarit.mx/feed/",
     "kind": "news",
     "topic": "world",
     "lean": null,

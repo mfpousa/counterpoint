@@ -1,0 +1,46 @@
+[
+  {
+    "id": "ls-publiceyenews-com",
+    "title": "publiceyenews.com",
+    "url": "https://publiceyenews.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "st"
+  },
+  {
+    "id": "ls-sundayexpress-co-ls",
+    "title": "sundayexpress.co.ls",
+    "url": "https://sundayexpress.co.ls/?feed=rss2",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "st"
+  },
+  {
+    "id": "ls-capitalnewspapers-co-za",
+    "title": "capitalnewspapers.co.za",
+    "url": "https://capitalnewspapers.co.za/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "st"
+  },
+  {
+    "id": "ls-lestimes-com",
+    "title": "lestimes.com",
+    "url": "https://lestimes.com/?feed=rss2",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "st"
+  }
+]

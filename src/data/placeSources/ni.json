@@ -63,6 +63,17 @@
     "lang": "es"
   },
   {
+    "id": "ni-vivanicaragua-com-ni",
+    "title": "vivanicaragua.com.ni",
+    "url": "http://www.vivanicaragua.com.ni/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "es"
+  },
+  {
     "id": "ni-canal10-com-ni",
     "title": "canal10.com.ni",
     "url": "http://www.canal10.com.ni/feed",
@@ -85,20 +96,9 @@
     "lang": "es"
   },
   {
-    "id": "ni-despacho505-com",
-    "title": "despacho505.com",
-    "url": "https://despacho505.com/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "es"
-  },
-  {
     "id": "ni-galerianews-com",
     "title": "galerianews.com",
-    "url": "https://galerianews.com/feed/",
+    "url": "https://www.galerianews.com/rss.xml",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -162,20 +162,9 @@
     "lang": "es"
   },
   {
-    "id": "ni-nicaraguainvestiga-com",
-    "title": "nicaraguainvestiga.com",
-    "url": "https://nicaraguainvestiga.com/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "es"
-  },
-  {
     "id": "ni-nicaraguaactual-tv",
     "title": "nicaraguaactual.tv",
-    "url": "https://nicaraguaactual.tv/feed",
+    "url": "https://nicaraguaactual.tv/rss.xml",
     "kind": "news",
     "topic": "world",
     "lean": null,

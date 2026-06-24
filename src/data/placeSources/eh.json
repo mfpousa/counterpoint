@@ -1,0 +1,35 @@
+[
+  {
+    "id": "eh-rasd-tv",
+    "title": "rasd.tv",
+    "url": "https://rasd.tv/rss.php",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "und"
+  },
+  {
+    "id": "eh-wsrw-org",
+    "title": "wsrw.org",
+    "url": "http://wsrw.org/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "und"
+  },
+  {
+    "id": "eh-elconfidencialsaharaui-com",
+    "title": "elconfidencialsaharaui.com",
+    "url": "https://www.elconfidencialsaharaui.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "und"
+  }
+]

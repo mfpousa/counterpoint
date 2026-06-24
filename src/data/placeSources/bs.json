@@ -26,7 +26,7 @@
   {
     "id": "bs-eleutheranews-com",
     "title": "eleutheranews.com",
-    "url": "http://eleutheranews.com/feed/",
+    "url": "http://eleutheranews.com/feed",
     "kind": "news",
     "topic": "world",
     "lean": null,

@@ -172,6 +172,17 @@
     "regionLabel": "İstanbul"
   },
   {
+    "id": "tr-tele1",
+    "title": "Tele1",
+    "url": "https://tele1.com.tr/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "tr"
+  },
+  {
     "id": "tr-trt-arabi",
     "title": "TRT Arabi",
     "url": "https://www.trtarabi.com/feed/rss.xml",
@@ -220,17 +231,6 @@
     "lang": "tr",
     "region": "TR-34",
     "regionLabel": "İstanbul"
-  },
-  {
-    "id": "tr-tele1",
-    "title": "Tele1",
-    "url": "https://tele1.com.tr/rss",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "tr"
   },
   {
     "id": "tr-haber-com",
@@ -394,19 +394,6 @@
     "lang": "tr",
     "region": "TR-07",
     "regionLabel": "Antalya"
-  },
-  {
-    "id": "tr-tmb-tv",
-    "title": "TMB TV",
-    "url": "http://www.tmb.tv/feed",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "tr",
-    "region": "TR-34",
-    "regionLabel": "İstanbul"
   },
   {
     "id": "tr-radyo-fenomen",
@@ -601,17 +588,6 @@
     "lang": "tr"
   },
   {
-    "id": "tr-ekoturk",
-    "title": "Ekotürk",
-    "url": "https://www.ekoturk.com/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "tr"
-  },
-  {
     "id": "tr-haber-global",
     "title": "Haber Global",
     "url": "https://www.haberglobal.com.tr/rss",
@@ -623,6 +599,28 @@
     "lang": "tr",
     "region": "TR-34",
     "regionLabel": "İstanbul"
+  },
+  {
+    "id": "tr-ekoturk",
+    "title": "Ekotürk",
+    "url": "https://www.ekoturk.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "tr"
+  },
+  {
+    "id": "tr-agro-tv",
+    "title": "Agro TV",
+    "url": "https://www.agrotv.com.tr/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "tr"
   },
   {
     "id": "tr-radyo-45-lik",
@@ -727,7 +725,7 @@
   {
     "id": "tr-yenialanya-com",
     "title": "yenialanya.com",
-    "url": "https://www.yenialanya.com/rss",
+    "url": "https://www.yenialanya.com/feed",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -882,6 +880,17 @@
     "lang": "tr"
   },
   {
+    "id": "tr-haberekspres-com-tr",
+    "title": "haberekspres.com.tr",
+    "url": "http://haberekspres.com.tr/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "tr"
+  },
+  {
     "id": "tr-yenimeram-com-tr",
     "title": "yenimeram.com.tr",
     "url": "https://www.yenimeram.com.tr/rss/",
@@ -915,6 +924,17 @@
     "lang": "tr"
   },
   {
+    "id": "tr-sakaryagazetesi-com-tr",
+    "title": "sakaryagazetesi.com.tr",
+    "url": "http://www.sakaryagazetesi.com.tr/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "tr"
+  },
+  {
     "id": "tr-basakgazetesi-com",
     "title": "basakgazetesi.com",
     "url": "http://www.basakgazetesi.com/rss.xml",
@@ -929,6 +949,17 @@
     "id": "tr-merhabahaber-com",
     "title": "merhabahaber.com",
     "url": "https://www.merhabahaber.com/service/rss.php",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "tr"
+  },
+  {
+    "id": "tr-dirilispostasi-com",
+    "title": "dirilispostasi.com",
+    "url": "http://dirilispostasi.com/rss",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -962,6 +993,17 @@
     "id": "tr-yeniasya-com-tr",
     "title": "yeniasya.com.tr",
     "url": "http://yeniasya.com.tr/rss/news",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "tr"
+  },
+  {
+    "id": "tr-aydinses-com",
+    "title": "aydinses.com",
+    "url": "http://www.aydinses.com/rss",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -1047,6 +1089,17 @@
     "lang": "tr"
   },
   {
+    "id": "tr-ekohaber-com-tr",
+    "title": "ekohaber.com.tr",
+    "url": "http://www.ekohaber.com.tr/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "tr"
+  },
+  {
     "id": "tr-kadikoygazetesi-com",
     "title": "kadikoygazetesi.com",
     "url": "http://feeds.feedburner.com/kadikoygazetesi/",
@@ -1124,6 +1177,17 @@
     "lang": "tr"
   },
   {
+    "id": "tr-milligazete-com-tr",
+    "title": "milligazete.com.tr",
+    "url": "http://milligazete.com.tr/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "tr"
+  },
+  {
     "id": "tr-cevrimicihaber-com",
     "title": "cevrimicihaber.com",
     "url": "http://www.cevrimicihaber.com/rss.xml",
@@ -1190,6 +1254,17 @@
     "lang": "tr"
   },
   {
+    "id": "tr-guneyege-net",
+    "title": "guneyege.net",
+    "url": "http://www.guneyege.net/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "tr"
+  },
+  {
     "id": "tr-hedefhalk-com",
     "title": "hedefhalk.com",
     "url": "http://www.hedefhalk.com/rss",
@@ -1201,9 +1276,9 @@
     "lang": "tr"
   },
   {
-    "id": "tr-pusula-tv",
-    "title": "pusula.tv",
-    "url": "https://medium.com/feed/pusulatv",
+    "id": "tr-hataygazetesi-com",
+    "title": "hataygazetesi.com",
+    "url": "https://www.sondakikahatay.com/rss",
     "kind": "news",
     "topic": "world",
     "lean": null,

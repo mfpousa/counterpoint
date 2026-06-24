@@ -1,0 +1,123 @@
+[
+  {
+    "id": "bi-netpress-com-mk",
+    "title": "netpress.com.mk",
+    "url": "http://netpress.com.mk/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "rn"
+  },
+  {
+    "id": "bi-iwacu-burundi-org",
+    "title": "iwacu-burundi.org",
+    "url": "https://www.iwacu-burundi.org/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "rn"
+  },
+  {
+    "id": "bi-burundi-eco-com",
+    "title": "burundi-eco.com",
+    "url": "https://burundi-eco.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "rn"
+  },
+  {
+    "id": "bi-burundi-agnews-org",
+    "title": "burundi-agnews.org",
+    "url": "https://burundi-agnews.org/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "rn"
+  },
+  {
+    "id": "bi-yaga-burundi-com",
+    "title": "yaga-burundi.com",
+    "url": "https://www.yaga-burundi.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "rn"
+  },
+  {
+    "id": "bi-isanganiro-org",
+    "title": "isanganiro.org",
+    "url": "https://isanganiro.org/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "rn"
+  },
+  {
+    "id": "bi-gov-bi",
+    "title": "gov.bi",
+    "url": "https://burundi.gov.bi/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "rn"
+  },
+  {
+    "id": "bi-ppbdi-com",
+    "title": "ppbdi.com",
+    "url": "http://ppbdi.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "rn"
+  },
+  {
+    "id": "bi-igihe-bi",
+    "title": "igihe.bi",
+    "url": "http://igihe.bi/spip.php?page=backend",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "rn"
+  },
+  {
+    "id": "bi-itaraburundi-com",
+    "title": "itaraburundi.com",
+    "url": "https://itaraburundi.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "rn"
+  },
+  {
+    "id": "bi-burundi24-wordpress-com",
+    "title": "burundi24.wordpress.com",
+    "url": "https://burundi24.wordpress.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "rn"
+  }
+]

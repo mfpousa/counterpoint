@@ -26,6 +26,19 @@
     "regionLabel": "ភ្នំពេញ"
   },
   {
+    "id": "kh-the-cambodia-daily",
+    "title": "The Cambodia Daily",
+    "url": "https://www.cambodiadaily.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "km",
+    "region": "KH-12",
+    "regionLabel": "ភ្នំពេញ"
+  },
+  {
     "id": "kh-src-2",
     "title": "វិទ្យុសំលេងប្រជាធិបតេយ្យ",
     "url": "https://vodenglish.news/feed/",

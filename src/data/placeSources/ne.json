@@ -1,0 +1,123 @@
+[
+  {
+    "id": "ne-le-sahel",
+    "title": "Le Sahel",
+    "url": "https://www.lesahel.org/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ha"
+  },
+  {
+    "id": "ne-agence-nigerienne-de-presse",
+    "title": "Agence Nigérienne de Presse",
+    "url": "https://anp.ne/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ha"
+  },
+  {
+    "id": "ne-lanouvelletribune-info",
+    "title": "lanouvelletribune.info",
+    "url": "https://lanouvelletribune.info/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ha"
+  },
+  {
+    "id": "ne-journalduniger-com",
+    "title": "journalduniger.com",
+    "url": "https://www.journalduniger.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ha"
+  },
+  {
+    "id": "ne-nigerdiaspora-net",
+    "title": "nigerdiaspora.net",
+    "url": "http://nigerdiaspora.net/?format=feed&amp;type=rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ha"
+  },
+  {
+    "id": "ne-airinfoagadez-com",
+    "title": "airinfoagadez.com",
+    "url": "https://airinfoagadez.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ha"
+  },
+  {
+    "id": "ne-alternativeniger-net",
+    "title": "alternativeniger.net",
+    "url": "http://alternativeniger.net/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ha"
+  },
+  {
+    "id": "ne-aniamey-com",
+    "title": "aniamey.com",
+    "url": "http://news.aniamey.com/xml/all.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ha"
+  },
+  {
+    "id": "ne-nigerinter-com",
+    "title": "nigerinter.com",
+    "url": "https://nigerinter.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ha"
+  },
+  {
+    "id": "ne-tamtaminfo-com",
+    "title": "tamtaminfo.com",
+    "url": "https://tamtaminfo.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ha"
+  },
+  {
+    "id": "ne-levenementniger-com",
+    "title": "levenementniger.com",
+    "url": "https://levenementniger.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ha"
+  }
+]

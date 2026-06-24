@@ -1,16 +1,5 @@
 [
   {
-    "id": "uz-tmb-tv",
-    "title": "TMB TV",
-    "url": "http://www.tmb.tv/feed",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "uz"
-  },
-  {
     "id": "uz-qoraqolpog-iston-xabar-agentligi",
     "title": "Qoraqolpog'iston xabar agentligi",
     "url": "https://kknews.uz/feed",

@@ -13,17 +13,6 @@
     "regionLabel": "Rīga"
   },
   {
-    "id": "lv-latvijas-neatkariga-televizija",
-    "title": "Latvijas Neatkarīgā Televīzija",
-    "url": "https://skaties.lv/feed",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "lv"
-  },
-  {
     "id": "lv-the-baltic-times",
     "title": "The Baltic Times",
     "url": "http://www.baltictimes.com/rss",
@@ -77,6 +66,17 @@
     "id": "lv-dienas-bizness",
     "title": "Dienas Bizness",
     "url": "https://db.lv/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "lv"
+  },
+  {
+    "id": "lv-latvijas-neatkariga-televizija",
+    "title": "Latvijas Neatkarīgā Televīzija",
+    "url": "https://skaties.lv/feed",
     "kind": "news",
     "topic": "world",
     "lean": null,

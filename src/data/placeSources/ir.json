@@ -14,17 +14,6 @@
   },
   {
     "id": "ir-src-2",
-    "title": "جام جم",
-    "url": "http://jamejamonline.ir/fa/rss/allnews",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "fa"
-  },
-  {
-    "id": "ir-src-3",
     "title": "اطلاعات (روزنامه)",
     "url": "http://www.ettelaat.com/rss",
     "kind": "news",
@@ -37,7 +26,7 @@
     "regionLabel": "استان تهران"
   },
   {
-    "id": "ir-src-4",
+    "id": "ir-src-3",
     "title": "همشهری",
     "url": "http://hamshahrionline.ir/rss",
     "kind": "news",
@@ -50,7 +39,7 @@
     "regionLabel": "استان تهران"
   },
   {
-    "id": "ir-src-5",
+    "id": "ir-src-4",
     "title": "تهران تایمز",
     "url": "https://www.tehrantimes.com/rss",
     "kind": "news",
@@ -61,7 +50,7 @@
     "lang": "fa"
   },
   {
-    "id": "ir-src-6",
+    "id": "ir-src-5",
     "title": "آلیک",
     "url": "https://alikonline.ir/feed",
     "kind": "news",
@@ -74,7 +63,7 @@
     "regionLabel": "استان تهران"
   },
   {
-    "id": "ir-src-7",
+    "id": "ir-src-6",
     "title": "جمهوری اسلامی",
     "url": "http://www.jomhourieslami.com/rss.xml",
     "kind": "news",
@@ -87,9 +76,22 @@
     "regionLabel": "استان تهران"
   },
   {
-    "id": "ir-src-8",
+    "id": "ir-src-7",
     "title": "ایرنا",
     "url": "https://en.irna.ir/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fa",
+    "region": "IR-23",
+    "regionLabel": "استان تهران"
+  },
+  {
+    "id": "ir-src-8",
+    "title": "انتخاب (روزنامه)",
+    "url": "http://www.entekhab.ir/fa/rss/allnews",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -138,8 +140,8 @@
   },
   {
     "id": "ir-src-12",
-    "title": "انتخاب (روزنامه)",
-    "url": "http://www.entekhab.ir/fa/rss/allnews",
+    "title": "روزنامه ابتکار",
+    "url": "http://ebtekarnews.com/rss.xml",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -151,8 +153,8 @@
   },
   {
     "id": "ir-src-13",
-    "title": "روزنامه ابتکار",
-    "url": "http://ebtekarnews.com/rss.xml",
+    "title": "اقتصاد آنلاین",
+    "url": "http://www.eghtesadonline.com/rss",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -188,6 +190,17 @@
   },
   {
     "id": "ir-src-16",
+    "title": "رادیو اقتصاد",
+    "url": "http://radioeqtesad.ir/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fa"
+  },
+  {
+    "id": "ir-src-17",
     "title": "رادیو معارف",
     "url": "http://radiomaaref.ir/rss",
     "kind": "news",
@@ -198,42 +211,7 @@
     "lang": "fa"
   },
   {
-    "id": "ir-src-17",
-    "title": "اقتصاد آنلاین",
-    "url": "http://www.eghtesadonline.com/fa/updates/allnews",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "fa",
-    "region": "IR-23",
-    "regionLabel": "استان تهران"
-  },
-  {
     "id": "ir-src-18",
-    "title": "عجبشیر",
-    "url": "http://ajabshirpress.ir/feed",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "fa"
-  },
-  {
-    "id": "ir-src-19",
-    "title": "اُفُقِ رامهرمز",
-    "url": "https://www.ofogheramhormoz.ir/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "fa"
-  },
-  {
-    "id": "ir-src-20",
     "title": "تابناک",
     "url": "https://www.tabnak.ir/fa/rss/allnews",
     "kind": "news",
@@ -244,6 +222,28 @@
     "lang": "fa",
     "region": "IR-23",
     "regionLabel": "استان تهران"
+  },
+  {
+    "id": "ir-src-19",
+    "title": "عجبشیر",
+    "url": "http://ajabshirpress.ir/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fa"
+  },
+  {
+    "id": "ir-src-20",
+    "title": "اُفُقِ رامهرمز",
+    "url": "https://www.ofogheramhormoz.ir/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fa"
   },
   {
     "id": "ir-src-21",
@@ -330,21 +330,8 @@
   },
   {
     "id": "ir-src-27",
-    "title": "خبرگزاری آنا",
-    "url": "https://ana.ir/fa/rss/allnews",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "fa",
-    "region": "IR-23",
-    "regionLabel": "استان تهران"
-  },
-  {
-    "id": "ir-src-28",
     "title": "کارمادیو",
-    "url": "https://karmadio.ir/feed/",
+    "url": "https://karmadio.ir/rss",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -353,7 +340,7 @@
     "lang": "fa"
   },
   {
-    "id": "ir-src-29",
+    "id": "ir-src-28",
     "title": "سلامت نیوز",
     "url": "https://www.salamatnews.com/rss",
     "kind": "news",
@@ -364,17 +351,6 @@
     "lang": "fa",
     "region": "IR-23",
     "regionLabel": "استان تهران"
-  },
-  {
-    "id": "ir-borna-news-agency",
-    "title": "Borna News Agency",
-    "url": "https://borna.news/fa/rss/allnews",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "fa"
   },
   {
     "id": "ir-rfi-fr",
@@ -465,17 +441,6 @@
     "lang": "fa"
   },
   {
-    "id": "ir-vatanemrooz-ir",
-    "title": "vatanemrooz.ir",
-    "url": "http://vatanemrooz.ir/fa/rss/allnews",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "fa"
-  },
-  {
     "id": "ir-iranian-com",
     "title": "iranian.com",
     "url": "https://iranian.com/feed/",
@@ -498,31 +463,9 @@
     "lang": "fa"
   },
   {
-    "id": "ir-javanonline-ir",
-    "title": "javanonline.ir",
-    "url": "http://javanonline.ir/fa/rss/allnews",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "fa"
-  },
-  {
     "id": "ir-sobh-eqtesad-ir",
     "title": "sobh-eqtesad.ir",
     "url": "https://sobh-eqtesad.ir/feed",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "fa"
-  },
-  {
-    "id": "ir-ruydadiran-com",
-    "title": "ruydadiran.com",
-    "url": "https://ruydadiran.com/rss.xml",
     "kind": "news",
     "topic": "world",
     "lean": null,

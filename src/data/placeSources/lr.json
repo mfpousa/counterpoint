@@ -1,0 +1,57 @@
+[
+  {
+    "id": "lr-albiladpress-com",
+    "title": "albiladpress.com",
+    "url": "http://www.albiladpress.com/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "lr-gnnliberia-com",
+    "title": "gnnliberia.com",
+    "url": "https://gnnliberia.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "lr-frontpageafricaonline-com",
+    "title": "frontpageafricaonline.com",
+    "url": "https://fpa.news/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "lr-thenewdawnliberia-com",
+    "title": "thenewdawnliberia.com",
+    "url": "https://www.thenewdawnliberia.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "lr-libyaherald-com",
+    "title": "libyaherald.com",
+    "url": "https://libyaherald.com/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  }
+]

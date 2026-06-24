@@ -52,7 +52,20 @@
   {
     "id": "cu-prensa-latina",
     "title": "Prensa Latina",
-    "url": "https://www.prensa-latina.cu/feed/",
+    "url": "http://www.prensa-latina.cu/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "es",
+    "region": "CU-03",
+    "regionLabel": "provincia de La Habana"
+  },
+  {
+    "id": "cu-trabajadores",
+    "title": "Trabajadores",
+    "url": "http://www.trabajadores.cu/feed",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -72,19 +85,6 @@
     "confidence": 0.4,
     "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
     "lang": "es"
-  },
-  {
-    "id": "cu-trabajadores",
-    "title": "Trabajadores",
-    "url": "http://www.trabajadores.cu/feed",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "es",
-    "region": "CU-03",
-    "regionLabel": "provincia de La Habana"
   },
   {
     "id": "cu-14ymedio",
@@ -188,6 +188,17 @@
     "lang": "es"
   },
   {
+    "id": "cu-lademajagua-cu",
+    "title": "lademajagua.cu",
+    "url": "https://lademajagua.cu/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "es"
+  },
+  {
     "id": "cu-diariodecuba-com",
     "title": "diariodecuba.com",
     "url": "http://diariodecuba.com/rss.xml",
@@ -199,9 +210,20 @@
     "lang": "es"
   },
   {
+    "id": "cu-escambray-cu",
+    "title": "escambray.cu",
+    "url": "http://www.escambray.cu/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "es"
+  },
+  {
     "id": "cu-radio26-cu",
     "title": "radio26.cu",
-    "url": "https://www.radio26.cu/feed/",
+    "url": "http://www.radio26.cu/?feed=rss2",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -320,6 +342,17 @@
     "lang": "es"
   },
   {
+    "id": "cu-bohemia-cu",
+    "title": "bohemia.cu",
+    "url": "https://bohemia.cu/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "es"
+  },
+  {
     "id": "cu-radiociudadbandera-wordpress-com",
     "title": "radiociudadbandera.wordpress.com",
     "url": "https://radiociudadbandera.wordpress.com/feed/",
@@ -345,17 +378,6 @@
     "id": "cu-jovencuba-com",
     "title": "jovencuba.com",
     "url": "https://jovencuba.com/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "es"
-  },
-  {
-    "id": "cu-sierramaestra-cu",
-    "title": "sierramaestra.cu",
-    "url": "http://www.sierramaestra.cu/index.php?format=feed",
     "kind": "news",
     "topic": "world",
     "lean": null,

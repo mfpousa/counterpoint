@@ -1,0 +1,54 @@
+[
+  {
+    "id": "cv-expresso-das-ilhas",
+    "title": "Expresso das Ilhas",
+    "url": "https://expressodasilhas.cv/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "pt",
+    "region": "CV-S",
+    "regionLabel": "Ilhas de Sotavento"
+  },
+  {
+    "id": "cv-recordtv-cabo-verde",
+    "title": "RecordTV Cabo Verde",
+    "url": "https://recordeuropa.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "pt",
+    "region": "CV-S",
+    "regionLabel": "Ilhas de Sotavento"
+  },
+  {
+    "id": "cv-radio-morabeza",
+    "title": "Rádio Morabeza",
+    "url": "https://radiomorabeza.cv/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "pt",
+    "region": "CV-B",
+    "regionLabel": "Ilhas de Barlavento"
+  },
+  {
+    "id": "cv-a-nacao",
+    "title": "A Nação",
+    "url": "https://www.anacao.cv/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "pt",
+    "region": "CV-S",
+    "regionLabel": "Ilhas de Sotavento"
+  }
+]

@@ -1,0 +1,13 @@
+[
+  {
+    "id": "sz-swazi-observer",
+    "title": "Swazi Observer",
+    "url": "https://www.eswatiniobserver.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ss"
+  }
+]

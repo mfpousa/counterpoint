@@ -1,0 +1,81 @@
+[
+  {
+    "id": "ci-l-intelligent-d-abidjan",
+    "title": "L'Intelligent d'Abidjan",
+    "url": "http://www.lintelligentdabidjan.org/?feed=rss2",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fr"
+  },
+  {
+    "id": "ci-le-nouveau-reveil",
+    "title": "Le Nouveau Réveil",
+    "url": "https://lenouveaureveil.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fr"
+  },
+  {
+    "id": "ci-soir-info",
+    "title": "Soir Info",
+    "url": "https://www.linfodrome.com/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fr",
+    "region": "CI-AB",
+    "regionLabel": "Abidjan"
+  },
+  {
+    "id": "ci-nord-sud",
+    "title": "Nord-Sud",
+    "url": "https://www.nordsud.info/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fr"
+  },
+  {
+    "id": "ci-islam-info",
+    "title": "Islam Info",
+    "url": "https://islaminfo.org/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fr"
+  },
+  {
+    "id": "ci-agence-ivoirienne-de-presse",
+    "title": "Agence ivoirienne de presse",
+    "url": "https://www.aip.ci/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fr"
+  },
+  {
+    "id": "ci-lumiere-du-monde-television",
+    "title": "Lumière du Monde Télévision",
+    "url": "https://lumieredumonde.tv/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fr"
+  }
+]

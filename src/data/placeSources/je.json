@@ -121,17 +121,6 @@
     "lang": "en"
   },
   {
-    "id": "je-starnewsgroup-com",
-    "title": "starnewsgroup.com",
-    "url": "https://starnewsgroup.com/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "en"
-  },
-  {
     "id": "je-reportehispano-com",
     "title": "reportehispano.com",
     "url": "https://reportehispano.com/feed",
@@ -245,6 +234,17 @@
     "id": "je-princetoninfo-com",
     "title": "princetoninfo.com",
     "url": "https://princetoninfo.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "je-thewhitonline-com",
+    "title": "thewhitonline.com",
+    "url": "https://thewhitonline.com/feed/",
     "kind": "news",
     "topic": "world",
     "lean": null,

@@ -161,17 +161,6 @@
     "lang": "uk"
   },
   {
-    "id": "ua-nv",
-    "title": "NV",
-    "url": "https://nv.ua/ukr/rss/all.xml",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "uk"
-  },
-  {
     "id": "ua-src-9",
     "title": "УНІАН",
     "url": "https://www.unian.ua/feed",
@@ -201,6 +190,17 @@
     "id": "ua-src-10",
     "title": "АТН",
     "url": "https://atn.ua/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "uk"
+  },
+  {
+    "id": "ua-nv",
+    "title": "NV",
+    "url": "https://nv.ua/ukr/rss/all.xml",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -296,7 +296,7 @@
   {
     "id": "ua-src-15",
     "title": "Маріупольське телебачення",
-    "url": "https://ysjewel.me/feed/",
+    "url": "https://studiocorad.nl/feed/",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -357,17 +357,6 @@
     "regionLabel": "Київ"
   },
   {
-    "id": "ua-src-18",
-    "title": "Вечерняя Одесса",
-    "url": "https://vo.od.ua/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "uk"
-  },
-  {
     "id": "ua-newsone",
     "title": "NewsOne",
     "url": "http://www.newsone.ua/feed",
@@ -379,7 +368,7 @@
     "lang": "uk"
   },
   {
-    "id": "ua-src-19",
+    "id": "ua-src-18",
     "title": "Ірпінський вісник",
     "url": "https://visnyk-irpin.com.ua/feed/rss/",
     "kind": "news",
@@ -390,9 +379,9 @@
     "lang": "uk"
   },
   {
-    "id": "ua-src-20",
+    "id": "ua-src-19",
     "title": "Вільне життя плюс",
-    "url": "http://vilne.org.ua/feed/",
+    "url": "http://vilne.org.ua/feed",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -401,7 +390,7 @@
     "lang": "uk"
   },
   {
-    "id": "ua-src-21",
+    "id": "ua-src-20",
     "title": "Главред",
     "url": "https://glavred.info/rss",
     "kind": "news",
@@ -414,7 +403,7 @@
     "regionLabel": "Київ"
   },
   {
-    "id": "ua-src-22",
+    "id": "ua-src-21",
     "title": "Західний полюс",
     "url": "https://z-polus.info/feed/",
     "kind": "news",
@@ -425,7 +414,7 @@
     "lang": "uk"
   },
   {
-    "id": "ua-src-23",
+    "id": "ua-src-22",
     "title": "Зоря Полтавщини",
     "url": "http://zorya.poltava.ua/feed/",
     "kind": "news",
@@ -436,7 +425,7 @@
     "lang": "uk"
   },
   {
-    "id": "ua-src-24",
+    "id": "ua-src-23",
     "title": "Нова Доба (Черкаси)",
     "url": "http://novadoba.com.ua/feed",
     "kind": "news",
@@ -447,7 +436,7 @@
     "lang": "uk"
   },
   {
-    "id": "ua-src-25",
+    "id": "ua-src-24",
     "title": "Нова Тернопільська газета",
     "url": "https://nova.te.ua/feed/",
     "kind": "news",
@@ -458,7 +447,7 @@
     "lang": "uk"
   },
   {
-    "id": "ua-src-26",
+    "id": "ua-src-25",
     "title": "Подільські вісті",
     "url": "http://pvisti.info/feed/",
     "kind": "news",
@@ -471,7 +460,7 @@
     "regionLabel": "Хмельницька область"
   },
   {
-    "id": "ua-src-27",
+    "id": "ua-src-26",
     "title": "ГОРДОН (інтернет-видання)",
     "url": "https://gordonua.com/ukr/api/media/out/rss/lastnews.xml",
     "kind": "news",
@@ -493,7 +482,7 @@
     "lang": "uk"
   },
   {
-    "id": "ua-src-28",
+    "id": "ua-src-27",
     "title": "Українські національні новини",
     "url": "https://unn.ua/rss/news_uk.xml",
     "kind": "news",
@@ -506,7 +495,7 @@
     "regionLabel": "Київ"
   },
   {
-    "id": "ua-src-29",
+    "id": "ua-src-28",
     "title": "Хадашот",
     "url": "http://www.hadashot.kiev.ua/rss.xml",
     "kind": "news",
@@ -517,7 +506,7 @@
     "lang": "uk"
   },
   {
-    "id": "ua-src-30",
+    "id": "ua-src-29",
     "title": "Євпаторійська здравниця",
     "url": "http://e-zdravnitsa.ru/rss",
     "kind": "news",
@@ -528,7 +517,7 @@
     "lang": "uk"
   },
   {
-    "id": "ua-src-31",
+    "id": "ua-src-30",
     "title": "Столичные новости",
     "url": "https://cn.com.ua/feed/",
     "kind": "news",
@@ -539,7 +528,7 @@
     "lang": "uk"
   },
   {
-    "id": "ua-src-32",
+    "id": "ua-src-31",
     "title": "Центр новин",
     "url": "https://www.centernews.com.ua/?feed=rss2",
     "kind": "news",
@@ -563,7 +552,7 @@
     "lang": "uk"
   },
   {
-    "id": "ua-src-33",
+    "id": "ua-src-32",
     "title": "Детектор медіа",
     "url": "https://detector.media/rss/",
     "kind": "news",
@@ -576,7 +565,7 @@
     "regionLabel": "Київ"
   },
   {
-    "id": "ua-src-34",
+    "id": "ua-src-33",
     "title": "МикВісті",
     "url": "https://nikvesti.com/rss.xml",
     "kind": "news",
@@ -600,7 +589,7 @@
     "lang": "uk"
   },
   {
-    "id": "ua-src-35",
+    "id": "ua-src-34",
     "title": "Дитинець",
     "url": "https://webtv.net.ua/feed/",
     "kind": "news",
@@ -624,7 +613,7 @@
     "lang": "uk"
   },
   {
-    "id": "ua-src-36",
+    "id": "ua-src-35",
     "title": "Коментарі",
     "url": "https://comments.ua/feed",
     "kind": "news",
@@ -635,7 +624,7 @@
     "lang": "uk"
   },
   {
-    "id": "ua-src-37",
+    "id": "ua-src-36",
     "title": "Новинарня",
     "url": "https://novynarnia.com/feed",
     "kind": "news",
@@ -648,7 +637,7 @@
     "regionLabel": "Київ"
   },
   {
-    "id": "ua-src-38",
+    "id": "ua-src-37",
     "title": "Українська редакція Радіо Свобода",
     "url": "https://www.radiosvoboda.org/api/",
     "kind": "news",
@@ -659,7 +648,7 @@
     "lang": "uk"
   },
   {
-    "id": "ua-src-39",
+    "id": "ua-src-38",
     "title": "Дім",
     "url": "https://kanaldim.tv/feed",
     "kind": "news",
@@ -696,7 +685,7 @@
     "lang": "uk"
   },
   {
-    "id": "ua-src-40",
+    "id": "ua-src-39",
     "title": "Радіо Марія",
     "url": "http://radiomaria.org.ua/rss",
     "kind": "news",
@@ -733,7 +722,7 @@
     "regionLabel": "Автономна Республіка Крим"
   },
   {
-    "id": "ua-src-41",
+    "id": "ua-src-40",
     "title": "Конкурент",
     "url": "https://konkurent.ua/rss",
     "kind": "news",
@@ -746,7 +735,7 @@
     "regionLabel": "Волинська область"
   },
   {
-    "id": "ua-src-42",
+    "id": "ua-src-41",
     "title": "Ми — Україна",
     "url": "https://weukraine.tv/feed/",
     "kind": "news",
@@ -781,7 +770,7 @@
     "lang": "uk"
   },
   {
-    "id": "ua-src-43",
+    "id": "ua-src-42",
     "title": "Новини Тернопільщини",
     "url": "https://tenews.org.ua/feed/",
     "kind": "news",
@@ -792,7 +781,7 @@
     "lang": "uk"
   },
   {
-    "id": "ua-src-44",
+    "id": "ua-src-43",
     "title": "Радіо Хартія",
     "url": "https://radiokhartia.com/feed/",
     "kind": "news",
@@ -803,7 +792,7 @@
     "lang": "uk"
   },
   {
-    "id": "ua-src-45",
+    "id": "ua-src-44",
     "title": "Реально",
     "url": "https://realno.net/feed/",
     "kind": "news",
@@ -1632,7 +1621,7 @@
   {
     "id": "ua-newday-kherson-ua",
     "title": "newday.kherson.ua",
-    "url": "https://newday.kherson.ua/feed/",
+    "url": "http://www.newday.kherson.ua/feed/",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -1677,6 +1666,17 @@
     "id": "ua-meta-ua",
     "title": "meta.ua",
     "url": "https://meta.ua/news/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "uk"
+  },
+  {
+    "id": "ua-novosti-dn-ua",
+    "title": "novosti.dn.ua",
+    "url": "http://novosti.dn.ua/feed/",
     "kind": "news",
     "topic": "world",
     "lean": null,

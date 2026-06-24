@@ -214,9 +214,9 @@
     "lang": "nl"
   },
   {
-    "id": "be-bruzz-ket",
-    "title": "BRUZZ Ket",
-    "url": "https://www.bruzzket.be/rss.xml",
+    "id": "be-het-observatorium",
+    "title": "Het Observatorium",
+    "url": "https://www.hetobservatorium.be/feed/",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -225,9 +225,9 @@
     "lang": "nl"
   },
   {
-    "id": "be-het-observatorium",
-    "title": "Het Observatorium",
-    "url": "https://www.hetobservatorium.be/feed/",
+    "id": "be-bruzz-ket",
+    "title": "BRUZZ Ket",
+    "url": "https://www.bruzzket.be/rss.xml",
     "kind": "news",
     "topic": "world",
     "lean": null,

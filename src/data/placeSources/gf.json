@@ -1,0 +1,35 @@
+[
+  {
+    "id": "gf-guyaweb-com",
+    "title": "guyaweb.com",
+    "url": "https://www.guyaweb.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fr"
+  },
+  {
+    "id": "gf-coconews-com",
+    "title": "coconews.com",
+    "url": "https://guadeloupe.coconews.com/flux-actualite.rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fr"
+  },
+  {
+    "id": "gf-blada-com",
+    "title": "blada.com",
+    "url": "http://www.blada.com/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fr"
+  }
+]

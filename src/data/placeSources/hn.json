@@ -26,17 +26,6 @@
     "regionLabel": "Departamento de Cortés"
   },
   {
-    "id": "hn-el-periodico",
-    "title": "El Periódico",
-    "url": "http://elperiodico.hn/?feed=rss2",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "es"
-  },
-  {
     "id": "hn-la-gaceta",
     "title": "La Gaceta",
     "url": "https://lagaceta.hn/feed/",
@@ -160,7 +149,7 @@
   {
     "id": "hn-eldiario-hn",
     "title": "eldiario.hn",
-    "url": "https://www.eldiario.hn/feed/",
+    "url": "http://eldiario.hn/feed/",
     "kind": "news",
     "topic": "world",
     "lean": null,

@@ -146,19 +146,6 @@
     "regionLabel": "Punjab"
   },
   {
-    "id": "pk-stepspoint",
-    "title": "StepsPoint",
-    "url": "https://www.stepspoint.com/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "en",
-    "region": "PK-SD",
-    "regionLabel": "Sindh"
-  },
-  {
     "id": "pk-geo-kahani",
     "title": "Geo Kahani",
     "url": "https://geokahani.tv/feed/",
@@ -244,7 +231,7 @@
   {
     "id": "pk-arynews-tv",
     "title": "arynews.tv",
-    "url": "http://arynews.tv/feed/",
+    "url": "http://arynews.tv/feed",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -256,17 +243,6 @@
     "id": "pk-nation-com-pk",
     "title": "nation.com.pk",
     "url": "http://nation.com.pk/rss/news",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "en"
-  },
-  {
-    "id": "pk-dailytimes-com-pk",
-    "title": "dailytimes.com.pk",
-    "url": "https://dailytimes.com.pk/feed/",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -387,7 +363,7 @@
   {
     "id": "pk-weeklycuttingedge-com",
     "title": "weeklycuttingedge.com",
-    "url": "https://weeklycuttingedge.com/feed/",
+    "url": "http://www.weeklycuttingedge.com/feed",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -552,7 +528,18 @@
   {
     "id": "pk-enews-pk",
     "title": "enews.pk",
-    "url": "https://www.enews.pk/feed/",
+    "url": "http://www.enews.pk/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "pk-siddysays-com",
+    "title": "siddysays.com",
+    "url": "https://www.siddysays.com/feed/",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -660,9 +647,9 @@
     "lang": "en"
   },
   {
-    "id": "pk-lavozdedurango-com-mx",
-    "title": "lavozdedurango.com.mx",
-    "url": "https://lavozdedurango.com.mx/feed/",
+    "id": "pk-alqamar-info",
+    "title": "alqamar.info",
+    "url": "https://www.alqamar.info/news/?feed=rss2",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -674,83 +661,6 @@
     "id": "pk-thebalochhal-com",
     "title": "thebalochhal.com",
     "url": "https://thebalochhal.com/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "en"
-  },
-  {
-    "id": "pk-whyahmadi-org",
-    "title": "whyahmadi.org",
-    "url": "http://whyahmadi.org/feed",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "en"
-  },
-  {
-    "id": "pk-qtatribune-com",
-    "title": "qtatribune.com",
-    "url": "http://www.qtatribune.com/rss.xml",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "en"
-  },
-  {
-    "id": "pk-aacounterterror-wordpress-com",
-    "title": "aacounterterror.wordpress.com",
-    "url": "https://aacounterterror.wordpress.com/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "en"
-  },
-  {
-    "id": "pk-pakistaniat-wordpress-com",
-    "title": "pakistaniat.wordpress.com",
-    "url": "https://pakistaniat.wordpress.com/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "en"
-  },
-  {
-    "id": "pk-genocidewatch-org",
-    "title": "genocidewatch.org",
-    "url": "https://www.genocidewatch.com/blog-feed.xml",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "en"
-  },
-  {
-    "id": "pk-pakistanchristiancongress-com",
-    "title": "pakistanchristiancongress.com",
-    "url": "https://pakistanchristiancongress.com/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "en"
-  },
-  {
-    "id": "pk-alqamar-info",
-    "title": "alqamar.info",
-    "url": "https://www.alqamar.info/news/?feed=rss2",
     "kind": "news",
     "topic": "world",
     "lean": null,

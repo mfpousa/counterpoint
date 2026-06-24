@@ -1,0 +1,90 @@
+[
+  {
+    "id": "gy-guyana-times",
+    "title": "Guyana Times",
+    "url": "https://guyanatimesgy.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "gy-guyanainquirer-com",
+    "title": "guyanainquirer.com",
+    "url": "http://guyanainquirer.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "gy-kaieteurnewsonline-com",
+    "title": "kaieteurnewsonline.com",
+    "url": "https://kaieteurnewsonline.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "gy-inewsguyana-com",
+    "title": "inewsguyana.com",
+    "url": "https://inewsguyana.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "gy-hgptv-com",
+    "title": "hgptv.com",
+    "url": "https://www.hgptv.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "gy-guyanagraphic-com",
+    "title": "guyanagraphic.com",
+    "url": "https://guyanagraphic.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "gy-guyanachronicle-com",
+    "title": "guyanachronicle.com",
+    "url": "http://www.guyanachronicle.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "gy-capitolnewsgy-com",
+    "title": "capitolnewsgy.com",
+    "url": "https://www.capitolnewsonline.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  }
+]

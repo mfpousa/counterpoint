@@ -137,6 +137,17 @@
     "regionLabel": "Federacija Bosne i Hercegovine"
   },
   {
+    "id": "ba-radio-herceg-bosne",
+    "title": "Radio Herceg-Bosne",
+    "url": "http://www.rtv-hb.com/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "bs"
+  },
+  {
     "id": "ba-bn-televizija",
     "title": "BN televizija",
     "url": "https://rtvbn.tv/rss",
@@ -185,7 +196,7 @@
   {
     "id": "ba-televizija-5",
     "title": "Televizija 5",
-    "url": "https://televizija5.ba/feed/",
+    "url": "https://televizija5.ba/feed",
     "kind": "news",
     "topic": "world",
     "lean": null,

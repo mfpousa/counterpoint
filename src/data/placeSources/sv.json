@@ -233,17 +233,6 @@
     "lang": "es"
   },
   {
-    "id": "sv-focostv-com",
-    "title": "focostv.com",
-    "url": "http://focostv.com/feed",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "es"
-  },
-  {
     "id": "sv-proyectolava-com",
     "title": "proyectolava.com",
     "url": "https://proyectolava.com/feed/",
@@ -302,28 +291,6 @@
     "id": "sv-alharaca-sv",
     "title": "alharaca.sv",
     "url": "https://www.alharaca.sv/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "es"
-  },
-  {
-    "id": "sv-vozpublica-net",
-    "title": "vozpublica.net",
-    "url": "https://vozpublica.net/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "es"
-  },
-  {
-    "id": "sv-infodemia-com-sv",
-    "title": "infodemia.com.sv",
-    "url": "https://infodemia.com.sv/feed",
     "kind": "news",
     "topic": "world",
     "lean": null,

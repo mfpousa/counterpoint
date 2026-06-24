@@ -133,7 +133,7 @@
   {
     "id": "hr-glas-istre",
     "title": "Glas Istre",
-    "url": "http://www.glasistre.hr/rss",
+    "url": "http://www.glasistre.hr/rss.xml",
     "kind": "news",
     "topic": "world",
     "lean": null,

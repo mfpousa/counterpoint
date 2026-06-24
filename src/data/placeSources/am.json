@@ -113,7 +113,7 @@
   {
     "id": "am-src-8",
     "title": "Ազգ",
-    "url": "https://azg.am/feed/",
+    "url": "https://azg.am/feed",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -184,6 +184,17 @@
     "id": "am-1in-am",
     "title": "1in.am",
     "url": "https://www.1in.am/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "hy"
+  },
+  {
+    "id": "am-irates-am",
+    "title": "irates.am",
+    "url": "https://www.irates.am/rss.php?rsslang=1",
     "kind": "news",
     "topic": "world",
     "lean": null,

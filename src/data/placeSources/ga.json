@@ -1,0 +1,81 @@
+[
+  {
+    "id": "ga-agence-gabonaise-de-presse",
+    "title": "Agence gabonaise de presse",
+    "url": "https://agpgabon.ga/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fr",
+    "region": "GA-1",
+    "regionLabel": "Estuaire"
+  },
+  {
+    "id": "ga-gabonreview-com",
+    "title": "gabonreview.com",
+    "url": "https://www.gabonreview.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fr"
+  },
+  {
+    "id": "ga-sonapresse-com",
+    "title": "sonapresse.com",
+    "url": "http://union.sonapresse.com/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fr"
+  },
+  {
+    "id": "ga-gabonactu-com",
+    "title": "gabonactu.com",
+    "url": "https://gabonactu.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fr"
+  },
+  {
+    "id": "ga-gaboneco-com",
+    "title": "gaboneco.com",
+    "url": "https://gaboneco.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fr"
+  },
+  {
+    "id": "ga-infosplusgabon-com",
+    "title": "infosplusgabon.com",
+    "url": "http://www.infosplusgabon.com/index.php?format=feed&amp;type=rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fr"
+  },
+  {
+    "id": "ga-gabonlibre-com",
+    "title": "gabonlibre.com",
+    "url": "http://gabonlibre.com/feed.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fr"
+  }
+]

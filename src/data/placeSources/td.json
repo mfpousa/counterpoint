@@ -1,0 +1,48 @@
+[
+  {
+    "id": "td-tchadinfos-groupe-media",
+    "title": "Tchadinfos, Groupe média",
+    "url": "https://tchadinfos.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar",
+    "region": "TD-ND",
+    "regionLabel": "انجمينا"
+  },
+  {
+    "id": "td-alwihdainfo-com",
+    "title": "alwihdainfo.com",
+    "url": "https://www.alwihdainfo.com/rss/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "td-journaldutchad-com",
+    "title": "journaldutchad.com",
+    "url": "https://journaldutchad.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "td-tchadactuel-com",
+    "title": "tchadactuel.com",
+    "url": "http://www.tchadactuel.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  }
+]

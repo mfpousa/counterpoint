@@ -125,6 +125,17 @@
     "lang": "cs"
   },
   {
+    "id": "cz-denik-n",
+    "title": "Deník N",
+    "url": "https://denikn.cz/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "cs"
+  },
+  {
     "id": "cz-olomoucky-denik",
     "title": "Olomoucký deník",
     "url": "https://olomoucky.denik.cz/rss/vse.xml",
@@ -230,6 +241,19 @@
     "confidence": 0.4,
     "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
     "lang": "cs"
+  },
+  {
+    "id": "cz-frekvence-1",
+    "title": "Frekvence 1",
+    "url": "https://www.frekvence1.cz/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "cs",
+    "region": "CZ-10",
+    "regionLabel": "Praha"
   },
   {
     "id": "cz-cesky-rozhlas-dvojka",
@@ -342,9 +366,22 @@
     "lang": "cs"
   },
   {
-    "id": "cz-denik-n",
-    "title": "Deník N",
-    "url": "https://denikn.cz/feed/",
+    "id": "cz-radio-relax",
+    "title": "Radio Relax",
+    "url": "https://radio-relax.cz/new/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "cs",
+    "region": "CZ-20",
+    "regionLabel": "Středočeský kraj"
+  },
+  {
+    "id": "cz-cesky-rozhlas-radio-junior",
+    "title": "Český rozhlas Rádio Junior",
+    "url": "https://junior.rozhlas.cz/rss.xml",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -421,19 +458,6 @@
     "lang": "cs"
   },
   {
-    "id": "cz-frekvence-1",
-    "title": "Frekvence 1",
-    "url": "https://www.frekvence1.cz/feed",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "cs",
-    "region": "CZ-10",
-    "regionLabel": "Praha"
-  },
-  {
     "id": "cz-cesky-rozhlas-radiozurnal",
     "title": "Český rozhlas Radiožurnál",
     "url": "https://radiozurnal.rozhlas.cz/rss.xml",
@@ -470,30 +494,6 @@
     "id": "cz-cesky-rozhlas-stredni-cechy",
     "title": "Český rozhlas Střední Čechy",
     "url": "https://strednicechy.rozhlas.cz/rss.xml",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "cs"
-  },
-  {
-    "id": "cz-radio-relax",
-    "title": "Radio Relax",
-    "url": "https://radio-relax.cz/new/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "cs",
-    "region": "CZ-20",
-    "regionLabel": "Středočeský kraj"
-  },
-  {
-    "id": "cz-cesky-rozhlas-radio-junior",
-    "title": "Český rozhlas Rádio Junior",
-    "url": "https://junior.rozhlas.cz/rss.xml",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -596,6 +596,30 @@
     "lang": "cs"
   },
   {
+    "id": "cz-radio-dalnice",
+    "title": "Rádio Dálnice",
+    "url": "https://radiodalnice.cz/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "cs"
+  },
+  {
+    "id": "cz-radio-free-europe-radio-liberty-turkmen-",
+    "title": "Radio Free Europe Radio Liberty Turkmen Service",
+    "url": "https://rus.azathabar.com/api/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "cs",
+    "region": "CZ-10",
+    "regionLabel": "Praha"
+  },
+  {
     "id": "cz-cesky-rozhlas-radiozurnal-sport",
     "title": "Český rozhlas Radiožurnál Sport",
     "url": "https://sport.rozhlas.cz/rss.xml",
@@ -623,6 +647,19 @@
     "id": "cz-blesk",
     "title": "Blesk",
     "url": "http://www.blesk.cz/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "cs",
+    "region": "CZ-10",
+    "regionLabel": "Praha"
+  },
+  {
+    "id": "cz-transitions-online",
+    "title": "Transitions Online",
+    "url": "https://tol.org/feed",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -688,17 +725,6 @@
     "lang": "cs"
   },
   {
-    "id": "cz-radio-dalnice",
-    "title": "Rádio Dálnice",
-    "url": "https://radiodalnice.cz/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "cs"
-  },
-  {
     "id": "cz-budejcka-drbna",
     "title": "Budějcká drbna",
     "url": "https://budejcka.drbna.cz/rss",
@@ -708,19 +734,6 @@
     "confidence": 0.4,
     "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
     "lang": "cs"
-  },
-  {
-    "id": "cz-radio-free-europe-radio-liberty-turkmen-",
-    "title": "Radio Free Europe Radio Liberty Turkmen Service",
-    "url": "https://rus.azathabar.com/api/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "cs",
-    "region": "CZ-10",
-    "regionLabel": "Praha"
   },
   {
     "id": "cz-denik-alarm",
@@ -734,17 +747,50 @@
     "lang": "cs"
   },
   {
-    "id": "cz-transitions-online",
-    "title": "Transitions Online",
-    "url": "https://tol.org/feed",
+    "id": "cz-rebel-televizni-stanice",
+    "title": "Rebel (televizní stanice)",
+    "url": "https://www.tvrebel.cz/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "cs"
+  },
+  {
+    "id": "cz-mnam-tv",
+    "title": "Mňam TV",
+    "url": "https://imnam.cz/feed/atom/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "cs"
+  },
+  {
+    "id": "cz-tv-morava",
+    "title": "TV Morava",
+    "url": "https://www.tvmorava.cz/feed/",
     "kind": "news",
     "topic": "world",
     "lean": null,
     "confidence": 0.4,
     "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
     "lang": "cs",
-    "region": "CZ-10",
-    "regionLabel": "Praha"
+    "region": "CZ-71",
+    "regionLabel": "Olomoucký kraj"
+  },
+  {
+    "id": "cz-tvs",
+    "title": "TVS",
+    "url": "https://itvs24.cz/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "cs"
   },
   {
     "id": "cz-cs-mystery",
@@ -772,39 +818,6 @@
     "id": "cz-tv-mis",
     "title": "TV-MIS",
     "url": "http://www.tv-mis.cz/rss.php",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "cs"
-  },
-  {
-    "id": "cz-rebel-televizni-stanice",
-    "title": "Rebel (televizní stanice)",
-    "url": "https://www.tvrebel.cz/feed",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "cs"
-  },
-  {
-    "id": "cz-mnam-tv",
-    "title": "Mňam TV",
-    "url": "https://imnam.cz/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "cs"
-  },
-  {
-    "id": "cz-tvs",
-    "title": "TVS",
-    "url": "https://itvs24.cz/feed/",
     "kind": "news",
     "topic": "world",
     "lean": null,

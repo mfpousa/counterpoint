@@ -357,7 +357,7 @@
   {
     "id": "ee-balticguide-ee",
     "title": "balticguide.ee",
-    "url": "http://balticguide.ee/feed/",
+    "url": "http://balticguide.ee/feed",
     "kind": "news",
     "topic": "world",
     "lean": null,

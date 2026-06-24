@@ -50,41 +50,6 @@
     "regionLabel": "Metro Manila"
   },
   {
-    "id": "ph-newsbreak-magazine",
-    "title": "Newsbreak Magazine",
-    "url": "https://shepdigital.com/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "en"
-  },
-  {
-    "id": "ph-filipino-mirror-media-group-corporation",
-    "title": "Filipino Mirror Media Group Corporation",
-    "url": "https://pilipinomirror.com/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "en",
-    "region": "PH-00",
-    "regionLabel": "Metro Manila"
-  },
-  {
-    "id": "ph-sunstar-davao",
-    "title": "SunStar Davao",
-    "url": "https://www.sunstar.com.ph/feed",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "en"
-  },
-  {
     "id": "ph-dzfe",
     "title": "DZFE",
     "url": "https://dzfe.febc.ph/feed/",
@@ -122,6 +87,41 @@
     "lang": "en",
     "region": "PH-03",
     "regionLabel": "Central Luzon"
+  },
+  {
+    "id": "ph-newsbreak-magazine",
+    "title": "Newsbreak Magazine",
+    "url": "https://shepdigital.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "ph-filipino-mirror-media-group-corporation",
+    "title": "Filipino Mirror Media Group Corporation",
+    "url": "https://pilipinomirror.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en",
+    "region": "PH-00",
+    "regionLabel": "Metro Manila"
+  },
+  {
+    "id": "ph-sunstar-davao",
+    "title": "SunStar Davao",
+    "url": "https://www.sunstar.com.ph/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
   },
   {
     "id": "ph-dwkc-fm",
@@ -176,19 +176,6 @@
     "regionLabel": "Metro Manila"
   },
   {
-    "id": "ph-dyrk",
-    "title": "DYRK",
-    "url": "https://963wrock.com/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "en",
-    "region": "PH-07",
-    "regionLabel": "Central Visayas"
-  },
-  {
     "id": "ph-dwrw",
     "title": "DWRW",
     "url": "https://rw951.fm/feed/",
@@ -204,7 +191,7 @@
   {
     "id": "ph-dxkp",
     "title": "DXKP",
-    "url": "https://rpnradio.com/feed/",
+    "url": "https://rpnradio.com/feed",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -213,6 +200,19 @@
     "lang": "en",
     "region": "PH-09",
     "regionLabel": "Zamboanga Peninsula"
+  },
+  {
+    "id": "ph-dziq",
+    "title": "DZIQ",
+    "url": "http://www.dziq.am/?feed=rss2",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en",
+    "region": "PH-03",
+    "regionLabel": "Central Luzon"
   },
   {
     "id": "ph-dyfx",
@@ -274,6 +274,19 @@
     "lang": "en",
     "region": "PH-06",
     "regionLabel": "Western Visayas"
+  },
+  {
+    "id": "ph-dyrk",
+    "title": "DYRK",
+    "url": "https://963wrock.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en",
+    "region": "PH-07",
+    "regionLabel": "Central Visayas"
   },
   {
     "id": "ph-dxns-fm",

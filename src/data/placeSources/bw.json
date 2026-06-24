@@ -1,0 +1,94 @@
+[
+  {
+    "id": "bw-yarona-fm",
+    "title": "Yarona FM",
+    "url": "https://yaronafm.co.bw/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en",
+    "region": "BW-SE",
+    "regionLabel": "South-East District"
+  },
+  {
+    "id": "bw-gabz-fm",
+    "title": "Gabz FM",
+    "url": "https://www.gabzfm.com/blog-feed.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en",
+    "region": "BW-SE",
+    "regionLabel": "South-East District"
+  },
+  {
+    "id": "bw-businessweekly-co-bw",
+    "title": "businessweekly.co.bw",
+    "url": "https://businessweekly.co.bw/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "bw-weekendpost-co-bw",
+    "title": "weekendpost.co.bw",
+    "url": "https://weekendpost.co.bw/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "bw-thegazette-news",
+    "title": "thegazette.news",
+    "url": "https://www.thegazette.news/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "bw-sundaystandard-info",
+    "title": "sundaystandard.info",
+    "url": "https://www.sundaystandard.info/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "bw-gov-bw",
+    "title": "gov.bw",
+    "url": "http://www.gov.bw/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "bw-themidweeksun-co-bw",
+    "title": "themidweeksun.co.bw",
+    "url": "https://bettingbotswana.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  }
+]

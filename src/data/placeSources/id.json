@@ -92,17 +92,28 @@
     "lang": "id"
   },
   {
-    "id": "id-klcbs",
-    "title": "KLCBS",
-    "url": "https://klcbsofficial.com/feed/",
+    "id": "id-jak-fm",
+    "title": "Jak FM",
+    "url": "https://jak101fm.com/feed/",
     "kind": "news",
     "topic": "world",
     "lean": null,
     "confidence": 0.4,
     "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
     "lang": "id",
-    "region": "ID-JB",
-    "regionLabel": "Jawa Barat"
+    "region": "ID-JK",
+    "regionLabel": "Jakarta"
+  },
+  {
+    "id": "id-tvr-parlemen",
+    "title": "TVR Parlemen",
+    "url": "https://tvrparlemen.dpr.go.id/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "id"
   },
   {
     "id": "id-radar-bekasi",
@@ -116,19 +127,6 @@
     "lang": "id",
     "region": "ID-JB",
     "regionLabel": "Jawa Barat"
-  },
-  {
-    "id": "id-rri-jambi",
-    "title": "RRI Jambi",
-    "url": "https://www.rri.co.id/rss",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "id",
-    "region": "ID-JA",
-    "regionLabel": "Jambi"
   },
   {
     "id": "id-good-news-from-indonesia",
@@ -181,30 +179,6 @@
     "regionLabel": "Riau"
   },
   {
-    "id": "id-jak-fm",
-    "title": "Jak FM",
-    "url": "https://jak101fm.com/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "id",
-    "region": "ID-JK",
-    "regionLabel": "Jakarta"
-  },
-  {
-    "id": "id-tvr-parlemen",
-    "title": "TVR Parlemen",
-    "url": "https://tvrparlemen.dpr.go.id/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "id"
-  },
-  {
     "id": "id-kepripedia-com",
     "title": "Kepripedia.com",
     "url": "https://kepripedia.com/feed/",
@@ -218,6 +192,19 @@
     "regionLabel": "Kepulauan Riau"
   },
   {
+    "id": "id-klcbs",
+    "title": "KLCBS",
+    "url": "https://klcbsofficial.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "id",
+    "region": "ID-JB",
+    "regionLabel": "Jawa Barat"
+  },
+  {
     "id": "id-tabloid-jubi",
     "title": "Tabloid Jubi",
     "url": "https://jubi.id/feed/",
@@ -229,6 +216,28 @@
     "lang": "id",
     "region": "ID-PA",
     "regionLabel": "Papua"
+  },
+  {
+    "id": "id-panduanproperti-id",
+    "title": "Panduanproperti.id",
+    "url": "https://panduanproperti.id/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "id"
+  },
+  {
+    "id": "id-cyrustimes",
+    "title": "Cyrustimes",
+    "url": "https://cyrustimes.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "id"
   },
   {
     "id": "id-kediripedia-com",
@@ -260,50 +269,6 @@
     "id": "id-publik-khatulistiwa-tv",
     "title": "Publik Khatulistiwa TV",
     "url": "https://pktvkaltim.com/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "id"
-  },
-  {
-    "id": "id-itv-malang",
-    "title": "itv Malang",
-    "url": "https://www.indonesiatv.or.id/rss.xml",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "id"
-  },
-  {
-    "id": "id-panduanproperti-id",
-    "title": "Panduanproperti.id",
-    "url": "https://panduanproperti.id/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "id"
-  },
-  {
-    "id": "id-cyrustimes",
-    "title": "Cyrustimes",
-    "url": "https://cyrustimes.com/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "id"
-  },
-  {
-    "id": "id-beritasatu",
-    "title": "BeritaSatu",
-    "url": "https://investor.id/rss/news",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -361,6 +326,17 @@
     "id": "id-sin-po-tv",
     "title": "Sin Po TV",
     "url": "https://sinpo.tv/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "id"
+  },
+  {
+    "id": "id-itv-malang",
+    "title": "itv Malang",
+    "url": "https://www.indonesiatv.or.id/rss.xml",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -734,7 +710,7 @@
   {
     "id": "id-sulutnews-com",
     "title": "sulutnews.com",
-    "url": "https://sulutnews.com/feed/",
+    "url": "http://www.sulutnews.com/feed",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -889,17 +865,6 @@
     "id": "id-manadonews-co-id",
     "title": "manadonews.co.id",
     "url": "https://www.manadonews.co.id/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "id"
-  },
-  {
-    "id": "id-lintaslampung-com",
-    "title": "lintaslampung.com",
-    "url": "https://web.lintaslampung.com/feed/",
     "kind": "news",
     "topic": "world",
     "lean": null,

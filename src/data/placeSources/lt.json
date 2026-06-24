@@ -294,6 +294,17 @@
     "lang": "lt"
   },
   {
+    "id": "lt-santarve-lt",
+    "title": "santarve.lt",
+    "url": "https://www.santarve.lt/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "lt"
+  },
+  {
     "id": "lt-gzeme-lt",
     "title": "gzeme.lt",
     "url": "http://www.gzeme.lt/feed",

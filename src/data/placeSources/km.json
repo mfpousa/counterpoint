@@ -1,0 +1,24 @@
+[
+  {
+    "id": "km-comores-actualites-com",
+    "title": "comores-actualites.com",
+    "url": "https://www.comores-actualites.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "km-comores-infos-net",
+    "title": "comores-infos.net",
+    "url": "https://www.comoresinfos.net/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  }
+]

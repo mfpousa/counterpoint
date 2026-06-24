@@ -1,0 +1,90 @@
+[
+  {
+    "id": "er-awate-com",
+    "title": "awate.com",
+    "url": "https://awate.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ti"
+  },
+  {
+    "id": "er-jeberti-com",
+    "title": "jeberti.com",
+    "url": "http://www.jeberti.com/index.php?format=feed&amp;type=rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ti"
+  },
+  {
+    "id": "er-adoulis-net",
+    "title": "adoulis.net",
+    "url": "https://adoulis.net/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ti"
+  },
+  {
+    "id": "er-farajat-net",
+    "title": "farajat.net",
+    "url": "https://www.farajat.net/ar/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ti"
+  },
+  {
+    "id": "er-asmarino-com",
+    "title": "asmarino.com",
+    "url": "http://asmarino.com/?cperpage=1&amp;format=feed&amp;type=rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ti"
+  },
+  {
+    "id": "er-raimoq-com",
+    "title": "raimoq.com",
+    "url": "http://raimoq.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ti"
+  },
+  {
+    "id": "er-zenazajel-net",
+    "title": "zenazajel.net",
+    "url": "https://zenazajel.net/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ti"
+  },
+  {
+    "id": "er-asenatv-com",
+    "title": "asenatv.com",
+    "url": "https://asenatv.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ti"
+  }
+]

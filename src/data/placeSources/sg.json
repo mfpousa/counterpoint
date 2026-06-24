@@ -1,16 +1,5 @@
 [
   {
-    "id": "sg-eco-business",
-    "title": "Eco-Business",
-    "url": "https://www.eco-business.com/feeds/all/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "ms"
-  },
-  {
     "id": "sg-the-new-paper",
     "title": "The New Paper",
     "url": "https://www.tnp.sg/feed",
@@ -113,6 +102,17 @@
     "id": "sg-96-3-hao-fm",
     "title": "96.3 Hao FM",
     "url": "https://www.963haofm.sg/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ms"
+  },
+  {
+    "id": "sg-eco-business",
+    "title": "Eco-Business",
+    "url": "https://www.eco-business.com/feeds/all/",
     "kind": "news",
     "topic": "world",
     "lean": null,

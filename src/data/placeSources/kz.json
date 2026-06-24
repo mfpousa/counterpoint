@@ -92,18 +92,20 @@
     "lang": "kk"
   },
   {
-    "id": "kz-tmb-tv",
-    "title": "TMB TV",
-    "url": "http://www.tmb.tv/feed",
+    "id": "kz-src-6",
+    "title": "Жетісу газеті",
+    "url": "https://7-su.kz/feed/",
     "kind": "news",
     "topic": "world",
     "lean": null,
     "confidence": 0.4,
     "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "kk"
+    "lang": "kk",
+    "region": "KZ-33",
+    "regionLabel": "Жетісу облысы"
   },
   {
-    "id": "kz-src-6",
+    "id": "kz-src-7",
     "title": "Знамя Труда",
     "url": "https://ztgzt.kz/feed",
     "kind": "news",
@@ -116,7 +118,7 @@
     "regionLabel": "Жамбыл облысы"
   },
   {
-    "id": "kz-src-7",
+    "id": "kz-src-8",
     "title": "Караван",
     "url": "https://www.caravan.kz/feed",
     "kind": "news",
@@ -129,7 +131,7 @@
     "regionLabel": "Алматы"
   },
   {
-    "id": "kz-src-8",
+    "id": "kz-src-9",
     "title": "Қазақ әдебиеті (газет)",
     "url": "http://qazaqadebieti.kz/feed",
     "kind": "news",
@@ -140,7 +142,7 @@
     "lang": "kk"
   },
   {
-    "id": "kz-src-9",
+    "id": "kz-src-10",
     "title": "Азаттық радиосы",
     "url": "http://www.azattyq.org/api/",
     "kind": "news",

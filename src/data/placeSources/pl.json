@@ -190,19 +190,6 @@
     "lang": "pl"
   },
   {
-    "id": "pl-tygodnik-swarzedzki",
-    "title": "Tygodnik Swarzędzki",
-    "url": "https://swarzedzki.pl/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "pl",
-    "region": "PL-30",
-    "regionLabel": "województwo wielkopolskie"
-  },
-  {
     "id": "pl-polskie-radio-lublin",
     "title": "Polskie Radio Lublin",
     "url": "https://radio.lublin.pl/feed/",
@@ -223,6 +210,120 @@
     "confidence": 0.4,
     "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
     "lang": "pl"
+  },
+  {
+    "id": "pl-studenckie-radio-zak-politechniki-odzkie",
+    "title": "Studenckie Radio Żak Politechniki Łódzkiej",
+    "url": "https://www.zak.lodz.pl/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "pl"
+  },
+  {
+    "id": "pl-tygodnik-swarzedzki",
+    "title": "Tygodnik Swarzędzki",
+    "url": "https://swarzedzki.pl/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "pl",
+    "region": "PL-30",
+    "regionLabel": "województwo wielkopolskie"
+  },
+  {
+    "id": "pl-radio-anio-beskidow",
+    "title": "Radio Anioł Beskidów",
+    "url": "http://www.aniolbeskidow.pl/index.php?format=feed&amp;type=rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "pl"
+  },
+  {
+    "id": "pl-radio-egida",
+    "title": "Radio Egida",
+    "url": "https://egida.us.edu.pl/index.php?format=feed&amp;type=rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "pl"
+  },
+  {
+    "id": "pl-radio-gra",
+    "title": "Radio Gra",
+    "url": "https://gra.fm/feed/rss2",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "pl"
+  },
+  {
+    "id": "pl-radio-rodzina-kalisz",
+    "title": "Radio Rodzina (Kalisz)",
+    "url": "http://www.radiorodzina.kalisz.pl/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "pl"
+  },
+  {
+    "id": "pl-radio-sfera",
+    "title": "Radio Sfera",
+    "url": "https://www.sfera.umk.pl/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "pl"
+  },
+  {
+    "id": "pl-radio-zielona-gora",
+    "title": "Radio Zielona Góra",
+    "url": "https://rzg.pl/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "pl"
+  },
+  {
+    "id": "pl-g-os-pomorza",
+    "title": "Głos Pomorza",
+    "url": "http://www.gp24.pl/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "pl"
+  },
+  {
+    "id": "pl-super-nowosci",
+    "title": "Super Nowości",
+    "url": "https://supernowosci24.pl/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "pl",
+    "region": "PL-18",
+    "regionLabel": "województwo podkarpackie"
   },
   {
     "id": "pl-katolickie-radio-podlasie",
@@ -345,17 +446,6 @@
     "lang": "pl"
   },
   {
-    "id": "pl-radio-centrum",
-    "title": "Radio Centrum",
-    "url": "https://centrum.fm/feed",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "pl"
-  },
-  {
     "id": "pl-radio-em",
     "title": "Radio eM",
     "url": "https://www.radioem.pl/rss/rtr/70b1d2.Najnowsze-audycje",
@@ -367,107 +457,6 @@
     "lang": "pl",
     "region": "PL-24",
     "regionLabel": "województwo śląskie"
-  },
-  {
-    "id": "pl-radio-anio-beskidow",
-    "title": "Radio Anioł Beskidów",
-    "url": "http://www.aniolbeskidow.pl/index.php?format=feed&amp;type=rss",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "pl"
-  },
-  {
-    "id": "pl-radio-egida",
-    "title": "Radio Egida",
-    "url": "https://egida.us.edu.pl/index.php?format=feed&amp;type=rss",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "pl"
-  },
-  {
-    "id": "pl-radio-gra",
-    "title": "Radio Gra",
-    "url": "https://gra.fm/feed/rss2",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "pl"
-  },
-  {
-    "id": "pl-radio-rodzina-kalisz",
-    "title": "Radio Rodzina (Kalisz)",
-    "url": "http://www.radiorodzina.kalisz.pl/rss.xml",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "pl"
-  },
-  {
-    "id": "pl-radio-sfera",
-    "title": "Radio Sfera",
-    "url": "https://www.sfera.umk.pl/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "pl"
-  },
-  {
-    "id": "pl-radio-zielona-gora",
-    "title": "Radio Zielona Góra",
-    "url": "https://rzg.pl/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "pl"
-  },
-  {
-    "id": "pl-dziennik-ba-tycki",
-    "title": "Dziennik Bałtycki",
-    "url": "http://www.dziennikbaltycki.pl/rss",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "pl"
-  },
-  {
-    "id": "pl-g-os-pomorza",
-    "title": "Głos Pomorza",
-    "url": "http://www.gp24.pl/rss",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "pl"
-  },
-  {
-    "id": "pl-super-nowosci",
-    "title": "Super Nowości",
-    "url": "https://supernowosci24.pl/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "pl",
-    "region": "PL-18",
-    "regionLabel": "województwo podkarpackie"
   },
   {
     "id": "pl-radio-sygna-y",
@@ -484,17 +473,6 @@
     "id": "pl-radio-net",
     "title": "Radio NET",
     "url": "http://www.radionet.pl/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "pl"
-  },
-  {
-    "id": "pl-adeste",
-    "title": "Adeste",
-    "url": "https://adeste.org/feed/",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -588,9 +566,20 @@
     "regionLabel": "województwo mazowieckie"
   },
   {
-    "id": "pl-superstacja",
-    "title": "Superstacja",
-    "url": "https://www.superstacja.tv/feed/",
+    "id": "pl-dziennik-ba-tycki",
+    "title": "Dziennik Bałtycki",
+    "url": "http://www.dziennikbaltycki.pl/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "pl"
+  },
+  {
+    "id": "pl-adeste",
+    "title": "Adeste",
+    "url": "https://adeste.org/feed/",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -621,6 +610,17 @@
     "lang": "pl",
     "region": "PL-30",
     "regionLabel": "województwo wielkopolskie"
+  },
+  {
+    "id": "pl-superstacja",
+    "title": "Superstacja",
+    "url": "https://www.superstacja.tv/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "pl"
   },
   {
     "id": "pl-cw-24tv",
@@ -691,6 +691,17 @@
     "lang": "pl"
   },
   {
+    "id": "pl-telewizja-wtk",
+    "title": "Telewizja WTK",
+    "url": "http://www.wtk.pl/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "pl"
+  },
+  {
     "id": "pl-nowa-tv-kielce",
     "title": "Nowa TV Kielce",
     "url": "https://ntv-kielce.pl/feed/",
@@ -746,6 +757,19 @@
     "lang": "pl"
   },
   {
+    "id": "pl-studiomed-tv",
+    "title": "StudioMed TV",
+    "url": "https://studiomed.tv/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "pl",
+    "region": "PL-14",
+    "regionLabel": "województwo mazowieckie"
+  },
+  {
     "id": "pl-zoom-tv",
     "title": "Zoom TV",
     "url": "https://zoomtv.pl/feed",
@@ -760,30 +784,6 @@
     "id": "pl-kino-polska-muzyka",
     "title": "Kino Polska Muzyka",
     "url": "https://kinopolskamuzyka.pl/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "pl"
-  },
-  {
-    "id": "pl-studiomed-tv",
-    "title": "StudioMed TV",
-    "url": "https://studiomed.tv/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "pl",
-    "region": "PL-14",
-    "regionLabel": "województwo mazowieckie"
-  },
-  {
-    "id": "pl-studenckie-radio-zak-politechniki-odzkie",
-    "title": "Studenckie Radio Żak Politechniki Łódzkiej",
-    "url": "https://www.zak.lodz.pl/rss",
     "kind": "news",
     "topic": "world",
     "lean": null,

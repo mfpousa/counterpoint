@@ -1,0 +1,142 @@
+[
+  {
+    "id": "rw-rwanda-broadcasting-agency",
+    "title": "Rwanda Broadcasting Agency",
+    "url": "https://www.rba.co.rw/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "rw",
+    "region": "RW-01",
+    "regionLabel": "Kigali"
+  },
+  {
+    "id": "rw-kt-radio-rwanda",
+    "title": "KT Radio Rwanda",
+    "url": "https://www.ktradio.rw/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "rw",
+    "region": "RW-01",
+    "regionLabel": "Kigali"
+  },
+  {
+    "id": "rw-radio-flash-fm-rwanda",
+    "title": "Radio Flash FM Rwanda",
+    "url": "https://flash.rw/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "rw",
+    "region": "RW-01",
+    "regionLabel": "Kigali"
+  },
+  {
+    "id": "rw-umuseke",
+    "title": "Umuseke",
+    "url": "https://umuseke.rw/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "rw"
+  },
+  {
+    "id": "rw-umuryango",
+    "title": "Umuryango",
+    "url": "https://umuryango.rw/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "rw",
+    "region": "RW-01",
+    "regionLabel": "Kigali"
+  },
+  {
+    "id": "rw-kt-press",
+    "title": "KT Press",
+    "url": "https://www.ktpress.rw/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "rw"
+  },
+  {
+    "id": "rw-rnanews-com",
+    "title": "rnanews.com",
+    "url": "http://www.rnanews.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "rw"
+  },
+  {
+    "id": "rw-intyoza-com",
+    "title": "intyoza.com",
+    "url": "https://intyoza.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "rw"
+  },
+  {
+    "id": "rw-rwandaises-com",
+    "title": "rwandaises.com",
+    "url": "https://rwandaises.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "rw"
+  },
+  {
+    "id": "rw-irmct-org",
+    "title": "irmct.org",
+    "url": "http://irmct.org/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "rw"
+  },
+  {
+    "id": "rw-hose-rw",
+    "title": "hose.rw",
+    "url": "http://hose.rw/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "rw"
+  },
+  {
+    "id": "rw-musabyimana-net",
+    "title": "musabyimana.net",
+    "url": "http://www.musabyimana.net/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "rw"
+  }
+]

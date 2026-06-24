@@ -1,16 +1,5 @@
 [
   {
-    "id": "xk-21",
-    "title": "РТВ 21",
-    "url": "https://rtv21.tv/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "sr"
-  },
-  {
     "id": "xk-kohavision",
     "title": "Kohavision",
     "url": "https://www.koha.net/rss",
@@ -289,6 +278,17 @@
     "id": "xk-radiogjakova-info",
     "title": "radiogjakova.info",
     "url": "http://radiogjakova.info/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "sr"
+  },
+  {
+    "id": "xk-kallxo-com",
+    "title": "kallxo.com",
+    "url": "https://kallxo.com/feed/",
     "kind": "news",
     "topic": "world",
     "lean": null,

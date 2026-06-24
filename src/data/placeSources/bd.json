@@ -88,19 +88,6 @@
   },
   {
     "id": "bd-src-8",
-    "title": "এসএ টিভি",
-    "url": "https://www.satv.tv/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "bn",
-    "region": "BD-C",
-    "regionLabel": "ঢাকা বিভাগ"
-  },
-  {
-    "id": "bd-src-9",
     "title": "দৈনিক সুপ্রভাত বাংলাদেশ",
     "url": "https://suprobhat.com/feed/",
     "kind": "news",
@@ -111,7 +98,7 @@
     "lang": "bn"
   },
   {
-    "id": "bd-src-10",
+    "id": "bd-src-9",
     "title": "দৈনিক পূর্বকোণ",
     "url": "http://www.dainikpurbokone.net/feed",
     "kind": "news",
@@ -124,7 +111,7 @@
     "regionLabel": "চট্টগ্রাম বিভাগ"
   },
   {
-    "id": "bd-src-11",
+    "id": "bd-src-10",
     "title": "বাংলা ট্রিবিউন",
     "url": "http://www.banglatribune.com/feed/",
     "kind": "news",
@@ -137,9 +124,22 @@
     "regionLabel": "ঢাকা বিভাগ"
   },
   {
-    "id": "bd-src-12",
+    "id": "bd-src-11",
     "title": "শীর্ষনিউজ ডট কম",
     "url": "https://sheershanews.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "bn",
+    "region": "BD-C",
+    "regionLabel": "ঢাকা বিভাগ"
+  },
+  {
+    "id": "bd-src-12",
+    "title": "এসএ টিভি",
+    "url": "https://www.satv.tv/feed/",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -165,7 +165,7 @@
   {
     "id": "bd-src-14",
     "title": "সাপ্তাহিক ব্লিটজ",
-    "url": "http://www.weeklyblitz.net/feed/",
+    "url": "http://www.weeklyblitz.net/feed",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -357,7 +357,7 @@
   {
     "id": "bd-deshebideshe-com",
     "title": "deshebideshe.com",
-    "url": "https://www.deshebideshe.com/feed/",
+    "url": "http://deshebideshe.com/rss",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -413,6 +413,17 @@
     "id": "bd-dhakaprotidin-com",
     "title": "dhakaprotidin.com",
     "url": "https://www.dhakaprotidin.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "bn"
+  },
+  {
+    "id": "bd-amaderbarisal-com",
+    "title": "amaderbarisal.com",
+    "url": "http://www.amaderbarisal.com/feed",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -850,6 +861,17 @@
     "lang": "bn"
   },
   {
+    "id": "bd-thedailysangbad-com",
+    "title": "thedailysangbad.com",
+    "url": "https://www.thedailysangbad.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "bn"
+  },
+  {
     "id": "bd-businessleader-club",
     "title": "businessleader.club",
     "url": "http://www.businessleader.club/?feed=rss2",
@@ -951,7 +973,7 @@
   {
     "id": "bd-ournewsbd-com",
     "title": "ournewsbd.com",
-    "url": "https://ournewsbd.net/feed/",
+    "url": "http://ournewsbd.com/feed",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -973,7 +995,7 @@
   {
     "id": "bd-dailysharebiz-net",
     "title": "dailysharebiz.net",
-    "url": "http://dailysharebiz.net/feed",
+    "url": "https://www.dailysharebiz.net/feed/",
     "kind": "news",
     "topic": "world",
     "lean": null,

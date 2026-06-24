@@ -1,0 +1,101 @@
+[
+  {
+    "id": "mw-mbc-tv-1",
+    "title": "MBC TV 1",
+    "url": "https://mbc.mw/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ny"
+  },
+  {
+    "id": "mw-malawivoice-com",
+    "title": "malawivoice.com",
+    "url": "https://www.malawivoice.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ny"
+  },
+  {
+    "id": "mw-mwnation-com",
+    "title": "mwnation.com",
+    "url": "https://mwnation.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ny"
+  },
+  {
+    "id": "mw-malawi24-com",
+    "title": "malawi24.com",
+    "url": "https://malawi24.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ny"
+  },
+  {
+    "id": "mw-maravipost-com",
+    "title": "maravipost.com",
+    "url": "https://www.maravipost.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ny"
+  },
+  {
+    "id": "mw-nyasatimes-com",
+    "title": "nyasatimes.com",
+    "url": "https://www.nyasatimes.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ny"
+  },
+  {
+    "id": "mw-times-mw",
+    "title": "times.mw",
+    "url": "https://times.mw/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ny"
+  },
+  {
+    "id": "mw-faceofmalawi-com",
+    "title": "faceofmalawi.com",
+    "url": "http://www.faceofmalawi.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ny"
+  },
+  {
+    "id": "mw-malawiana-net",
+    "title": "malawiana.net",
+    "url": "https://www.malawiana.net/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ny"
+  }
+]

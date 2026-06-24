@@ -158,17 +158,6 @@
     "lang": "is"
   },
   {
-    "id": "is-huni-is",
-    "title": "huni.is",
-    "url": "https://www.huni.is/rss.php",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "is"
-  },
-  {
     "id": "is-eyjar-net",
     "title": "eyjar.net",
     "url": "http://www.eyjar.net/feed",

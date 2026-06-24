@@ -1,0 +1,171 @@
+[
+  {
+    "id": "tz-daily-news",
+    "title": "Daily News",
+    "url": "https://dailynews.co.tz/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "sw",
+    "region": "TZ-02",
+    "regionLabel": "Mkoa wa Dar es Salaam"
+  },
+  {
+    "id": "tz-the-citizen",
+    "title": "The Citizen",
+    "url": "http://thecitizen.co.tz/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "sw"
+  },
+  {
+    "id": "tz-independent-television",
+    "title": "Independent Television",
+    "url": "https://www.itv.co.tz/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "sw",
+    "region": "TZ-02",
+    "regionLabel": "Mkoa wa Dar es Salaam"
+  },
+  {
+    "id": "tz-mwananchi-co-tz",
+    "title": "mwananchi.co.tz",
+    "url": "https://nation.africa/kenya/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "sw"
+  },
+  {
+    "id": "tz-mwanaspoti-co-tz",
+    "title": "mwanaspoti.co.tz",
+    "url": "http://www.mwanaspoti.co.tz/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "sw"
+  },
+  {
+    "id": "tz-globalpublishers-co-tz",
+    "title": "globalpublishers.co.tz",
+    "url": "https://globalpublishers.co.tz/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "sw"
+  },
+  {
+    "id": "tz-jamhurimedia-co-tz",
+    "title": "jamhurimedia.co.tz",
+    "url": "https://www.jamhurimedia.co.tz/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "sw"
+  },
+  {
+    "id": "tz-habarileo-co-tz",
+    "title": "habarileo.co.tz",
+    "url": "https://habarileo.co.tz/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "sw"
+  },
+  {
+    "id": "tz-businesstimes-co-tz",
+    "title": "businesstimes.co.tz",
+    "url": "https://businesstimes.co.tz/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "sw"
+  },
+  {
+    "id": "tz-bongo5-com",
+    "title": "bongo5.com",
+    "url": "https://bongo5.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "sw"
+  },
+  {
+    "id": "tz-thehabari-com",
+    "title": "thehabari.com",
+    "url": "http://www.thehabari.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "sw"
+  },
+  {
+    "id": "tz-zanzibarleo-co-tz",
+    "title": "zanzibarleo.co.tz",
+    "url": "http://zanzibarleo.co.tz/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "sw"
+  },
+  {
+    "id": "tz-radiomaria-co-tz",
+    "title": "radiomaria.co.tz",
+    "url": "http://www.radiomaria.co.tz/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "sw"
+  },
+  {
+    "id": "tz-startv-co-tz",
+    "title": "startv.co.tz",
+    "url": "https://startv.co.tz/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "sw"
+  },
+  {
+    "id": "tz-radiofreeafrica-co-tz",
+    "title": "radiofreeafrica.co.tz",
+    "url": "http://www.radiofreeafrica.co.tz/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "sw"
+  }
+]

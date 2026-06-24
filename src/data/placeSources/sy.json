@@ -25,6 +25,28 @@
   },
   {
     "id": "sy-src-3",
+    "title": "صحيفة الجماهير",
+    "url": "http://jamahir.alwehda.gov.sy/?feed=rss2",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "sy-src-4",
+    "title": "صحيفة الفداء",
+    "url": "http://fedaa.alwehda.gov.sy/?feed=rss2",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "sy-src-5",
     "title": "إذاعة دمشق",
     "url": "https://damasradio.fm/feed/",
     "kind": "news",
@@ -37,7 +59,7 @@
     "regionLabel": "محافظة دمشق"
   },
   {
-    "id": "sy-src-4",
+    "id": "sy-src-6",
     "title": "عنب بلدي",
     "url": "https://english.enabbaladi.net/feed/",
     "kind": "news",
@@ -50,9 +72,9 @@
     "regionLabel": "محافظة دمشق"
   },
   {
-    "id": "sy-src-5",
+    "id": "sy-src-7",
     "title": "تلفزيون سوريا",
-    "url": "https://www.syria.tv/rss2",
+    "url": "https://www.syria.tv/feed",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -61,7 +83,7 @@
     "lang": "ar"
   },
   {
-    "id": "sy-src-6",
+    "id": "sy-src-8",
     "title": "تلفزيون برايم",
     "url": "https://prime1tv.com/feed/",
     "kind": "news",

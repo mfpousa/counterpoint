@@ -1,0 +1,140 @@
+[
+  {
+    "id": "tg-forum-de-la-semaine",
+    "title": "Forum de la Semaine",
+    "url": "https://forumdelasemaine.tg/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fr"
+  },
+  {
+    "id": "tg-togo-presse",
+    "title": "Togo - Presse",
+    "url": "https://togopresse.tg/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fr",
+    "region": "TG-M",
+    "regionLabel": "Région Maritime"
+  },
+  {
+    "id": "tg-agence-togolaise-de-presse",
+    "title": "Agence togolaise de presse",
+    "url": "https://atop.tg/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fr",
+    "region": "TG-M",
+    "regionLabel": "Région Maritime"
+  },
+  {
+    "id": "tg-radio-kara",
+    "title": "Radio Kara",
+    "url": "https://radiokara.tg/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fr",
+    "region": "TG-K",
+    "regionLabel": "Région de la Kara"
+  },
+  {
+    "id": "tg-togolais-info",
+    "title": "togolais.info",
+    "url": "https://www.togolais.info/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fr"
+  },
+  {
+    "id": "tg-icilome-com",
+    "title": "icilome.com",
+    "url": "https://icilome.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fr"
+  },
+  {
+    "id": "tg-togoactualite-com",
+    "title": "togoactualite.com",
+    "url": "https://togoactualite.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fr"
+  },
+  {
+    "id": "tg-letempstg-com",
+    "title": "letempstg.com",
+    "url": "https://letempstg.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fr"
+  },
+  {
+    "id": "tg-radiogameli-com",
+    "title": "radiogameli.com",
+    "url": "https://radiolebene.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fr"
+  },
+  {
+    "id": "tg-radiolome-tg",
+    "title": "radiolome.tg",
+    "url": "http://www.radiolome.tg/index.php?format=feed&amp;type=rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fr"
+  },
+  {
+    "id": "tg-lomeinfos-com",
+    "title": "lomeinfos.com",
+    "url": "https://www.lomeinfos.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fr"
+  },
+  {
+    "id": "tg-letogolais-com",
+    "title": "letogolais.com",
+    "url": "https://www.letogolais.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "fr"
+  }
+]

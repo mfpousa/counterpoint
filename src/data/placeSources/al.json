@@ -157,7 +157,7 @@
   {
     "id": "al-sot-com-al",
     "title": "sot.com.al",
-    "url": "http://sot.com.al/feed",
+    "url": "https://sot.com.al/feed/",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -168,7 +168,7 @@
   {
     "id": "al-albeu-com",
     "title": "albeu.com",
-    "url": "http://albeu.com/feed/",
+    "url": "https://albeu.com/feed/",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -377,7 +377,7 @@
   {
     "id": "al-rozafa-tv",
     "title": "rozafa.tv",
-    "url": "https://www.schwabe.com.mx/feed/",
+    "url": "https://studenty.me/feed/",
     "kind": "news",
     "topic": "world",
     "lean": null,

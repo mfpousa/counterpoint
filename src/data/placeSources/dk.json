@@ -213,6 +213,17 @@
     "regionLabel": "Region Hovedstaden"
   },
   {
+    "id": "dk-lokalavisen-aarhus",
+    "title": "Lokalavisen Aarhus",
+    "url": "https://feeds.dinavis.dk/topnyheder",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "da"
+  },
+  {
     "id": "dk-l-kken-vra-n-rradio",
     "title": "Løkken-Vrå Nærradio",
     "url": "https://radiolvn.dk/feed/",
@@ -311,30 +322,6 @@
     "lang": "da"
   },
   {
-    "id": "dk-lokalavisen-aarhus",
-    "title": "Lokalavisen Aarhus",
-    "url": "https://feeds.dinavis.dk/topnyheder",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "da"
-  },
-  {
-    "id": "dk-kontrast",
-    "title": "Kontrast",
-    "url": "https://kontrast.dk/feeds/rss/articles/latest-news/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "da",
-    "region": "DK-84",
-    "regionLabel": "Region Hovedstaden"
-  },
-  {
     "id": "dk-point-of-view-international",
     "title": "Point of View International",
     "url": "https://pov.international/feed/",
@@ -355,6 +342,19 @@
     "confidence": 0.4,
     "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
     "lang": "da"
+  },
+  {
+    "id": "dk-kontrast",
+    "title": "Kontrast",
+    "url": "https://kontrast.dk/feeds/rss/articles/latest-news/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "da",
+    "region": "DK-84",
+    "regionLabel": "Region Hovedstaden"
   },
   {
     "id": "dk-radio-loud",
@@ -427,7 +427,7 @@
   {
     "id": "dk-extrafokus",
     "title": "ExtraFokus",
-    "url": "https://extrafokus.com/feed/",
+    "url": "https://extrafokus.com/feed",
     "kind": "news",
     "topic": "world",
     "lean": null,

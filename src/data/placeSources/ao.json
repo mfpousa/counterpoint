@@ -1,0 +1,171 @@
+[
+  {
+    "id": "ao-radio-ecclesia",
+    "title": "Rádio Ecclesia",
+    "url": "https://www.radioecclesia.org/?format=feed&amp;type=rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "pt",
+    "region": "AO-LUA",
+    "regionLabel": "Província de Luanda"
+  },
+  {
+    "id": "ao-tvi-africa",
+    "title": "TVI África",
+    "url": "http://www.tvi.iol.pt/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "pt"
+  },
+  {
+    "id": "ao-radio-mais",
+    "title": "Rádio Mais",
+    "url": "https://radiomais.ao/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "pt",
+    "region": "AO-LUA",
+    "regionLabel": "Província de Luanda"
+  },
+  {
+    "id": "ao-hold-on-angola",
+    "title": "Hold On Angola",
+    "url": "https://holdonangola.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "pt"
+  },
+  {
+    "id": "ao-sapo-pt",
+    "title": "sapo.pt",
+    "url": "http://www.sapo.pt/rss/destaques",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "pt"
+  },
+  {
+    "id": "ao-correiokianda-info",
+    "title": "correiokianda.info",
+    "url": "https://correiokianda.info/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "pt"
+  },
+  {
+    "id": "ao-expansao-co-ao",
+    "title": "expansao.co.ao",
+    "url": "http://www.expansao.co.ao/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "pt"
+  },
+  {
+    "id": "ao-jornalf8-net",
+    "title": "jornalf8.net",
+    "url": "https://jornalf8.net/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "pt"
+  },
+  {
+    "id": "ao-opais-co-ao",
+    "title": "opais.co.ao",
+    "url": "https://www.opais.ao/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "pt"
+  },
+  {
+    "id": "ao-portaldeangola-com",
+    "title": "portaldeangola.com",
+    "url": "http://portaldeangola.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "pt"
+  },
+  {
+    "id": "ao-actsa-org",
+    "title": "actsa.org",
+    "url": "http://actsa.org/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "pt"
+  },
+  {
+    "id": "ao-club-k-net",
+    "title": "club-k.net",
+    "url": "http://www.club-k.net/index.php?option=com_obrss&amp;task=feed&amp;id=2:rss-noticias-do-club-k&amp;format=feed&amp;lang=pt",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "pt"
+  },
+  {
+    "id": "ao-voaportugues-com",
+    "title": "voaportugues.com",
+    "url": "http://voaportugues.com/api/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "pt"
+  },
+  {
+    "id": "ao-mercado-co-ao",
+    "title": "mercado.co.ao",
+    "url": "https://mercado.co.ao/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "pt"
+  },
+  {
+    "id": "ao-novagazeta-co-ao",
+    "title": "novagazeta.co.ao",
+    "url": "https://www.novagazeta.co.ao/rss.php",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "pt"
+  }
+]

@@ -52,7 +52,7 @@
   {
     "id": "tw-cti-international",
     "title": "CTi International",
-    "url": "http://www.ctitv.com.tw/feed",
+    "url": "https://www.ctitv.com.tw/feed",
     "kind": "news",
     "topic": "world",
     "lean": null,

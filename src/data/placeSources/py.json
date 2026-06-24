@@ -1,0 +1,211 @@
+[
+  {
+    "id": "py-latele",
+    "title": "LaTele",
+    "url": "https://www.latele.com.py/index.rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "gn"
+  },
+  {
+    "id": "py-radio-caritas-am-680",
+    "title": "Radio Caritas AM 680",
+    "url": "https://www.caritas.com.py/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "gn"
+  },
+  {
+    "id": "py-itapuanoticias-tv",
+    "title": "itapuanoticias.tv",
+    "url": "https://itapuanoticias.tv/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "gn"
+  },
+  {
+    "id": "py-wochenblatt-cc",
+    "title": "wochenblatt.cc",
+    "url": "https://wochenblatt.cc/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "gn"
+  },
+  {
+    "id": "py-smashasu-com",
+    "title": "smashasu.com",
+    "url": "https://smashasu.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "gn"
+  },
+  {
+    "id": "py-television-com-py",
+    "title": "television.com.py",
+    "url": "https://television.com.py/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "gn"
+  },
+  {
+    "id": "py-cienciasdelsur-com",
+    "title": "cienciasdelsur.com",
+    "url": "https://cienciasdelsur.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "gn"
+  },
+  {
+    "id": "py-consen-so",
+    "title": "consen.so",
+    "url": "https://consen.so/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "gn"
+  },
+  {
+    "id": "py-revistaemancipa-org",
+    "title": "revistaemancipa.org",
+    "url": "https://revistaemancipa.org/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "gn"
+  },
+  {
+    "id": "py-elmundodelbus-com",
+    "title": "elmundodelbus.com",
+    "url": "https://elmundodelbus.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "gn"
+  },
+  {
+    "id": "py-hoy-com-py",
+    "title": "hoy.com.py",
+    "url": "https://www.hoy.com.py/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "gn"
+  },
+  {
+    "id": "py-elsurti-com",
+    "title": "elsurti.com",
+    "url": "http://elsurti.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "gn"
+  },
+  {
+    "id": "py-fronterasecanews-com",
+    "title": "fronterasecanews.com",
+    "url": "https://fronterasecanews.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "gn"
+  },
+  {
+    "id": "py-oviedopress-com",
+    "title": "oviedopress.com",
+    "url": "https://oviedopress.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "gn"
+  },
+  {
+    "id": "py-elotropais-org",
+    "title": "elotropais.org",
+    "url": "https://elotropais.org/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "gn"
+  },
+  {
+    "id": "py-nacurutunews-com",
+    "title": "nacurutunews.com",
+    "url": "https://nacurutunews.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "gn"
+  },
+  {
+    "id": "py-elurbano-com-py",
+    "title": "elurbano.com.py",
+    "url": "https://elurbano.com.py/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "gn"
+  },
+  {
+    "id": "py-capiatanoticias-com-py",
+    "title": "capiatanoticias.com.py",
+    "url": "https://capiatanoticias.com.py/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "gn"
+  },
+  {
+    "id": "py-lavolanta-substack-com",
+    "title": "lavolanta.substack.com",
+    "url": "https://lavolanta.substack.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "gn"
+  }
+]

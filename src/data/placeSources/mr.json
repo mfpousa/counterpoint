@@ -1,0 +1,138 @@
+[
+  {
+    "id": "mr-src",
+    "title": "وكالة الأخبار المستقلة",
+    "url": "https://www.alakhbar.info/latest/rss/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "mr-src-2",
+    "title": "إذاعة موريتانيا",
+    "url": "https://www.radiomauritanie.mr/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar",
+    "region": "MR-15",
+    "regionLabel": "ولاية نواكشوط الجنوبية"
+  },
+  {
+    "id": "mr-cridem-org",
+    "title": "Cridem.org",
+    "url": "https://www.cridem.org/rss/actualites.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "mr-saharamedias-net",
+    "title": "saharamedias.net",
+    "url": "https://saharamedias.net/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "mr-mauriweb",
+    "title": "MauriWeb",
+    "url": "https://mauriweb.info/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "mr-initiatives-news",
+    "title": "Initiatives News",
+    "url": "https://initiativesnews.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "mr-l-authentique-mauritania",
+    "title": "L'Authentique (Mauritania)",
+    "url": "https://www.lauthentic.info/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "mr-le-calame",
+    "title": "Le Calame",
+    "url": "https://lecalame.info/?q=rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar",
+    "region": "MR-15",
+    "regionLabel": "ولاية نواكشوط الجنوبية"
+  },
+  {
+    "id": "mr-al-tawary",
+    "title": "Al-Tawary",
+    "url": "https://tawary.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "mr-alhaqaiq",
+    "title": "alhaqaiq",
+    "url": "https://alhaqaiq.info/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "mr-taqadoum-info",
+    "title": "Taqadoum info",
+    "url": "https://taqadoum.mr/rss.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  },
+  {
+    "id": "mr-journal-tahalil",
+    "title": "Journal Tahalil",
+    "url": "https://www.journaltahalil.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ar"
+  }
+]

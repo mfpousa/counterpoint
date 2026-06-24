@@ -1,0 +1,125 @@
+[
+  {
+    "id": "cf-radio-ndeke-luka",
+    "title": "Radio Ndeke Luka",
+    "url": "https://www.radiondekeluka.org/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "sg",
+    "region": "CF-BGF",
+    "regionLabel": "Kötä gbätä tî Bangî"
+  },
+  {
+    "id": "cf-journaldebangui-com",
+    "title": "journaldebangui.com",
+    "url": "https://www.journaldebangui.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "sg"
+  },
+  {
+    "id": "cf-letsunami-net",
+    "title": "letsunami.net",
+    "url": "https://letsunami.net/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "sg"
+  },
+  {
+    "id": "cf-lepotentielcentrafricain-com",
+    "title": "lepotentielcentrafricain.com",
+    "url": "https://lepotentielcentrafricain.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "sg"
+  },
+  {
+    "id": "cf-centrafrique-presse-over-blog-com",
+    "title": "centrafrique-presse.over-blog.com",
+    "url": "http://centrafrique-presse.over-blog.com/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "sg"
+  },
+  {
+    "id": "cf-voaafrique-com",
+    "title": "voaafrique.com",
+    "url": "https://www.voaafrique.com/api/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "sg"
+  },
+  {
+    "id": "cf-themusebaproject-org",
+    "title": "themusebaproject.org",
+    "url": "https://www.themusebaproject.org/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "sg"
+  },
+  {
+    "id": "cf-centraf-infos-over-blog-com",
+    "title": "centraf-infos.over-blog.com",
+    "url": "http://centraf-infos.over-blog.com/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "sg"
+  },
+  {
+    "id": "cf-takaparlenews-over-blog-com",
+    "title": "takaparlenews.over-blog.com",
+    "url": "http://takaparlenews.over-blog.com/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "sg"
+  },
+  {
+    "id": "cf-nouvellesplus-com",
+    "title": "nouvellesplus.com",
+    "url": "https://nouvellesplus.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "sg"
+  },
+  {
+    "id": "cf-lescollinesdeloubangui-over-blog-com",
+    "title": "lescollinesdeloubangui.over-blog.com",
+    "url": "http://lescollinesdeloubangui.over-blog.com/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "sg"
+  }
+]

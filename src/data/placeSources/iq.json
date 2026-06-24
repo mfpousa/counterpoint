@@ -118,7 +118,7 @@
   {
     "id": "iq-sotaliraq-com",
     "title": "sotaliraq.com",
-    "url": "http://www.sotaliraq.com/feed",
+    "url": "http://www.sotaliraq.com/feed/",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -207,6 +207,17 @@
     "id": "iq-iraqhurr-org",
     "title": "iraqhurr.org",
     "url": "http://www.iraqhurr.org/api/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ku"
+  },
+  {
+    "id": "iq-albayyna-new-com",
+    "title": "albayyna-new.com",
+    "url": "https://albayyna-new.com/feed/",
     "kind": "news",
     "topic": "world",
     "lean": null,

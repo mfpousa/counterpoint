@@ -73,21 +73,8 @@
   },
   {
     "id": "by-src-6",
-    "title": "Родныя вытокі",
-    "url": "https://www.dokshitsy.by/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "be",
-    "region": "BY-VI",
-    "regionLabel": "Віцебская вобласць"
-  },
-  {
-    "id": "by-sputnik",
-    "title": "Sputnik Беларусь",
-    "url": "https://bel.sputnik.by/export/rss2/archive/index.xml",
+    "title": "Народная Воля",
+    "url": "https://nv-online.info/feed",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -156,6 +143,32 @@
   },
   {
     "id": "by-src-11",
+    "title": "Родныя вытокі",
+    "url": "https://www.dokshitsy.by/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "be",
+    "region": "BY-VI",
+    "regionLabel": "Віцебская вобласць"
+  },
+  {
+    "id": "by-sputnik",
+    "title": "Sputnik Беларусь",
+    "url": "https://bel.sputnik.by/export/rss2/archive/index.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "be",
+    "region": "BY-HM",
+    "regionLabel": "Мінск"
+  },
+  {
+    "id": "by-src-12",
     "title": "Веснік Глыбоччыны",
     "url": "http://vg-gazeta.by/feed",
     "kind": "news",
@@ -168,7 +181,7 @@
     "regionLabel": "Віцебская вобласць"
   },
   {
-    "id": "by-src-12",
+    "id": "by-src-13",
     "title": "Жыццё Прыдзвіння",
     "url": "https://pridvinje.by/feed/",
     "kind": "news",
@@ -181,7 +194,7 @@
     "regionLabel": "Віцебская вобласць"
   },
   {
-    "id": "by-src-13",
+    "id": "by-src-14",
     "title": "Новополоцк сегодня",
     "url": "https://www.novaya.by/feed/",
     "kind": "news",
@@ -194,7 +207,7 @@
     "regionLabel": "Віцебская вобласць"
   },
   {
-    "id": "by-src-14",
+    "id": "by-src-15",
     "title": "Полацкі веснік",
     "url": "https://www.pvestnik.by/feed/",
     "kind": "news",
@@ -207,7 +220,7 @@
     "regionLabel": "Віцебская вобласць"
   },
   {
-    "id": "by-src-15",
+    "id": "by-src-16",
     "title": "Сцяг Перамогі",
     "url": "https://www.lioznonews.by/feed/",
     "kind": "news",
@@ -220,7 +233,7 @@
     "regionLabel": "Віцебская вобласць"
   },
   {
-    "id": "by-src-16",
+    "id": "by-src-17",
     "title": "Чырвоны прамень",
     "url": "https://www.chashnikinews.by/feed/",
     "kind": "news",
@@ -233,7 +246,7 @@
     "regionLabel": "Віцебская вобласць"
   },
   {
-    "id": "by-src-17",
+    "id": "by-src-18",
     "title": "Гарадоцкі веснік",
     "url": "https://www.garadvest.by/feed/",
     "kind": "news",
@@ -244,7 +257,7 @@
     "lang": "be"
   },
   {
-    "id": "by-src-18",
+    "id": "by-src-19",
     "title": "Каталіцкі веснік",
     "url": "https://catholicnews.by/feed/",
     "kind": "news",
@@ -255,7 +268,7 @@
     "lang": "be"
   },
   {
-    "id": "by-src-19",
+    "id": "by-src-20",
     "title": "Кліч Радзімы",
     "url": "http://www.klich.by/?feed=rss2",
     "kind": "news",
@@ -268,7 +281,7 @@
     "regionLabel": "Віцебская вобласць"
   },
   {
-    "id": "by-src-20",
+    "id": "by-src-21",
     "title": "Да новых перамог",
     "url": "https://www.kleck.by/feed/",
     "kind": "news",
@@ -279,7 +292,7 @@
     "lang": "be"
   },
   {
-    "id": "by-src-21",
+    "id": "by-src-22",
     "title": "Ганцавіцкі час",
     "url": "https://ganc-chas.com/feed",
     "kind": "news",
@@ -290,7 +303,7 @@
     "lang": "be"
   },
   {
-    "id": "by-src-22",
+    "id": "by-src-23",
     "title": "Ваяр",
     "url": "https://vayar.mil.by/rss/news",
     "kind": "news",
@@ -301,9 +314,9 @@
     "lang": "be"
   },
   {
-    "id": "by-src-23",
+    "id": "by-src-24",
     "title": "Мінск-Навіны",
-    "url": "https://minsknews.by/feed/",
+    "url": "https://minsknews.by/feed",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -314,7 +327,7 @@
     "regionLabel": "Мінск"
   },
   {
-    "id": "by-src-24",
+    "id": "by-src-25",
     "title": "Радыё Марыя",
     "url": "https://radiomaria.by/?format=feed&amp;type=rss",
     "kind": "news",
@@ -325,7 +338,7 @@
     "lang": "be"
   },
   {
-    "id": "by-src-25",
+    "id": "by-src-26",
     "title": "Новости Бобруйска",
     "url": "https://babruisk.info/feed/",
     "kind": "news",
@@ -448,7 +461,7 @@
   {
     "id": "by-mk-by",
     "title": "mk.by",
-    "url": "http://mk.by/feed/",
+    "url": "http://mk.by/feed",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -459,7 +472,7 @@
   {
     "id": "by-telegraf-by",
     "title": "telegraf.by",
-    "url": "https://telegraf.news/feed/",
+    "url": "http://telegraf.by/feed/",
     "kind": "news",
     "topic": "world",
     "lean": null,

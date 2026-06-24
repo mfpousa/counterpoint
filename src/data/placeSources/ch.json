@@ -74,19 +74,6 @@
     "lang": "rm"
   },
   {
-    "id": "ch-hd-suisse",
-    "title": "HD suisse",
-    "url": "http://www.srgssrideesuisse.ch/feed",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "rm",
-    "region": "CH-ZH",
-    "regionLabel": "Chantun Turitg"
-  },
-  {
     "id": "ch-cnnmoney-switzerland",
     "title": "CNNMoney Switzerland",
     "url": "https://cnnmoney.ch/feed/",
@@ -109,6 +96,19 @@
     "confidence": 0.4,
     "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
     "lang": "rm"
+  },
+  {
+    "id": "ch-hd-suisse",
+    "title": "HD suisse",
+    "url": "http://www.srgssrideesuisse.ch/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "rm",
+    "region": "CH-ZH",
+    "regionLabel": "Chantun Turitg"
   },
   {
     "id": "ch-tageswoche",

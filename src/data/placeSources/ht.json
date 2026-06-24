@@ -2,7 +2,7 @@
   {
     "id": "ht-signal-fm",
     "title": "Signal FM",
-    "url": "https://signalfmhaiti.com/feed/",
+    "url": "http://www.signalfmhaiti.com/feed",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -63,17 +63,6 @@
     "lang": "ht"
   },
   {
-    "id": "ht-hebdo24",
-    "title": "Hebdo24",
-    "url": "https://hebdo24.com/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "ht"
-  },
-  {
     "id": "ht-haitiliberte-com",
     "title": "haitiliberte.com",
     "url": "https://haitiliberte.com/feed/",
@@ -98,18 +87,7 @@
   {
     "id": "ht-rezonodwes-com",
     "title": "rezonodwes.com",
-    "url": "https://rezonodwes.com/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "ht"
-  },
-  {
-    "id": "ht-haitilibre-com",
-    "title": "haitilibre.com",
-    "url": "https://www.haitilibre.com/rss-flash.php",
+    "url": "http://rezonodwes.com/feed",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -142,7 +120,7 @@
   {
     "id": "ht-haitian-truth-org",
     "title": "haitian-truth.org",
-    "url": "http://haitian-truth.org/?feed=rss2",
+    "url": "https://www.haitian-truth.org/feed/",
     "kind": "news",
     "topic": "world",
     "lean": null,

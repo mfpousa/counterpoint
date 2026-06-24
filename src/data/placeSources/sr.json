@@ -1,0 +1,107 @@
+[
+  {
+    "id": "sr-ampies-broadcasting-corporation-suriname",
+    "title": "Ampies Broadcasting Corporation Suriname",
+    "url": "https://abcsuriname.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "nl",
+    "region": "SR-PM",
+    "regionLabel": "Paramaribo"
+  },
+  {
+    "id": "sr-atv-suriname",
+    "title": "ATV (Suriname)",
+    "url": "https://atv.sr/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "nl",
+    "region": "SR-PM",
+    "regionLabel": "Paramaribo"
+  },
+  {
+    "id": "sr-de-ware-tijd",
+    "title": "De Ware Tijd",
+    "url": "https://dwtonline.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "nl",
+    "region": "SR-PM",
+    "regionLabel": "Paramaribo"
+  },
+  {
+    "id": "sr-waterkant",
+    "title": "Waterkant",
+    "url": "https://www.waterkant.net/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "nl"
+  },
+  {
+    "id": "sr-gfc-nieuws",
+    "title": "GFC Nieuws",
+    "url": "https://www.gfcnieuws.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "nl"
+  },
+  {
+    "id": "sr-dbsuriname-com",
+    "title": "dbsuriname.com",
+    "url": "http://www.dbsuriname.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "nl"
+  },
+  {
+    "id": "sr-srherald-com",
+    "title": "srherald.com",
+    "url": "https://www.srherald.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "nl"
+  },
+  {
+    "id": "sr-unitednews-sr",
+    "title": "unitednews.sr",
+    "url": "https://unitednews.sr/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "nl"
+  },
+  {
+    "id": "sr-politie-sr",
+    "title": "politie.sr",
+    "url": "https://politie.sr/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "nl"
+  }
+]

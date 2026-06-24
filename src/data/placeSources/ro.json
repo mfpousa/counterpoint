@@ -107,30 +107,6 @@
     "regionLabel": "București"
   },
   {
-    "id": "ro-prosport",
-    "title": "ProSport",
-    "url": "https://www.prosport.ro/feed",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "ro",
-    "region": "RO-B",
-    "regionLabel": "București"
-  },
-  {
-    "id": "ro-nine-o-clock",
-    "title": "Nine O' Clock",
-    "url": "http://www.nineoclock.ro/feed",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "ro"
-  },
-  {
     "id": "ro-curentul",
     "title": "Curentul",
     "url": "https://www.curentul.info/feed/",
@@ -155,9 +131,9 @@
     "regionLabel": "București"
   },
   {
-    "id": "ro-romania-libera",
-    "title": "România liberă",
-    "url": "https://romanialibera.ro/feed/",
+    "id": "ro-uj-magyar-szo",
+    "title": "Új Magyar Szó",
+    "url": "http://www.maszol.ro/rss",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -166,9 +142,35 @@
     "lang": "ro"
   },
   {
-    "id": "ro-uj-magyar-szo",
-    "title": "Új Magyar Szó",
-    "url": "http://www.maszol.ro/rss",
+    "id": "ro-szabadsag",
+    "title": "Szabadság",
+    "url": "http://www.szabadsag.ro/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ro",
+    "region": "RO-CJ",
+    "regionLabel": "Județul Cluj"
+  },
+  {
+    "id": "ro-tvr-1",
+    "title": "TVR 1",
+    "url": "http://www.tvr.ro/rss/stiri.xml",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ro",
+    "region": "RO-B",
+    "regionLabel": "București"
+  },
+  {
+    "id": "ro-romania-libera",
+    "title": "România liberă",
+    "url": "https://romanialibera.ro/feed/",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -210,32 +212,6 @@
     "lang": "ro",
     "region": "RO-DJ",
     "regionLabel": "Județul Dolj"
-  },
-  {
-    "id": "ro-szabadsag",
-    "title": "Szabadság",
-    "url": "http://www.szabadsag.ro/feed",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "ro",
-    "region": "RO-CJ",
-    "regionLabel": "Județul Cluj"
-  },
-  {
-    "id": "ro-tvr-1",
-    "title": "TVR 1",
-    "url": "http://www.tvr.ro/rss/stiri.xml",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "ro",
-    "region": "RO-B",
-    "regionLabel": "București"
   },
   {
     "id": "ro-radio-cluj",
@@ -541,41 +517,6 @@
     "regionLabel": "București"
   },
   {
-    "id": "ro-radio-romania-cultural",
-    "title": "Radio România Cultural",
-    "url": "https://www.radioromaniacultural.ro/rss",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "ro"
-  },
-  {
-    "id": "ro-radio-romania-actualitati",
-    "title": "Radio România Actualități",
-    "url": "http://www.romania-actualitati.ro/rss",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "ro"
-  },
-  {
-    "id": "ro-romania-tv",
-    "title": "România TV",
-    "url": "https://www.romaniatv.net/feed",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "ro",
-    "region": "RO-B",
-    "regionLabel": "București"
-  },
-  {
     "id": "ro-virgin-radio-romania",
     "title": "Virgin Radio România",
     "url": "https://virginradio.ro/feed",
@@ -609,6 +550,41 @@
     "lang": "ro",
     "region": "RO-CJ",
     "regionLabel": "Județul Cluj"
+  },
+  {
+    "id": "ro-radio-romania-cultural",
+    "title": "Radio România Cultural",
+    "url": "https://www.radioromaniacultural.ro/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ro"
+  },
+  {
+    "id": "ro-radio-romania-actualitati",
+    "title": "Radio România Actualități",
+    "url": "http://www.romania-actualitati.ro/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ro"
+  },
+  {
+    "id": "ro-romania-tv",
+    "title": "România TV",
+    "url": "https://www.romaniatv.net/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ro",
+    "region": "RO-B",
+    "regionLabel": "București"
   },
   {
     "id": "ro-telesport",
@@ -765,6 +741,30 @@
     "id": "ro-agro-tv",
     "title": "Agro TV",
     "url": "https://agro-tv.ro/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ro"
+  },
+  {
+    "id": "ro-prosport",
+    "title": "ProSport",
+    "url": "https://www.prosport.ro/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ro",
+    "region": "RO-B",
+    "regionLabel": "București"
+  },
+  {
+    "id": "ro-nine-o-clock",
+    "title": "Nine O' Clock",
+    "url": "http://www.nineoclock.ro/feed",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -1280,7 +1280,7 @@
   {
     "id": "ro-monitorulbt-ro",
     "title": "monitorulbt.ro",
-    "url": "https://www.monitorulbt.ro/comments/feed/",
+    "url": "https://www.monitorulbt.ro/feed/",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -1303,6 +1303,17 @@
     "id": "ro-ziaruldebacau-ro",
     "title": "ziaruldebacau.ro",
     "url": "https://ziaruldebacau.ro/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "ro"
+  },
+  {
+    "id": "ro-monitoruldevaslui-ro",
+    "title": "monitoruldevaslui.ro",
+    "url": "https://www.monitoruldevaslui.ro/feed/",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -1468,17 +1479,6 @@
     "id": "ro-informatiavranceana-ro",
     "title": "informatiavranceana.ro",
     "url": "https://informatiavranceana.ro/feed/",
-    "kind": "news",
-    "topic": "world",
-    "lean": null,
-    "confidence": 0.4,
-    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
-    "lang": "ro"
-  },
-  {
-    "id": "ro-estnews-ro",
-    "title": "estnews.ro",
-    "url": "https://estnews.ro/feed/",
     "kind": "news",
     "topic": "world",
     "lean": null,

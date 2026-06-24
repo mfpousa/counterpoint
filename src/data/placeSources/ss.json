@@ -1,0 +1,68 @@
+[
+  {
+    "id": "ss-eye-radio",
+    "title": "Eye Radio",
+    "url": "https://www.eyeradio.org/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "ss-radiotamazuj-org",
+    "title": "radiotamazuj.org",
+    "url": "https://www.radiotamazuj.org/en/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "ss-pachodo-org",
+    "title": "pachodo.org",
+    "url": "https://pachodo.org/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "ss-nyamile-com",
+    "title": "nyamile.com",
+    "url": "https://www.nyamile.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "ss-ssnewsnow-com",
+    "title": "ssnewsnow.com",
+    "url": "https://ssnewsnow.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "ss-hotinjuba-com",
+    "title": "hotinjuba.com",
+    "url": "http://hotinjuba.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  }
+]

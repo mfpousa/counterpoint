@@ -64,8 +64,8 @@
   },
   {
     "id": "bg-src-4",
-    "title": "Стършел (вестник)",
-    "url": "http://www.starshel.bg/feed/",
+    "title": "Стандарт",
+    "url": "https://www.standartnews.com/rss",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -75,8 +75,8 @@
   },
   {
     "id": "bg-src-5",
-    "title": "Стандарт",
-    "url": "https://www.standartnews.com/rss",
+    "title": "Стършел (вестник)",
+    "url": "https://starshel.bg/feed/",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -122,7 +122,7 @@
   {
     "id": "bg-mm",
     "title": "MM (телевизия)",
-    "url": "http://mmtvmusic.com/rss",
+    "url": "https://mmtvmusic.com/feed/",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -344,6 +344,17 @@
     "id": "bg-politika-rs",
     "title": "politika.rs",
     "url": "http://www.politika.rs/rss",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "bg"
+  },
+  {
+    "id": "bg-focus-news-net",
+    "title": "focus-news.net",
+    "url": "https://www.focus-news.net/rss.php",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -651,7 +662,7 @@
   {
     "id": "bg-tranonline-info",
     "title": "tranonline.info",
-    "url": "http://www.tranonline.info/rss.xml",
+    "url": "https://tranonline.info/rss.xml",
     "kind": "news",
     "topic": "world",
     "lean": null,

@@ -61,7 +61,7 @@
   {
     "id": "cy-philenews-com",
     "title": "philenews.com",
-    "url": "http://www.philenews.com/feed",
+    "url": "http://www.philenews.com/feed/",
     "kind": "news",
     "topic": "world",
     "lean": null,
@@ -183,6 +183,17 @@
     "id": "cy-observercyprus-com",
     "title": "observercyprus.com",
     "url": "https://www.observercyprus.com/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "el"
+  },
+  {
+    "id": "cy-financialmirror-com",
+    "title": "financialmirror.com",
+    "url": "https://www.financialmirror.com/feed/",
     "kind": "news",
     "topic": "world",
     "lean": null,

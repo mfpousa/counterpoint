@@ -1,0 +1,24 @@
+[
+  {
+    "id": "sc-jeuneafrique-com",
+    "title": "jeuneafrique.com",
+    "url": "https://www.jeuneafrique.com/feed",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  },
+  {
+    "id": "sc-sbc-sc",
+    "title": "sbc.sc",
+    "url": "https://www.sbc.sc/feed/",
+    "kind": "news",
+    "topic": "world",
+    "lean": null,
+    "confidence": 0.4,
+    "leanRationale": "Discovered via dataset; lean assigned per item by analysis (not source-level).",
+    "lang": "en"
+  }
+]
