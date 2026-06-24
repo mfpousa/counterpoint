@@ -5,12 +5,25 @@
 // + left->right comparison are layered in once the server emits them; this screen
 // already renders them when present and degrades cleanly when they're absent.
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { fetchStory } from "../../src/lib/api";
+import {
+  deepenStoryOnce,
+  fetchStory,
+  streamDeepen,
+  type DeepenLogEntry,
+} from "../../src/lib/api";
 import { cacheStories, getCachedStories, getCachedStory } from "../../src/lib/storyCache";
 import { goBack, openNews, openStory } from "../../src/lib/nav";
 import { topicMeta } from "../../src/lib/topics";
@@ -58,6 +71,19 @@ function tlDate(ms: number): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+/** A small glyph prefixing a dive-deeper log line by level (console-style). */
+function deepPrefix(level: DeepenLogEntry["level"]): string {
+  return level === "step" ? "▸ " : level === "ok" ? "✓ " : level === "warn" ? "! " : "   ";
+}
+
+/** Colour for a dive-deeper log line by level. */
+function deepColor(level: DeepenLogEntry["level"]): string {
+  if (level === "ok") return colors.good;
+  if (level === "warn") return colors.warn;
+  if (level === "step") return colors.text;
+  return colors.textDim;
 }
 
 export default function StoryPanel() {
@@ -134,6 +160,71 @@ export default function StoryPanel() {
   }, [story]);
   const m = story ? topicMeta(story.topic) : null;
 
+  // "Dive deeper" (debug + enrichment): asks the server to fetch more side coverage and
+  // re-synthesize THIS story, streaming a verbose log of exactly what it looks for so the
+  // side calculation is debuggable. The rebuilt story (with recomputed sides) replaces the
+  // displayed one when it lands.
+  const [deepOpen, setDeepOpen] = useState(false);
+  const [deepBusy, setDeepBusy] = useState(false);
+  const [deepLog, setDeepLog] = useState<DeepenLogEntry[]>([]);
+  const deepRef = useRef<{ cancel: () => void } | null>(null);
+  // Cancel any in-flight deepen + reset the panel when the story changes / on unmount.
+  useEffect(() => {
+    deepRef.current?.cancel();
+    deepRef.current = null;
+    setDeepOpen(false);
+    setDeepBusy(false);
+    setDeepLog([]);
+    return () => deepRef.current?.cancel();
+  }, [id]);
+
+  const diveDeeper = useCallback(() => {
+    if (!id || deepBusy) return;
+    setDeepOpen(true);
+    setDeepLog([]);
+    setDeepBusy(true);
+    const applyStory = (s: Story | null) => {
+      if (s) {
+        cacheStories([s]);
+        setStory(s);
+      }
+    };
+    let gotLog = false;
+    const runFallback = () => {
+      void deepenStoryOnce({ id, world: worldId, lang: prefs.language }).then(({ story: s, log }) => {
+        setDeepLog(log.length > 0 ? log : [{ level: "warn", msg: "No progress reported." }]);
+        applyStory(s);
+        setDeepBusy(false);
+      });
+    };
+    const handle = streamDeepen({
+      id,
+      world: worldId,
+      lang: prefs.language,
+      onLog: (entry) => {
+        gotLog = true;
+        setDeepLog((prev) => [...prev, entry]);
+      },
+      onStory: applyStory,
+      onDone: () => setDeepBusy(false),
+      onError: (msg) => {
+        // Nothing streamed yet (SSE unavailable here) → try the one-shot endpoint;
+        // a mid-stream failure just appends a warning and stops the spinner.
+        if (!gotLog) {
+          runFallback();
+        } else {
+          setDeepLog((prev) => [...prev, { level: "warn", msg }]);
+          setDeepBusy(false);
+        }
+      },
+    });
+    if (!handle) {
+      runFallback();
+      return;
+    }
+    deepRef.current = handle;
+  }, [id, worldId, prefs.language, deepBusy]);
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.topBar}>
@@ -208,6 +299,55 @@ export default function StoryPanel() {
                 </>
               )}
             </View>
+
+            {story.developing && (
+              <View style={styles.deepWrap}>
+                <Pressable
+                  style={[styles.deepBtn, deepBusy && styles.deepBtnBusy]}
+                  onPress={diveDeeper}
+                  disabled={deepBusy}
+                  accessibilityRole="button"
+                  accessibilityLabel={t("storyPanel.diveDeeper")}
+                >
+                  {deepBusy ? (
+                    <ActivityIndicator size="small" color={colors.accent} />
+                  ) : (
+                    <Ionicons name="search" size={15} color={colors.accent} />
+                  )}
+                  <Text style={styles.deepBtnText}>
+                    {deepBusy ? t("storyPanel.diveDeeperBusy") : t("storyPanel.diveDeeper")}
+                  </Text>
+                </Pressable>
+                {deepOpen && (
+                  <View style={styles.deepPanel}>
+                    <View style={styles.deepPanelHead}>
+                      <Text style={styles.deepPanelTitle}>{t("storyPanel.deepProgress")}</Text>
+                      {!deepBusy && (
+                        <Pressable
+                          onPress={() => setDeepOpen(false)}
+                          hitSlop={8}
+                          accessibilityRole="button"
+                          accessibilityLabel="Close"
+                        >
+                          <Ionicons name="close" size={16} color={colors.textDim} />
+                        </Pressable>
+                      )}
+                    </View>
+                    {deepLog.length === 0 && deepBusy && (
+                      <Text style={[styles.deepLine, { color: colors.textDim }]}>
+                        {t("storyPanel.diveDeeperHint")}
+                      </Text>
+                    )}
+                    {deepLog.map((e, i) => (
+                      <Text key={i} style={[styles.deepLine, { color: deepColor(e.level) }]}>
+                        {deepPrefix(e.level)}
+                        {e.msg}
+                      </Text>
+                    ))}
+                  </View>
+                )}
+              </View>
+            )}
 
             {change?.hasUpdates && (
               <View style={styles.updateBanner}>
@@ -595,6 +735,48 @@ const styles = StyleSheet.create({
   zoneChipText: { color: colors.accent, fontSize: font.tiny, fontWeight: "800" },
   sideFraming: { color: colors.textDim, fontSize: font.small, lineHeight: font.small * 1.5 },
   sideOutlets: { color: colors.textFaint, fontSize: font.tiny, fontWeight: "600" },
+  // "Dive deeper" debug action + verbose server-progress console.
+  deepWrap: { gap: spacing.sm, marginTop: spacing.sm },
+  deepBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    alignSelf: "flex-start",
+    paddingHorizontal: spacing.md,
+    paddingVertical: 9,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.accent + "66",
+    backgroundColor: colors.accent + "14",
+  },
+  deepBtnBusy: { opacity: 0.7 },
+  deepBtnText: { color: colors.accent, fontSize: font.small, fontWeight: "800" },
+  deepPanel: {
+    backgroundColor: "#0b0f14",
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+    gap: 3,
+  },
+  deepPanelHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 4,
+  },
+  deepPanelTitle: {
+    color: colors.textDim,
+    fontSize: font.tiny,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+  deepLine: {
+    fontSize: font.tiny,
+    lineHeight: 16,
+    fontFamily: Platform.select({ ios: "Menlo", android: "monospace", default: "monospace" }),
+  },
   relatedRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs, paddingVertical: spacing.xs },
   relatedText: { flex: 1, color: colors.accent, fontSize: font.small, fontWeight: "600" },
   disclaimer: { color: colors.textFaint, fontSize: font.tiny, fontStyle: "italic", marginTop: spacing.lg },

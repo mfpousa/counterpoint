@@ -13,6 +13,7 @@ import { aiReachable } from "./ai";
 import { config } from "./config";
 import {
   clearCaches,
+  deepenStory,
   getBriefing,
   getBriefingStream,
   getCoverage,
@@ -22,6 +23,7 @@ import {
   getStories,
   getStoriesStream,
   getStory,
+  type DeepenLog,
 } from "./feedService";
 import { gradeSummary } from "./grade";
 import { getRegions } from "./regions";
@@ -303,6 +305,72 @@ app.get("/api/story", async (req, res) => {
   } catch (e) {
     console.error("[api] /api/story failed:", e);
     res.status(500).json({ error: e instanceof Error ? e.message : "failed" });
+  }
+});
+
+// "DIVE DEEPER" on one story (SSE): re-derive the involved countries, reactively pull each
+// country's discovered outlets, force-join the related coverage and RE-SYNTHESIZE so the
+// SIDES recompute. Streams a verbose `log` event per step (debug the side calculation),
+// then a `story` event with the rebuilt story, then `done`. Events: log, story, done, error.
+app.get("/api/story/deepen/stream", async (req, res) => {
+  res.set({
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache, no-transform",
+    Connection: "keep-alive",
+    "X-Accel-Buffering": "no",
+  });
+  res.flushHeaders?.();
+  let closed = false;
+  req.on("close", () => {
+    closed = true;
+  });
+  const send = (event: string, data: unknown) => {
+    if (closed) return;
+    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  };
+  const id = typeof req.query.id === "string" ? req.query.id : "";
+  if (!id) {
+    send("error", "missing story id");
+    if (!closed) res.end();
+    return;
+  }
+  try {
+    const story = await deepenStory(
+      readWorld(req.query.world),
+      id,
+      readLang(req.query.lang),
+      (entry) => send("log", entry),
+    );
+    send("story", story);
+    send("done", null);
+  } catch (e) {
+    console.error("[api] /api/story/deepen/stream failed:", e);
+    send("error", e instanceof Error ? e.message : "deepen failed");
+  } finally {
+    if (!closed) res.end();
+  }
+});
+
+// Non-streaming "dive deeper" fallback (runtimes without a readable SSE body, e.g. native
+// fetch): runs the same deepen, collecting the verbose log, and returns it all at once.
+app.get("/api/story/deepen", async (req, res) => {
+  const id = typeof req.query.id === "string" ? req.query.id : "";
+  if (!id) {
+    res.status(400).json({ error: "missing story id" });
+    return;
+  }
+  const log: DeepenLog[] = [];
+  try {
+    const story = await deepenStory(
+      readWorld(req.query.world),
+      id,
+      readLang(req.query.lang),
+      (entry) => log.push(entry),
+    );
+    res.json({ story, log });
+  } catch (e) {
+    console.error("[api] /api/story/deepen failed:", e);
+    res.status(500).json({ story: null, log, error: e instanceof Error ? e.message : "deepen failed" });
   }
 });
 

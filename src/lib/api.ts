@@ -350,6 +350,131 @@ export function streamBriefing(h: BriefingStreamHandlers): { cancel: () => void 
   return { cancel: () => controller.abort() };
 }
 
+/** One verbose progress line from a "dive deeper" run (matches the server DeepenLog). */
+export interface DeepenLogEntry {
+  level: "info" | "step" | "ok" | "warn";
+  msg: string;
+}
+
+export interface DeepenStreamHandlers {
+  /** The story to deepen. */
+  id: string;
+  /** A verbose progress line (append to the live debug log). */
+  onLog: (entry: DeepenLogEntry) => void;
+  /** The rebuilt story once re-synthesis finishes (null if it couldn't be resolved). */
+  onStory: (story: Story | null) => void;
+  /** The stream finished. */
+  onDone: () => void;
+  /** A failure (or that streaming is unsupported here) — caller may fall back. */
+  onError: (message: string) => void;
+  world?: string;
+  lang?: Lang;
+}
+
+/**
+ * Stream a "dive deeper" run over SSE so the story screen can show, live, exactly what the
+ * server looks for (countries detected → outlets fetched → coverage kept → sides formed).
+ * Returns a handle with `cancel()`, or `null` when streaming isn't supported here (caller
+ * should fall back to the non-streaming deepenStoryOnce).
+ */
+export function streamDeepen(h: DeepenStreamHandlers): { cancel: () => void } | null {
+  if (typeof fetch === "undefined" || typeof ReadableStream === "undefined") return null;
+
+  const params = new URLSearchParams();
+  params.set("id", h.id);
+  if (h.world) params.set("world", h.world);
+  if (h.lang) params.set("lang", h.lang);
+  const controller = new AbortController();
+
+  const dispatch = (frame: string) => {
+    let event = "message";
+    const dataLines: string[] = [];
+    for (const line of frame.split("\n")) {
+      if (line.startsWith("event:")) event = line.slice(6).trim();
+      else if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
+    }
+    if (dataLines.length === 0) return;
+    let payload: unknown;
+    try {
+      payload = JSON.parse(dataLines.join("\n"));
+    } catch {
+      return;
+    }
+    if (event === "log" && payload && typeof payload === "object") {
+      h.onLog(payload as DeepenLogEntry);
+    } else if (event === "story") h.onStory((payload as Story | null) ?? null);
+    else if (event === "done") h.onDone();
+    else if (event === "error") h.onError(typeof payload === "string" ? payload : "deepen failed");
+  };
+
+  (async () => {
+    try {
+      const res = await fetch(`${apiBaseUrl()}/api/story/deepen/stream?${params.toString()}`, {
+        method: "GET",
+        headers: { Accept: "text/event-stream" },
+        signal: controller.signal,
+      });
+      const reader = res.body?.getReader?.();
+      if (!res.ok || !reader) {
+        h.onError("stream unavailable");
+        return;
+      }
+      const decoder = new TextDecoder();
+      let buffer = "";
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        let idx: number;
+        while ((idx = buffer.indexOf("\n\n")) !== -1) {
+          dispatch(buffer.slice(0, idx));
+          buffer = buffer.slice(idx + 2);
+        }
+      }
+      if (buffer.trim()) dispatch(buffer);
+    } catch (e) {
+      if (!controller.signal.aborted) {
+        h.onError(e instanceof Error ? e.message : "stream failed");
+      }
+    }
+  })();
+
+  return { cancel: () => controller.abort() };
+}
+
+/**
+ * Non-streaming "dive deeper" (fallback where SSE bodies aren't readable, e.g. native
+ * fetch): runs the deepen on the server and returns the rebuilt story plus the whole
+ * verbose log at once. Never throws.
+ */
+export async function deepenStoryOnce(opts: {
+  id: string;
+  world?: string;
+  lang?: Lang;
+}): Promise<{ story: Story | null; log: DeepenLogEntry[] }> {
+  const params = new URLSearchParams();
+  params.set("id", opts.id);
+  if (opts.world) params.set("world", opts.world);
+  if (opts.lang) params.set("lang", opts.lang);
+  try {
+    const res = await fetch(`${apiBaseUrl()}/api/story/deepen?${params.toString()}`, {
+      method: "GET",
+    });
+    const data = (await res.json().catch(() => null)) as
+      | { story?: Story | null; log?: DeepenLogEntry[]; error?: string }
+      | null;
+    if (!res.ok || !data) {
+      return {
+        story: null,
+        log: [{ level: "warn", msg: data?.error ?? `Deepen failed (HTTP ${res.status}).` }],
+      };
+    }
+    return { story: data.story ?? null, log: Array.isArray(data.log) ? data.log : [] };
+  } catch (e) {
+    return { story: null, log: [{ level: "warn", msg: e instanceof Error ? e.message : "deepen failed" }] };
+  }
+}
+
 /**
  * Grade the reader's recall summary of an item against the article. Throws with
  * a clear message on failure so the summary UI can surface it (model offline,

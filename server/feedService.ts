@@ -47,7 +47,7 @@ import {
   type ItemAnalysis,
 } from "./analysis";
 import { generateBriefing, generateBriefingStream } from "./briefing";
-import { jaccard, titleTokens, type ClusterInput } from "./cluster";
+import { clusterItems, jaccard, titleTokens, type ClusterInput } from "./cluster";
 import { runStoryPlan } from "./clusterPool";
 import { config } from "./config";
 import type { StoryPlanConfig } from "./storyPlan";
@@ -2280,6 +2280,245 @@ export async function getStory(
   // window, so a deep link / related link resolves instead of dead-ending in a 404.
   const storeKey = lang === "en" ? worldId : `${worldId}__${lang}`;
   return getStoryStore(storeKey).get(id)?.story ?? null;
+}
+
+/** One verbose progress line streamed by `deepenStory`, for the in-app debug log. */
+export interface DeepenLog {
+  level: "info" | "step" | "ok" | "warn";
+  msg: string;
+}
+
+/**
+ * "DIVE DEEPER" on a single story (debug + on-demand enrichment): re-derive the COUNTRIES
+ * the story is about, reactively pull each country's DISCOVERED placeSources, keep the
+ * coverage related to THIS story, analyze it, FORCE-JOIN it onto the story's member set
+ * (bypassing the same-event clustering bar — that's the point of the manual deepen), and
+ * RE-SYNTHESIZE so the cross-country SIDES recompute. Every step is reported via `onLog`
+ * so the reader can see exactly what the server looked for. Returns the rebuilt story
+ * (also persisted + swapped into the in-memory cache), or null when it can't be resolved.
+ */
+export async function deepenStory(
+  worldId: string,
+  id: string,
+  lang: Lang,
+  onLog: (entry: DeepenLog) => void,
+): Promise<Story | null> {
+  const log = (level: DeepenLog["level"], msg: string) => onLog({ level, msg });
+  const storeKey = lang === "en" ? worldId : `${worldId}__${lang}`;
+  const storyStore = getStoryStore(storeKey);
+  const entry = storyStore.get(id);
+  if (!entry) {
+    log("warn", `Story "${id}" isn't in the store (it may have aged out). Nothing to deepen.`);
+    return null;
+  }
+  log("info", `Story: "${entry.story.title}"`);
+  log("info", `Kind: ${entry.kind} · ${entry.memberIds.length} contributing article(s).`);
+
+  const st = getStore(worldId);
+  const members = entry.memberIds
+    .map((mid) => st.get(mid))
+    .filter((s): s is StoredItem => !!s);
+  if (members.length === 0) {
+    log("warn", "None of the contributing articles are still in the pool — cannot deepen.");
+    return null;
+  }
+
+  // 1) Which COUNTRIES is the story about? The model tags each article's `countries`; we
+  //    also fold in any existing side zones + the protagonist nation. This is the input
+  //    to side detection, so surfacing it is the first debug signal.
+  const countryScore = new Map<string, number>();
+  for (const m of members) for (const cc of m.countries ?? []) {
+    countryScore.set(cc, (countryScore.get(cc) ?? 0) + 1);
+  }
+  for (const side of entry.story.sides ?? []) for (const z of side.zones) {
+    if (/^[a-z]{2}$/.test(z)) countryScore.set(z, (countryScore.get(z) ?? 0) + 1);
+  }
+  const proto = entry.story.protagonist?.iso2;
+  if (proto && /^[a-z]{2}$/.test(proto)) countryScore.set(proto, (countryScore.get(proto) ?? 0) + 1);
+  const countries = [...countryScore.entries()].sort((a, b) => b[1] - a[1]).map(([cc]) => cc);
+  if (countries.length === 0) {
+    log(
+      "warn",
+      "No countries detected on the contributing articles (the model tagged none), so no " +
+        "foreign side coverage can be fetched and no sides can form.",
+    );
+  } else {
+    log("step", `Detected countries: ${countries.map((cc) => `${countryLabel(cc)} [${cc}]`).join(", ")}`);
+  }
+
+  // Relatedness seeds from the story's members: salient tokens (English) + embeddings
+  // (cross-lingual), so a fetched country article is kept only if it's about THIS story.
+  const seedTokens = new Set<string>();
+  const seedEmb: number[][] = [];
+  for (const m of members) {
+    for (const tk of titleTokens(m.item.title, m.keywords)) seedTokens.add(tk);
+    if (m.embedding && m.embedding.length > 0) seedEmb.push(m.embedding);
+  }
+
+  const cutoff = analyzeCutoff();
+  const newItems: FeedItem[] = [];
+  for (const cc of countries.slice(0, config.zones.maxZonesPerBuild)) {
+    const sources = placeSourcesFor(cc).slice(0, config.zones.maxSourcesPerCountry);
+    if (sources.length === 0) {
+      log("warn", `${countryLabel(cc)} [${cc}]: no discovered outlets in the registry — skipped.`);
+      continue;
+    }
+    log("step", `${countryLabel(cc)} [${cc}]: fetching ${sources.length} discovered outlet(s)…`);
+    let raw: FeedItem[] = [];
+    try {
+      raw = await fetchAll(sources);
+    } catch (e) {
+      log("warn", `${countryLabel(cc)}: fetch failed — ${e instanceof Error ? e.message : e}`);
+      continue;
+    }
+    const fresh = raw.filter((it) => !st.has(it.id) && it.publishedAt >= cutoff);
+    log("info", `${countryLabel(cc)}: ${raw.length} fetched, ${fresh.length} new & recent.`);
+    const scored = fresh.map((it) => {
+      let shared = 0;
+      for (const tk of articleTokens(it.title)) if (seedTokens.has(tk)) shared += 1;
+      return { it, shared, sim: 0 };
+    });
+    if (config.ai.embeddingsEnabled && seedEmb.length > 0 && scored.length > 0) {
+      const vecs = await embedTexts(scored.map((x) => x.it.title));
+      scored.forEach((x, i) => {
+        const v = vecs[i];
+        if (!v || v.length === 0) return;
+        let best = 0;
+        for (const e of seedEmb) best = Math.max(best, cosineSim(v, e));
+        x.sim = best;
+      });
+    }
+    const related = scored
+      .filter((x) => x.shared >= config.zones.minSharedTokens || x.sim >= config.zones.minRelevance)
+      .sort((a, b) => b.sim - a.sim || b.shared - a.shared || b.it.publishedAt - a.it.publishedAt)
+      .slice(0, config.zones.perZoneItemCap);
+    log(
+      related.length > 0 ? "ok" : "warn",
+      `${countryLabel(cc)}: kept ${related.length} related of ${fresh.length} ` +
+        `(gate: ≥${config.zones.minSharedTokens} shared tokens OR ≥${config.zones.minRelevance} similarity).`,
+    );
+    for (const { it, shared, sim } of related) {
+      newItems.push({ ...it, zone: cc });
+      log("info", `   • ${it.sourceTitle}: "${it.title.slice(0, 90)}" (shared ${shared}, sim ${sim.toFixed(2)})`);
+    }
+  }
+
+  // 2) Analyze the new side coverage so it carries summary/keywords/lean like any item.
+  const newMembers: StoredItem[] = [];
+  if (newItems.length > 0) {
+    log("step", `Analyzing ${newItems.length} new article(s)…`);
+    const analyses = await analyzeItems(newItems, new Map());
+    const now = Date.now();
+    for (const it of newItems) {
+      const a = analyses.get(it.id);
+      const stored: StoredItem = a
+        ? {
+            item: it,
+            clickbait: false,
+            analyzed: true,
+            topic: a.topic,
+            lean: a.lean ?? it.lean,
+            leanSource: "source",
+            importance: a.importance,
+            summary: a.summary,
+            keywords: a.keywords,
+            countries: a.countries,
+            analyzedAt: now,
+          }
+        : {
+            item: it,
+            clickbait: false,
+            analyzed: false,
+            topic: it.topic,
+            lean: it.lean,
+            importance: 0,
+            summary: "",
+            keywords: [],
+            analyzedAt: 0,
+          };
+      st.upsert(stored);
+      if (a) newMembers.push(stored);
+    }
+    st.save();
+    log("ok", `Analyzed ${newMembers.length} of ${newItems.length}.`);
+  } else {
+    log("warn", "No new side coverage found to add.");
+  }
+
+  // 3) FORCE-JOIN the new coverage onto the story and re-synthesize, so the SIDES recompute.
+  const expanded = [...members, ...newMembers];
+  const vantages = new Set(expanded.map((m) => m.item.zone).filter((z): z is string => !!z));
+  log(
+    "step",
+    `Re-synthesizing with ${expanded.length} article(s) — foreign vantages present: ` +
+      `${vantages.size > 0 ? [...vantages].map((cc) => countryLabel(cc)).join(", ") : "none (home coverage only)"}.`,
+  );
+  let rebuilt: Story;
+  if (entry.kind === "issue") {
+    const inputs: ClusterInput[] = expanded.map((m) => ({
+      id: m.item.id,
+      sourceId: m.item.sourceId,
+      publishedAt: m.item.publishedAt,
+      topic: m.topic,
+      importance: m.importance,
+      title: m.item.title,
+      keywords: m.keywords,
+      embedding: m.embedding,
+      coveredBy: m.coveredBy,
+    }));
+    const byId = new Map(expanded.map((m) => [m.item.id, m]));
+    const events = clusterItems(inputs, {
+      simThreshold: config.stories.simThreshold,
+      textSimThreshold: config.stories.textSimThreshold,
+      windowMs: config.stories.issueWindowMs,
+    })
+      .map((c) => c.members.map((x) => byId.get(x.id)).filter((s): s is StoredItem => !!s))
+      .filter((e) => e.length > 0)
+      .sort(
+        (a, b) =>
+          Math.min(...a.map((x) => x.item.publishedAt)) -
+          Math.min(...b.map((x) => x.item.publishedAt)),
+      );
+    rebuilt = await buildDevelopingStory(events.length > 0 ? events : [expanded], lang);
+  } else {
+    rebuilt = await buildStory(expanded, lang);
+  }
+  rebuilt.id = entry.id; // keep continuity across the re-synthesis
+
+  const memberIds = expanded.map((m) => m.item.id).sort();
+  storyStore.upsert({
+    id: entry.id,
+    kind: entry.kind,
+    memberIds,
+    story: rebuilt,
+    builtAt: Date.now(),
+    updatedAt: rebuilt.updatedAt,
+  });
+  storyStore.save();
+  // Swap the rebuilt story into the in-memory cache so the next /api/stories reflects it.
+  const cache = ws(worldId).storiesCache.get(lang);
+  if (cache) {
+    const idx = cache.stories.findIndex((s) => s.id === entry.id);
+    if (idx >= 0) cache.stories[idx] = rebuilt;
+  }
+
+  if (rebuilt.sides && rebuilt.sides.length > 0) {
+    log(
+      "ok",
+      `Sides formed (${rebuilt.sides.length}): ` +
+        rebuilt.sides
+          .map((s) => `${s.label} [${s.zones.length > 0 ? s.zones.join(",") : "—"}]`)
+          .join("  |  "),
+    );
+  } else {
+    log(
+      "warn",
+      "No sides formed — synthesis needs ≥1 foreign-country outlet AND ≥2 distinct vantage " +
+        "points. Check the country detection + fetched coverage above.",
+    );
+  }
+  log("ok", "Done.");
+  return rebuilt;
 }
 
 /**
