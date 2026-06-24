@@ -80,19 +80,24 @@ type Ring = [number, number][];
 
 // On the coarse 110m mesh a single earcut triangle can span tens of degrees of arc, so
 // its FLAT face chords well below the spherical surface — denting big countries (Russia,
-// the US, Canada) toward the core. Recursively split any triangle with a wide edge so the
-// faces hug the sphere (high-res regional meshes never needed this). ~12° keeps the
-// mid-edge dip negligible vs the land/ocean radius gap; the depth cap bounds the blow-up.
-const SUBDIV_MIN_DOT = Math.cos((12 * Math.PI) / 180); // split an edge wider than ~12°
-const SUBDIV_MAX_DEPTH = 5;
+// the US, Canada) toward the core. We split every triangle 1→4 onto the sphere so the
+// faces hug the curvature (high-res regional meshes never needed this).
+//
+// Subdivision is UNIFORM (fixed depth, every triangle), NOT adaptive: an edge's midpoint
+// is shared by the two triangles that meet on it, so both split it identically and the
+// surface stays watertight. Adaptive (split only wide triangles) left T-JUNCTIONS where a
+// split triangle's sphere-projected midpoint bulged past an unsplit neighbour's straight
+// chord — the thin dark seams. Depth 2 = each edge quartered (≤ ~¼ of the coarsest arc),
+// which keeps the mid-edge dip above the ocean shell so no hole shows through.
+const SUBDIV_DEPTH = 2;
 
 /** Midpoint of two unit directions, re-projected onto the unit sphere. */
 function midUnit(a: Vec3, b: Vec3): Vec3 {
   return normalize({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, z: (a.z + b.z) / 2 });
 }
 
-/** Emit one sphere triangle (unit dirs a,b,c), subdividing 1→4 until every edge subtends
- *  a small angle, so the flat faces follow the curvature instead of cutting through it. */
+/** Emit one sphere triangle (unit dirs a,b,c), subdividing 1→4 UNIFORMLY to SUBDIV_DEPTH
+ *  so the flat faces follow the curvature without leaving cracks between neighbours. */
 function emitSphereTri(
   a: Vec3,
   b: Vec3,
@@ -102,13 +107,7 @@ function emitSphereTri(
   outNorm: number[],
   depth: number,
 ): void {
-  // Smallest dot = widest edge angle (unit vectors → dot = cos(angle)).
-  const widest = Math.min(
-    a.x * b.x + a.y * b.y + a.z * b.z,
-    b.x * c.x + b.y * c.y + b.z * c.z,
-    c.x * a.x + c.y * a.y + c.z * a.z,
-  );
-  if (depth < SUBDIV_MAX_DEPTH && widest < SUBDIV_MIN_DOT) {
+  if (depth < SUBDIV_DEPTH) {
     const ab = midUnit(a, b);
     const bc = midUnit(b, c);
     const ca = midUnit(c, a);
