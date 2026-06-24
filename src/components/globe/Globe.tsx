@@ -26,6 +26,7 @@ import {
   ActivityIndicator,
   Animated,
   Easing,
+  Image,
   Keyboard,
   PanResponder,
   Platform,
@@ -75,7 +76,6 @@ import {
 import { searchPlaces, type PlaceHit } from "../../lib/placeSearch";
 import { appendAskStream, resetAskStream } from "../../lib/askStream";
 import { buildAskNameIndex, resolveAskPlace, scanCountries } from "../../lib/askLocate";
-import { flagEmoji } from "../../lib/countries";
 import type { AnalysisStatus, AskResult, LinkKind, Story } from "../../types";
 import worldLand from "../../data/world/countries-50m.json";
 import { useApp, useT } from "../../store/AppContext";
@@ -387,22 +387,25 @@ const MarkerLayer = forwardRef<
         // Non-interactive so globe drags/clicks fall through.
         if (it.kind === "link") {
           const lk = (it.linkKind ?? "other") as LinkKind;
-          const flag = lk === "attack" ? flagEmoji(it.fromCc) : "";
+          const isAttack = lk === "attack" && !!it.fromCc;
           return (
             <View key={it.id} ref={setNode(it.id)} style={anchorStyle} pointerEvents="none">
-              <View
-                style={[
-                  styles.linkBadge,
-                  { borderColor: it.color, backgroundColor: it.color + "26" },
-                ]}
-              >
-                {flag ? (
-                  <Text style={styles.linkFlag}>{flag}</Text>
+              <View style={[styles.linkBadge, { backgroundColor: it.color }]}>
+                {isAttack ? (
+                  <>
+                    {/* The country CODE shows through if the flag image can't load (offline). */}
+                    <Text style={styles.linkCode}>{it.fromCc!.toUpperCase()}</Text>
+                    <Image
+                      source={{ uri: `https://flagcdn.com/w80/${it.fromCc}.png` }}
+                      style={styles.linkFlagImg}
+                      resizeMode="cover"
+                    />
+                  </>
                 ) : (
                   <Ionicons
                     name={(LINK_KINDS[lk]?.icon ?? "swap-horizontal") as IoniconName}
-                    size={13}
-                    color={it.color}
+                    size={15}
+                    color="#0b0f14"
                   />
                 )}
               </View>
@@ -2168,20 +2171,25 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   eventCountText: { color: colors.text, fontSize: 9, fontWeight: "800" },
-  // Travelling badge on a physical-LINK arc (flag for attacks, kind icon otherwise),
-  // centred on the arc's flowing point. Colour/translucent fill set inline per kind.
+  // Travelling badge on a physical-LINK arc (flag image for attacks, kind icon otherwise),
+  // centred on the arc's flowing point. SOLID per-kind fill (set inline) + a dark icon keeps
+  // it legible under motion, like the event chips.
   linkBadge: {
     position: "absolute",
-    left: -12,
-    top: -12,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    left: -13,
+    top: -13,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.55)", // light ring so the badge stays legible in motion
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden", // clip the flag image to the circle
   },
-  linkFlag: { fontSize: 14, lineHeight: 18 },
+  // Flag image fills the badge (attack links); country code sits behind it as the fallback.
+  linkFlagImg: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 },
+  linkCode: { color: "#fff", fontSize: 10, fontWeight: "800" },
   topBar: {
     position: "absolute",
     top: spacing.sm,

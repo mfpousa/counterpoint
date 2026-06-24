@@ -290,7 +290,9 @@ const ARC_SEGMENTS = 56; // polyline resolution along the great circle
 const ARC_BASE_RADIUS = 1.012; // hugs just above the land at the endpoints
 const ARC_LIFT = 0.22; // how high the arc bows out at its midpoint (scaled by span)
 const ARC_COLOR = "#ff7a5c"; // default (conflict tension) hue; per-arc `color` overrides it
-const ARC_FLOW_SPEED = 0.32; // comet loops per second along each arc
+const ARC_FLOW_SPEED = 0.4; // flow speed in RAD/sec along the great circle; the per-arc
+// t-rate is ARC_FLOW_SPEED / arc-angle, so EVERY arc flows at the same on-screen speed
+// (a long arc no longer whips its marker faster than a short one).
 
 /** Build the bowed great-circle geometry between two unit directions: the continuous
  *  point list (for sampling the comet) plus the segment-pair buffer (for <lineSegments>).
@@ -320,19 +322,31 @@ function arcGeometry(
  *  single useFrame (the governor keeps the loop alive while any arc is present). */
 function Arcs({ arcs }: { arcs: ArcData[] }) {
   const geoms = useMemo(
-    () => arcs.map((arc) => ({ ...arc, ...arcGeometry(arc.a, arc.b, arc.dash ?? "solid") })),
+    () =>
+      arcs.map((arc) => ({
+        ...arc,
+        // Angular length (rad) of the great circle a→b, floored so a tiny arc can't divide
+        // the flow rate toward infinity. Drives the constant-screen-speed flow below.
+        omega: Math.max(
+          0.15,
+          Math.acos(
+            Math.max(-1, Math.min(1, arc.a.x * arc.b.x + arc.a.y * arc.b.y + arc.a.z * arc.b.z)),
+          ),
+        ),
+        ...arcGeometry(arc.a, arc.b, arc.dash ?? "solid"),
+      })),
     [arcs],
   );
   const comets = useRef<(Mesh | null)[]>([]);
   useFrame((state) => {
-    const base = state.clock.elapsedTime * ARC_FLOW_SPEED;
     for (let i = 0; i < geoms.length; i++) {
       const m = comets.current[i];
       if (!m) continue;
-      const { path } = geoms[i];
+      const { path, omega } = geoms[i];
       const segs = path.length / 3 - 1;
-      // stagger each comet's phase so a hub of ties doesn't pulse in lockstep.
-      const t = (base + i * 0.13) % 1;
+      // CONSTANT screen speed: t-rate ∝ 1/arc-angle, staggered per comet so a hub of ties
+      // doesn't pulse in lockstep.
+      const t = (state.clock.elapsedTime * (ARC_FLOW_SPEED / omega) + i * 0.13) % 1;
       const f = t * segs;
       const k = Math.min(segs - 1, Math.floor(f));
       const r = f - k;
@@ -935,10 +949,16 @@ export const GlobeScene = memo(function GlobeScene({
       // LINK ties: a flag/icon BADGE rides each PHYSICAL-link arc (origin → destination).
       // Sample the travelling point on the SAME bowed great circle as the line and project
       // it, so the badge sits on the arc and flows with it (tension ties keep their 3D comet).
-      const tBase = frame.clock.elapsedTime * ARC_FLOW_SPEED;
       arcs.forEach((arc, i) => {
         if (!arc.kind) return;
-        const t = (tBase + i * 0.13) % 1;
+        // CONSTANT screen speed regardless of arc length (t-rate ∝ 1/arc-angle).
+        const omega = Math.max(
+          0.15,
+          Math.acos(
+            Math.max(-1, Math.min(1, arc.a.x * arc.b.x + arc.a.y * arc.b.y + arc.a.z * arc.b.z)),
+          ),
+        );
+        const t = (frame.clock.elapsedTime * (ARC_FLOW_SPEED / omega) + i * 0.13) % 1;
         const p = greatCirclePoint(arc.a, arc.b, t, ARC_BASE_RADIUS, ARC_LIFT);
         _proj.set(p.x, p.y, p.z).applyMatrix4(g.matrix);
         if (_proj.z <= 0.02) return; // far hemisphere → occluded by the globe
