@@ -950,18 +950,19 @@ export const GlobeScene = memo(function GlobeScene({
       focusedMarkerId === null &&
       !refs.dragging.current;
     const markersLive = alerts.length > 0 || askMarkers.length > 0;
-    // A fly-to (auto focus/zoom) is the ONE animation with no external driver: a drag is
-    // driven by pointer events and a wheel-zoom by wheel events (each calls wake→invalidate
-    // at the display's rate), but the fly-to relies solely on this loop. Throttled to 30fps
-    // via setTimeout — which isn't vsync-aligned and stalls under load (e.g. the new place's
-    // geometry building at the same moment) — a FAST camera move reads as choppy/low-fps.
+    // Transient camera EASES move the whole globe and are loop-driven (no per-event driver
+    // once kicked): the fly-to (auto focus/zoom), the scroll/pinch ZOOM ease (a wheel notch
+    // sets a target, then `scale` chases it over many frames), and the panel OFFSET shift.
+    // At the throttled 30fps — not vsync-aligned, and it stalls under load (e.g. a new
+    // place's geometry building) — these read as choppy/low-fps. So drive them at the
+    // display's FULL rate; they're short, self-terminating bursts. The steady-state loops
+    // (idle spin, marker pulse, post-kick settle) stay at 30fps to save power.
     const flyingTo = refs.target.current !== null;
+    const easingCamera = flyingTo || easingZoom || easingOffset;
     const needsMore =
       refs.dragging.current ||
-      flyingTo ||
+      easingCamera ||
       spinning ||
-      easingZoom ||
-      easingOffset ||
       markersLive ||
       Date.now() < settleUntil.current;
     if (nextFrame.current) {
@@ -969,10 +970,10 @@ export const GlobeScene = memo(function GlobeScene({
       nextFrame.current = null;
     }
     if (needsMore && !pausedRef.current) {
-      if (flyingTo) {
-        // Drive the fly-to at the display's FULL rate (vsync-aligned via r3f's demand loop)
-        // so the auto-zoom is smooth and quick. It's a short, self-terminating burst — the
-        // ease above clears the target on arrival, after which we fall back to the throttle.
+      if (easingCamera) {
+        // Full rate (vsync-aligned via r3f's demand loop) so the move is smooth and quick.
+        // The eases above converge on their targets, so this burst self-terminates and the
+        // loop falls back to the 30fps throttle (or sleeps) once everything settles.
         invalidate();
       } else {
         nextFrame.current = setTimeout(() => {

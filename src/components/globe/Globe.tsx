@@ -1269,6 +1269,7 @@ export function Globe({
               asking={asking}
               result={askResult}
               error={askError}
+              pinCount={askMarkers.length}
               onClose={clearAsk}
               onPlaceTap={(iso2) => {
                 const dir = worldGeo?.centroids.byIso2.get(iso2);
