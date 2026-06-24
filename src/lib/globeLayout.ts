@@ -188,3 +188,32 @@ export function greatCircleArc(
   }
   return out;
 }
+
+/**
+ * A SINGLE point at parameter `t` (0..1) along the same bowed great circle as
+ * `greatCircleArc` — used to ride a marker (a flag/icon badge) along the arc from
+ * origin (t=0) to destination (t=1). Identical slerp + lift math, so the marker sits
+ * exactly on the rendered line.
+ */
+export function greatCirclePoint(
+  a: Vec3,
+  b: Vec3,
+  t: number,
+  baseRadius = 1,
+  lift = 0,
+): Vec3 {
+  const va = normalize(a);
+  const vb = normalize(b);
+  const omega = Math.acos(Math.max(-1, Math.min(1, dot(va, vb))));
+  const sinO = Math.sin(omega) || 1e-6;
+  const span = omega / Math.PI;
+  const s0 = Math.sin((1 - t) * omega) / sinO;
+  const s1 = Math.sin(t * omega) / sinO;
+  let x = va.x * s0 + vb.x * s1;
+  let y = va.y * s0 + vb.y * s1;
+  let z = va.z * s0 + vb.z * s1;
+  const len = Math.hypot(x, y, z) || 1;
+  const r = baseRadius * (1 + lift * span * Math.sin(Math.PI * t));
+  const k = r / len;
+  return { x: x * k, y: y * k, z: z * k };
+}

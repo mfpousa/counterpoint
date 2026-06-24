@@ -3,6 +3,7 @@ import {
   dot,
   fibonacciSphere,
   greatCircleArc,
+  greatCirclePoint,
   hashId,
   latLonToVec3,
   layoutLevel,
@@ -142,5 +143,32 @@ describe("greatCircleArc (tension-tie geometry)", () => {
     const a = latLonToVec3(12, 34);
     const buf = greatCircleArc(a, a, 8, 1.02, 0.2);
     for (let i = 0; i < buf.length; i++) expect(Number.isFinite(buf[i])).toBe(true);
+  });
+
+  it("greatCirclePoint rides the same arc: endpoints at t=0/1, bows at t=0.5", () => {
+    const a = latLonToVec3(0, -70);
+    const b = latLonToVec3(0, 70);
+    const p0 = greatCirclePoint(a, b, 0, 1.05, 0.3);
+    const p1 = greatCirclePoint(a, b, 1, 1.05, 0.3);
+    const pm = greatCirclePoint(a, b, 0.5, 1.05, 0.3);
+    // Ends sit on the base sphere, in the endpoint directions.
+    expect(lengthOf(p0)).toBeCloseTo(1.05, 5);
+    expect(lengthOf(p1)).toBeCloseTo(1.05, 5);
+    expect(dot(normalize(p0), normalize(a))).toBeCloseTo(1, 5);
+    expect(dot(normalize(p1), normalize(b))).toBeCloseTo(1, 5);
+    // Midpoint bows OUTWARD past the base radius.
+    expect(lengthOf(pm)).toBeGreaterThan(1.05);
+  });
+
+  it("greatCirclePoint matches greatCircleArc at the sampled t", () => {
+    const a = latLonToVec3(40, 30);
+    const b = latLonToVec3(-10, 60);
+    const seg = 20;
+    const buf = greatCircleArc(a, b, seg, 1.02, 0.25);
+    const i = 7;
+    const p = greatCirclePoint(a, b, i / seg, 1.02, 0.25);
+    expect(p.x).toBeCloseTo(buf[i * 3], 5);
+    expect(p.y).toBeCloseTo(buf[i * 3 + 1], 5);
+    expect(p.z).toBeCloseTo(buf[i * 3 + 2], 5);
   });
 });

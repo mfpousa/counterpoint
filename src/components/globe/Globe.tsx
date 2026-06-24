@@ -63,6 +63,7 @@ import {
 } from "../../lib/geoShapes";
 import {
   EVENT_CATEGORIES,
+  LINK_KINDS,
   RECENCY_OPACITY,
   buildAlerts,
   recencyOf,
@@ -74,7 +75,8 @@ import {
 import { searchPlaces, type PlaceHit } from "../../lib/placeSearch";
 import { appendAskStream, resetAskStream } from "../../lib/askStream";
 import { buildAskNameIndex, resolveAskPlace, scanCountries } from "../../lib/askLocate";
-import type { AnalysisStatus, AskResult, Story } from "../../types";
+import { flagEmoji } from "../../lib/countries";
+import type { AnalysisStatus, AskResult, LinkKind, Story } from "../../types";
 import worldLand from "../../data/world/countries-50m.json";
 import { useApp, useT } from "../../store/AppContext";
 import { colors, font, radius, spacing } from "../../theme";
@@ -107,10 +109,9 @@ const TIME_WINDOWS: TimeWindow[] = ["all", "week", "day", "now"];
 // Stable empty arcs reference — passed while an AI search owns the globe (so the tension
 // web hides), avoiding a fresh [] each render that would defeat React.memo(GlobeScene).
 const EMPTY_ARCS: ArcData[] = [];
-// Arc palette: WARM for conflict tension (who's pulling against whom), COOL for a physical
-// LINK/flow between two places (a spread/route/shipment/migration, origin → destination).
+// Conflict TENSION ties are warm; physical-LINK ties take their per-kind colour from
+// LINK_KINDS (attack/spread/trade/… each distinct) so every connection is self-explanatory.
 const ARC_TENSION = "#ff7a5c";
-const ARC_LINK = "#22d3ee";
 const WORLD_ZOOM = 0.9; // zoomed-OUT scale for the world landing (whole globe in view)
 // Pixels→radians drag gain: 2·cameraZ·tan(fov/2) = the world height the viewport spans
 // at the globe's distance. Dividing by (zoom·canvasHeightPx) makes a drag STICK to the
@@ -318,7 +319,7 @@ const MarkerLayer = forwardRef<
                 i.updatedAt ?? 0,
                 i.developing,
                 now,
-              )}:${i.label}:${i.detail}`,
+              )}:${i.linkKind ?? ""}:${i.fromCc ?? ""}:${i.label}:${i.detail}`,
           )
           .join("|");
         if (key === prevKey.current) return;
@@ -380,6 +381,34 @@ const MarkerLayer = forwardRef<
           { transform },
           isFocused && styles.markerAnchorTop,
         ];
+        // PHYSICAL LINK: a small badge riding the connection arc. An ATTACK flies the ORIGIN
+        // country's FLAG; every other kind shows its category icon (medical, ship, people…),
+        // tinted the arc's colour. The line carries colour + dash; this badge says WHAT it is.
+        // Non-interactive so globe drags/clicks fall through.
+        if (it.kind === "link") {
+          const lk = (it.linkKind ?? "other") as LinkKind;
+          const flag = lk === "attack" ? flagEmoji(it.fromCc) : "";
+          return (
+            <View key={it.id} ref={setNode(it.id)} style={anchorStyle} pointerEvents="none">
+              <View
+                style={[
+                  styles.linkBadge,
+                  { borderColor: it.color, backgroundColor: it.color + "26" },
+                ]}
+              >
+                {flag ? (
+                  <Text style={styles.linkFlag}>{flag}</Text>
+                ) : (
+                  <Ionicons
+                    name={(LINK_KINDS[lk]?.icon ?? "swap-horizontal") as IoniconName}
+                    size={13}
+                    color={it.color}
+                  />
+                )}
+              </View>
+            </View>
+          );
+        }
         // WORLDVIEW EVENT: a legible, category-coloured ICON chip sitting on the point. The
         // chip STAYS visible when focused; its card (aggregated fan-out) floats just above it.
         // Size scales with severity; a "+N" badge marks stacked events; hover → headline
@@ -777,11 +806,22 @@ export function Globe({
     for (const s of linked) {
       const links = s.links ?? [];
       for (let i = 0; i < links.length; i++) {
-        const a = byIso2.get(links[i].from);
-        const b = byIso2.get(links[i].to);
+        const lk = links[i];
+        const a = byIso2.get(lk.from);
+        const b = byIso2.get(lk.to);
         if (!a || !b) continue;
         if (a.x * b.x + a.y * b.y + a.z * b.z > 0.9999) continue; // same country → skip
-        out.push({ id: `link:${s.id}:${i}`, a, b, severity: s.severity ?? 0.6, color: ARC_LINK });
+        const style = LINK_KINDS[lk.kind] ?? LINK_KINDS.other;
+        out.push({
+          id: `link:${s.id}:${i}`,
+          a,
+          b,
+          severity: s.severity ?? 0.6,
+          color: style.color,
+          dash: style.dash,
+          kind: lk.kind,
+          fromCc: lk.from,
+        });
       }
     }
     return out.slice(0, 20); // hard cap so the flow animation stays bounded
@@ -2128,6 +2168,20 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   eventCountText: { color: colors.text, fontSize: 9, fontWeight: "800" },
+  // Travelling badge on a physical-LINK arc (flag for attacks, kind icon otherwise),
+  // centred on the arc's flowing point. Colour/translucent fill set inline per kind.
+  linkBadge: {
+    position: "absolute",
+    left: -12,
+    top: -12,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  linkFlag: { fontSize: 14, lineHeight: 18 },
   topBar: {
     position: "absolute",
     top: spacing.sm,

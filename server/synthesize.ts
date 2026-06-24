@@ -9,6 +9,7 @@
 import type {
   Lang,
   Lean,
+  LinkKind,
   Story,
   StoryAngle,
   StoryMilestone,
@@ -66,8 +67,15 @@ const SYNTH_SCHEMA: JsonSchema = {
         type: "array",
         items: {
           type: "object",
-          properties: { from: { type: "string" }, to: { type: "string" } },
-          required: ["from", "to"],
+          properties: {
+            from: { type: "string" },
+            to: { type: "string" },
+            kind: {
+              type: "string",
+              enum: ["attack", "spread", "trade", "migration", "aid", "transport", "other"],
+            },
+          },
+          required: ["from", "to", "kind"],
           additionalProperties: false,
         },
       },
@@ -90,13 +98,15 @@ const SYNTH_RULES =
   '  "sides": [ { "label": "<short side label, e.g. \'Western media\', \'Russian media\', \'Ukrainian media\'>", "outlets": ["<exact outlet names on this side>"], "framing": "1-2 sentences on how THIS side frames/emphasizes the story" } ],\n' +
   '  "contradictions": ["specific points where the outlets disagree or report differently; [] if none are evident"],\n' +
   '  "protagonist": { "name": "the central actor/subject the story is MOST about (a country, organisation, or person)", "iso2": "if that protagonist IS a country or a national government/actor, its ISO 3166-1 alpha-2 code in lowercase (e.g. us, es, ua); otherwise an empty string" },\n' +
-  '  "links": [ { "from": "<ISO 3166-1 alpha-2 ORIGIN>", "to": "<ISO 3166-1 alpha-2 DESTINATION>" } ]\n' +
+  '  "links": [ { "from": "<ISO-2 ORIGIN>", "to": "<ISO-2 DESTINATION>", "kind": "attack|spread|trade|migration|aid|transport|other" } ]\n' +
   "}\n" +
   "For 'links', emit a DIRECTED connection ONLY when the story describes a PHYSICAL link or " +
-  "movement between two DISTINCT countries \u2014 a disease spreading, a flight/shipment/migration/" +
-  "evacuation/aid/attack/pipeline, or a route \u2014 from an ORIGIN ('from') to a DESTINATION ('to'), " +
-  "both ISO 3166-1 alpha-2 lowercase. Return [] when the story is not about a place-to-place " +
-  "connection. " +
+  "movement between two DISTINCT countries, from an ORIGIN ('from') to a DESTINATION ('to'), both " +
+  "ISO 3166-1 alpha-2 lowercase, each with a 'kind': 'attack' (military strike/invasion/cross-border " +
+  "attack), 'spread' (disease/contagion), 'trade' (shipment/exports/energy/supply/pipeline), " +
+  "'migration' (people/refugees/evacuation), 'aid' (humanitarian or military assistance), " +
+  "'transport' (flight/route/travel), or 'other'. Return [] when the story is not about a " +
+  "place-to-place connection. " +
   "For 'protagonist', pick the single entity the story most centres on and name it; set 'iso2' ONLY " +
   "when that protagonist is a nation/national actor (use \"\" for organisations, people, or anything " +
   "non-national). Each outlet has a geographic/affiliation 'zone'. For 'sides', GROUP the outlets into the " +
@@ -213,9 +223,22 @@ function coerceProtagonist(raw: unknown): { name: string; iso2?: string } | unde
  * Validates ISO 3166-1 alpha-2 endpoints, drops self/degenerate + duplicate links, and
  * caps the count. The globe draws a flowing arc per link (origin → destination).
  */
-export function coerceLinks(raw: unknown, max = 4): { from: string; to: string }[] {
+const LINK_KINDS = new Set<LinkKind>([
+  "attack",
+  "spread",
+  "trade",
+  "migration",
+  "aid",
+  "transport",
+  "other",
+]);
+
+export function coerceLinks(
+  raw: unknown,
+  max = 4,
+): { from: string; to: string; kind: LinkKind }[] {
   if (!Array.isArray(raw)) return [];
-  const out: { from: string; to: string }[] = [];
+  const out: { from: string; to: string; kind: LinkKind }[] = [];
   const seen = new Set<string>();
   for (const row of raw) {
     if (!row || typeof row !== "object") continue;
@@ -226,7 +249,8 @@ export function coerceLinks(raw: unknown, max = 4): { from: string; to: string }
     const key = `${from}>${to}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    out.push({ from, to });
+    const k = typeof r["kind"] === "string" ? (r["kind"].trim().toLowerCase() as LinkKind) : "other";
+    out.push({ from, to, kind: LINK_KINDS.has(k) ? k : "other" });
     if (out.length >= max) break;
   }
   return out;
@@ -479,8 +503,15 @@ const DEVELOPING_SCHEMA: JsonSchema = {
         type: "array",
         items: {
           type: "object",
-          properties: { from: { type: "string" }, to: { type: "string" } },
-          required: ["from", "to"],
+          properties: {
+            from: { type: "string" },
+            to: { type: "string" },
+            kind: {
+              type: "string",
+              enum: ["attack", "spread", "trade", "migration", "aid", "transport", "other"],
+            },
+          },
+          required: ["from", "to", "kind"],
           additionalProperties: false,
         },
       },
@@ -526,10 +557,10 @@ const DEVELOPING_RULES =
   "opposing geographic/affiliation vantage points actually PRESENT (by 'zone') and describe how each " +
   "frames the issue \u2014 e.g. Western vs Ukrainian vs Russian media. Use only zones present; return [] " +
   "when all outlets share one vantage point. " +
-  'Also include "links": [ { "from": "<ISO 3166-1 alpha-2 ORIGIN>", "to": "<ISO 3166-1 alpha-2 DESTINATION>" } ] ' +
+  'Also include "links": [ { "from": "<ISO-2 ORIGIN>", "to": "<ISO-2 DESTINATION>", "kind": "attack|spread|trade|migration|aid|transport|other" } ] ' +
   "\u2014 a DIRECTED connection ONLY when the issue describes a PHYSICAL link or movement between two " +
-  "DISTINCT countries (a spread, route, shipment, migration, evacuation, aid, attack, or pipeline) from " +
-  "an ORIGIN to a DESTINATION, both lowercase; [] when it is not about a place-to-place connection. " +
+  "DISTINCT countries from an ORIGIN to a DESTINATION, both lowercase, classified by 'kind' " +
+  "(attack/spread/trade/migration/aid/transport/other); [] when it is not about a place-to-place connection. " +
   "No prose outside the JSON.";
 
 function earliestAt(members: StoredItem[]): number {

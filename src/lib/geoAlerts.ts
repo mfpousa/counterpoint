@@ -12,7 +12,7 @@
 // Stories we cannot locate are dropped (no fabricated positions). Lives apart from
 // three.js so the geolocation logic is unit-tested once and reused on web + native.
 
-import type { Story } from "../types";
+import type { LinkKind, Story } from "../types";
 import type { Vec3 } from "./globeLayout";
 
 /** A class of world EVENT we extract from the news to paint the globe's worldview. */
@@ -40,6 +40,22 @@ export const EVENT_CATEGORIES: Record<
   disaster: { color: "#E06C9F", label: "Disaster", icon: "warning" },
   economy: { color: "#56C2D6", label: "Economy", icon: "trending-up" },
   other: { color: "#9AA4B2", label: "Other", icon: "ellipse" },
+};
+
+/** Per-link-kind visuals so each place-to-place connection on the globe is
+ *  self-explanatory: a COLOUR, a line DASH style, and an Ionicons glyph for the
+ *  travelling badge (the `attack` kind flies the ORIGIN country's flag instead). */
+export const LINK_KINDS: Record<
+  LinkKind,
+  { color: string; icon: string; dash: "solid" | "dashed" | "dotted"; label: string }
+> = {
+  attack: { color: "#ef4444", icon: "flame", dash: "solid", label: "Attack" },
+  spread: { color: "#a3e635", icon: "medkit", dash: "dotted", label: "Spread" },
+  trade: { color: "#38bdf8", icon: "boat", dash: "dashed", label: "Trade" },
+  migration: { color: "#22d3ee", icon: "people", dash: "dashed", label: "Migration" },
+  aid: { color: "#34d399", icon: "heart", dash: "dashed", label: "Aid" },
+  transport: { color: "#c084fc", icon: "airplane", dash: "dotted", label: "Transport" },
+  other: { color: "#9aa4b2", icon: "swap-horizontal", dash: "dashed", label: "Link" },
 };
 
 /** Keyword signatures per category (lowercase substrings scanned in title + dek). */

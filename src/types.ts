@@ -357,6 +357,20 @@ export interface StorySpectrum {
 }
 
 /**
+ * How a story PHYSICALLY connects two places, so the globe can style each link
+ * self-explanatorily: an `attack` flies the origin's flag; a disease `spread` is a
+ * dotted line; `trade`/`aid`/`migration`/`transport` each get their own colour + icon.
+ */
+export type LinkKind =
+  | "attack"
+  | "spread"
+  | "trade"
+  | "migration"
+  | "aid"
+  | "transport"
+  | "other";
+
+/**
  * An AI-synthesized story aggregating multiple outlets' coverage of ONE event.
  * The synthesis is neutral and cites every contributing source; `angles` and
  * `contradictions` surface HOW the reporting differs across outlets.
@@ -425,10 +439,12 @@ export interface Story {
    * Directed PHYSICAL connections the story draws between two countries (ISO 3166-1
    * alpha-2, lowercase) — e.g. a disease, shipment, migration, evacuation, aid, attack,
    * or route spreading/moving FROM one place TO another ("Ebola spreads from DRC to
-   * France"). The globe draws a flowing arc per link (origin → destination). Absent when
-   * the story isn't about a place-to-place connection.
+   * France"). `kind` classifies the connection so the globe can style each link
+   * self-explanatorily (an attack flies the origin's flag; a spread is a dotted line; …).
+   * The globe draws a flowing arc per link (origin → destination). Absent when the story
+   * isn't about a place-to-place connection.
    */
-  links?: { from: string; to: string }[];
+  links?: { from: string; to: string; kind: LinkKind }[];
   /**
    * True when synthesis is a graceful FALLBACK (model offline/failed): built
    * from the source one-line summaries without cross-outlet analysis. The UI

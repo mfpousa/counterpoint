@@ -23,7 +23,7 @@ import {
 } from "three";
 import type { Group, Mesh, MeshBasicMaterial, PerspectiveCamera } from "three";
 import { colors } from "../../theme";
-import { greatCircleArc, hashId, type Vec3 } from "../../lib/globeLayout";
+import { greatCircleArc, greatCirclePoint, hashId, type Vec3 } from "../../lib/globeLayout";
 import { EVENT_CATEGORIES, type EventCategory, type GeoAlert } from "../../lib/geoAlerts";
 
 /** One geographic entity to render on the globe (a continent/country/region). */
@@ -273,9 +273,17 @@ export interface ArcData {
   b: Vec3;
   /** 0..1 — drives the arc's brightness, thickness-feel and comet size. */
   severity: number;
-  /** Hex colour for this tie (e.g. warm = conflict tension, cool = a physical link/flow).
-   *  Falls back to ARC_COLOR when omitted. The comet flows a → b (origin → destination). */
+  /** Hex colour for this tie (warm = conflict tension, per-kind for a physical link).
+   *  Falls back to ARC_COLOR when omitted. */
   color?: string;
+  /** Line style: tension ties are solid; physical links use their kind's dash. */
+  dash?: "solid" | "dashed" | "dotted";
+  /** Physical-link KIND (attack/spread/…). When set, the moving marker is a 2D BADGE
+   *  (flag for attack, kind icon otherwise) projected by the scene loop — NOT a 3D comet;
+   *  tension ties (no kind) keep the 3D comet. */
+  kind?: string;
+  /** Origin country ISO-2 (links only) — flies its flag when kind === "attack". */
+  fromCc?: string;
 }
 
 const ARC_SEGMENTS = 56; // polyline resolution along the great circle
@@ -287,14 +295,23 @@ const ARC_FLOW_SPEED = 0.32; // comet loops per second along each arc
 /** Build the bowed great-circle geometry between two unit directions: the continuous
  *  point list (for sampling the comet) plus the segment-pair buffer (for <lineSegments>).
  *  The sphere math lives in the pure, unit-tested `greatCircleArc`. */
-function arcGeometry(a: Vec3, b: Vec3): { path: Float32Array; line: Float32Array } {
+function arcGeometry(
+  a: Vec3,
+  b: Vec3,
+  dash: "solid" | "dashed" | "dotted" = "solid",
+): { path: Float32Array; line: Float32Array } {
   const path = greatCircleArc(a, b, ARC_SEGMENTS, ARC_BASE_RADIUS, ARC_LIFT);
-  // Expand the (N+1)-point polyline into N segment PAIRS for <lineSegments>.
-  const line = new Float32Array(ARC_SEGMENTS * 2 * 3);
+  // Keep the segments this dash style draws (solid = all; dashed/dotted skip gaps), then
+  // expand each kept segment into a PAIR for <lineSegments> — a static dashed/dotted line.
+  const keep: number[] = [];
   for (let i = 0; i < ARC_SEGMENTS; i++) {
-    line.set(path.subarray(i * 3, i * 3 + 3), i * 6);
-    line.set(path.subarray((i + 1) * 3, (i + 1) * 3 + 3), i * 6 + 3);
+    if (dash === "solid" || (dash === "dashed" ? i % 4 < 2 : i % 3 === 0)) keep.push(i);
   }
+  const line = new Float32Array(keep.length * 2 * 3);
+  keep.forEach((i, j) => {
+    line.set(path.subarray(i * 3, i * 3 + 3), j * 6);
+    line.set(path.subarray((i + 1) * 3, (i + 1) * 3 + 3), j * 6 + 3);
+  });
   return { path, line };
 }
 
@@ -303,7 +320,7 @@ function arcGeometry(a: Vec3, b: Vec3): { path: Float32Array; line: Float32Array
  *  single useFrame (the governor keeps the loop alive while any arc is present). */
 function Arcs({ arcs }: { arcs: ArcData[] }) {
   const geoms = useMemo(
-    () => arcs.map((arc) => ({ ...arc, ...arcGeometry(arc.a, arc.b) })),
+    () => arcs.map((arc) => ({ ...arc, ...arcGeometry(arc.a, arc.b, arc.dash ?? "solid") })),
     [arcs],
   );
   const comets = useRef<(Mesh | null)[]>([]);
@@ -343,20 +360,24 @@ function Arcs({ arcs }: { arcs: ArcData[] }) {
               depthWrite={false}
             />
           </lineSegments>
-          <mesh
-            ref={(el) => {
-              comets.current[i] = el;
-            }}
-          >
-            <sphereGeometry args={[0.011 + 0.012 * g.severity, 12, 12]} />
-            <meshBasicMaterial
-              color={g.color ?? ARC_COLOR}
-              transparent
-              opacity={0.95}
-              blending={AdditiveBlending}
-              depthWrite={false}
-            />
-          </mesh>
+          {/* Tension ties (no kind) flow a 3D comet; physical links ride a 2D flag/icon
+              badge instead (projected by the scene loop), so no comet for them. */}
+          {!g.kind && (
+            <mesh
+              ref={(el) => {
+                comets.current[i] = el;
+              }}
+            >
+              <sphereGeometry args={[0.011 + 0.012 * g.severity, 12, 12]} />
+              <meshBasicMaterial
+                color={g.color ?? ARC_COLOR}
+                transparent
+                opacity={0.95}
+                blending={AdditiveBlending}
+                depthWrite={false}
+              />
+            </mesh>
+          )}
         </group>
       ))}
     </group>
@@ -586,7 +607,7 @@ function AskMarkers({
 /** A marker projected to 2D screen space, for the wrapper's overlay chips/bubbles. */
 export interface ProjectedMarker {
   id: string;
-  kind: "ask" | "alert";
+  kind: "ask" | "alert" | "link";
   /** Screen position (px) of the marker's anchor on the globe. */
   x: number;
   y: number;
@@ -608,6 +629,10 @@ export interface ProjectedMarker {
   /** Most recent contributing article time (epoch ms, alerts only) — drives the chip's
    *  recency treatment: a live pulse when fresh, a fade when stale. */
   updatedAt?: number;
+  /** Physical-link KIND (links only) — drives the travelling badge's icon/colour. */
+  linkKind?: string;
+  /** Origin country ISO-2 (links only) — flies its flag when linkKind === "attack". */
+  fromCc?: string;
 }
 
 // memo'd so the scene only re-renders when its OWN inputs change. Without this, every
@@ -756,7 +781,7 @@ export const GlobeScene = memo(function GlobeScene({
     regions,
   ]);
 
-  useFrame((_, delta) => {
+  useFrame((frame, delta) => {
     const g = group.current;
     if (!g) return;
     // SOLE rule for the idle spin: spin while the pointer is OFF the globe, freeze while it
@@ -907,6 +932,31 @@ export const GlobeScene = memo(function GlobeScene({
           updatedAt: a.updatedAt,
         });
       }
+      // LINK ties: a flag/icon BADGE rides each PHYSICAL-link arc (origin → destination).
+      // Sample the travelling point on the SAME bowed great circle as the line and project
+      // it, so the badge sits on the arc and flows with it (tension ties keep their 3D comet).
+      const tBase = frame.clock.elapsedTime * ARC_FLOW_SPEED;
+      arcs.forEach((arc, i) => {
+        if (!arc.kind) return;
+        const t = (tBase + i * 0.13) % 1;
+        const p = greatCirclePoint(arc.a, arc.b, t, ARC_BASE_RADIUS, ARC_LIFT);
+        _proj.set(p.x, p.y, p.z).applyMatrix4(g.matrix);
+        if (_proj.z <= 0.02) return; // far hemisphere → occluded by the globe
+        _proj.project(cam);
+        if (_proj.z > 1) return;
+        out.push({
+          id: `link:${arc.id}`,
+          kind: "link",
+          x: ((_proj.x + 1) / 2) * size.width,
+          y: ((1 - _proj.y) / 2) * size.height,
+          label: "",
+          detail: "",
+          color: arc.color ?? ARC_COLOR,
+          hovered: false,
+          linkKind: arc.kind,
+          fromCc: arc.fromCc,
+        });
+      });
       onMarkersProject(out);
     }
 

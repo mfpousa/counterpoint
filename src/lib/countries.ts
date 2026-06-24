@@ -21,3 +21,18 @@ export function countryLabel(cc: string | undefined | null): string {
   const code = cc.toLowerCase().slice(0, 2);
   return INDEX[code]?.label ?? cc.toUpperCase();
 }
+
+/**
+ * The flag EMOJI for an ISO 3166-1 alpha-2 code (e.g. "ua" → 🇺🇦), built from the two
+ * Regional Indicator Symbols. Renders as a real flag on web/iOS/macOS; "" for a bad code.
+ * Lets the globe fly a country's flag on an "attack" link without bundling flag images.
+ */
+export function flagEmoji(cc: string | undefined | null): string {
+  const code = (cc ?? "").trim().toLowerCase();
+  if (!/^[a-z]{2}$/.test(code)) return "";
+  const A = 0x1f1e6; // Regional Indicator Symbol Letter A
+  return String.fromCodePoint(
+    A + (code.charCodeAt(0) - 97),
+    A + (code.charCodeAt(1) - 97),
+  );
+}
