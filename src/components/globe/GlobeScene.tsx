@@ -259,8 +259,10 @@ function Outline({
   );
 }
 
-/** All country shapes; the current level's are interactive, the rest are dim land. */
-function Countries({
+/** All country shapes; the current level's are interactive, the rest are dim land.
+ *  memo'd so an unrelated parent re-render (e.g. the 3s status poll) doesn't re-map the
+ *  hundreds of country meshes — only a real data/focus/handler change does. */
+const Countries = memo(function Countries({
   data,
   focusedId,
   onFocus,
@@ -287,7 +289,7 @@ function Countries({
       ))}
     </>
   );
-}
+});
 
 // ---------------------------------------------------------------------------
 // Markers (world events + AI-search results). Both stand UP from the surface so
@@ -707,7 +709,12 @@ export interface ProjectedMarker {
   hovered: boolean;
 }
 
-export function GlobeScene({
+// memo'd so the scene only re-renders when its OWN inputs change. Without this, every
+// AppContext update — notably the 3s background status poll and each live reloadPool —
+// re-rendered the parent Globe and forced r3f to re-reconcile the whole scene graph
+// (hundreds of country meshes + markers) on the JS thread, which is the periodic stutter.
+// The wrapper keeps every prop referentially stable (refs/handlers memoized) so this holds.
+export const GlobeScene = memo(function GlobeScene({
   countries,
   regions,
   countryOutline,
@@ -1072,4 +1079,4 @@ export function GlobeScene({
       </group>
     </>
   );
-}
+});

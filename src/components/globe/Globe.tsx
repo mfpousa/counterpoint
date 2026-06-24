@@ -311,10 +311,15 @@ export function Globe({
       GEO_ROOT_ID,
   );
   // Every USER navigation goes through here so it's recorded in the page history.
-  const navTo = (nodeId: string) => {
-    setBrowse(nodeId);
-    onNavigate?.(nodeId);
-  };
+  // useCallback so it's a STABLE identity — activate() (a GlobeScene prop) depends on it,
+  // and a fresh function each render would defeat React.memo(GlobeScene).
+  const navTo = useCallback(
+    (nodeId: string) => {
+      setBrowse(nodeId);
+      onNavigate?.(nodeId);
+    },
+    [onNavigate],
+  );
   const [view, setView] = useState<CoverageView | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
@@ -336,14 +341,25 @@ export function Globe({
   const markerLayerRef = useRef<{ set: (items: ProjectedMarker[]) => void }>(null);
 
   // View state the gesture layer mutates and the frame loop reads (no re-renders).
-  const refs: GlobeViewRefs = {
-    rot: useRef({ yaw: 0, pitch: 0 }),
-    zoom: useRef(1),
-    dragging: useRef(false),
-    target: useRef<{ yaw: number; pitch: number; zoom: number } | null>(null),
-    // Assigned by GlobeScene once mounted; gestures call it to wake the on-demand loop.
-    wake: useRef<() => void>(() => {}),
-  };
+  const rotRef = useRef({ yaw: 0, pitch: 0 });
+  const zoomRef = useRef(1);
+  const draggingRef = useRef(false);
+  const targetRef = useRef<{ yaw: number; pitch: number; zoom: number } | null>(null);
+  // Assigned by GlobeScene once mounted; gestures call it to wake the on-demand loop.
+  const wakeRef = useRef<() => void>(() => {});
+  // Bundle the refs ONCE (stable identity). A fresh object literal each render would change
+  // the `refs` prop every tick and defeat React.memo(GlobeScene) — re-reconciling the whole
+  // scene graph on every status poll (the periodic stutter).
+  const refs = useMemo<GlobeViewRefs>(
+    () => ({
+      rot: rotRef,
+      zoom: zoomRef,
+      dragging: draggingRef,
+      target: targetRef,
+      wake: wakeRef,
+    }),
+    [],
+  );
   const lastDrag = useRef({ x: 0, y: 0 });
   const pinchDist = useRef(0);
   // True once a gesture has actually DRAGGED past the slop. Reset at the start of every
@@ -915,9 +931,14 @@ export function Globe({
   }, [regionData, regionCc, view, activePoolId]);
 
   // Children with no border shape (provinces/localities) fall back to small gizmos.
+  // useMemo so the empty case returns a STABLE array (not a fresh [] each render) — keeps
+  // the `gizmos` prop referentially stable for React.memo(GlobeScene).
   const childLevel = view?.children?.[0]?.level ?? null;
-  const gizmos: GlobeEntityData[] =
-    childLevel === "province" || childLevel === "locality" ? entities : [];
+  const gizmos = useMemo<GlobeEntityData[]>(
+    () =>
+      childLevel === "province" || childLevel === "locality" ? entities : [],
+    [childLevel, entities],
+  );
 
   // Ease the globe to FACE + zoom into the focused node (continent/country/region).
   useEffect(() => {
@@ -998,22 +1019,24 @@ export function Globe({
     [],
   );
 
-  const childById = (id: string): CoverageNode | undefined =>
-    (view?.children ?? []).find((c) => c.nodeId === id);
-
   // Tap an entity: commit it as the feed if it has its own outlets AND drill in if
-  // it has children (mirrors the chip navigator's behaviour exactly).
-  const activate = (id: string) => {
-    if (didDrag.current) return; // a drag-to-rotate that ended here is not a tap
-    const node = childById(id);
-    if (!node) return;
-    if (node.state === "ready") {
-      onSelect(node.poolId);
-      onPlace?.(node.label);
-      onOpenArticles?.(); // selecting a covered place reveals the articles panel
-    }
-    if (node.hasChildren) navTo(node.nodeId);
-  };
+  // it has children (mirrors the chip navigator's behaviour exactly). useCallback (stable
+  // across the 3s status re-renders) so it doesn't defeat React.memo(GlobeScene); its
+  // identity only changes when the coverage `view` actually changes (a real place switch).
+  const activate = useCallback(
+    (id: string) => {
+      if (didDrag.current) return; // a drag-to-rotate that ended here is not a tap
+      const node = (view?.children ?? []).find((c) => c.nodeId === id);
+      if (!node) return;
+      if (node.state === "ready") {
+        onSelect(node.poolId);
+        onPlace?.(node.label);
+        onOpenArticles?.(); // selecting a covered place reveals the articles panel
+      }
+      if (node.hasChildren) navTo(node.nodeId);
+    },
+    [view, onSelect, onPlace, onOpenArticles, navTo],
+  );
 
   const goUp = () => {
     const path = view?.path ?? [];
