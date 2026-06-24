@@ -91,6 +91,10 @@ import {
 
 const clamp = (v: number, lo: number, hi: number) =>
   Math.min(hi, Math.max(lo, v));
+// Severity → heat colour for the fan-out rows: muted when low, ramping amber → orange →
+// red as a story gets hotter, so "which collapsed stories are hotter" reads at a glance.
+const heatColor = (sev: number) =>
+  sev >= 0.8 ? "#ef4444" : sev >= 0.6 ? "#f97316" : sev >= 0.45 ? "#f2b705" : colors.textDim;
 // Valid Ionicons glyph name — EVENT_CATEGORIES stores icon names as plain strings, so we
 // cast through this when handing them to <Ionicons> for the event chips + legend lenses.
 type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
@@ -708,11 +712,16 @@ export function Globe({
       const ex = byLoc.get(key);
       if (ex) {
         ex.count = (ex.count ?? 1) + 1;
-        ex.stacked!.push({ id: a.id, title: a.title }); // keep each collapsed story for fan-out
+        // keep each collapsed story (with its own severity) for the fan-out heat cue
+        ex.stacked!.push({ id: a.id, title: a.title, severity: a.severity });
         ex.updatedAt = Math.max(ex.updatedAt, a.updatedAt); // FRESHEST drives the pulse
         ex.developing = ex.developing || a.developing; // ongoing if ANY collapsed issue is
       } else {
-        byLoc.set(key, { ...a, count: 1, stacked: [{ id: a.id, title: a.title }] });
+        byLoc.set(key, {
+          ...a,
+          count: 1,
+          stacked: [{ id: a.id, title: a.title, severity: a.severity }],
+        });
       }
     }
     return [...byLoc.values()].slice(0, 40);
@@ -1000,13 +1009,16 @@ export function Globe({
         // An aggregated chip (many stories on one country) FANS OUT: list every collapsed
         // headline, each its own tap-to-open row. A lone event keeps the simple card.
         const stacked = alertById.get(it.id)?.stacked ?? [
-          { id: it.id, title: it.detail },
+          { id: it.id, title: it.detail, severity: it.severity ?? 0.5 },
         ];
         if (stacked.length > 1) {
+          // Hottest (highest severity) first, so the eye lands on the biggest story; each
+          // row's heat DOT colour encodes its severity so "which are hotter" is at a glance.
+          const rows = [...stacked].sort((a, b) => b.severity - a.severity);
           return (
             <>
               <Text style={styles.markerCardCount}>
-                {t("globe.storiesHere", { count: stacked.length })}
+                {t("globe.storiesHere", { count: rows.length })}
               </Text>
               {/* Cap the height and scroll when many stories collapse here, so a busy
                   country (e.g. 12+ events) doesn't grow a card taller than the screen. */}
@@ -1016,7 +1028,7 @@ export function Globe({
                 nestedScrollEnabled
                 showsVerticalScrollIndicator
               >
-                {stacked.map((s) => (
+                {rows.map((s) => (
                   <Pressable
                     key={s.id}
                     style={styles.markerCardRow}
@@ -1026,10 +1038,17 @@ export function Globe({
                     }}
                     accessibilityRole="link"
                   >
-                    <Text style={styles.markerCardRowText} numberOfLines={2}>
-                      {s.title}
-                    </Text>
-                    <Ionicons name="open-outline" size={13} color={colors.accent} />
+                    <View
+                      style={[styles.markerCardHeat, { backgroundColor: heatColor(s.severity) }]}
+                    />
+                    {/* FULL headline (no truncation) so the reader can actually read each one. */}
+                    <Text style={styles.markerCardRowText}>{s.title}</Text>
+                    <Ionicons
+                      name="open-outline"
+                      size={13}
+                      color={colors.accent}
+                      style={styles.markerCardRowOpen}
+                    />
                   </Pressable>
                 ))}
               </ScrollView>
@@ -2284,11 +2303,14 @@ const styles = StyleSheet.create({
   markerCardScrollBody: { paddingRight: 2 },
   markerCardRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start", // headlines wrap to full text → keep dot/icon by the first line
     gap: spacing.sm,
-    paddingVertical: 5,
+    paddingVertical: 7,
     borderTopWidth: 1,
     borderTopColor: colors.border,
   },
   markerCardRowText: { flex: 1, color: colors.text, fontSize: font.small, lineHeight: 17 },
+  // Per-row HEAT dot: colour ramps with the collapsed story's severity (heatColor).
+  markerCardHeat: { width: 9, height: 9, borderRadius: 5, marginTop: 4 },
+  markerCardRowOpen: { marginTop: 2 },
 });

@@ -117,8 +117,9 @@ export interface GeoAlert {
    *  UI show "+N more" instead of stacking many pins on one country's centroid. */
   count?: number;
   /** The events collapsed onto this location (including this one, strongest first), so a
-   *  tap on an aggregated marker can fan out into each story. Set by the UI declutter. */
-  stacked?: { id: string; title: string }[];
+   *  tap on an aggregated marker can fan out into each story. Each carries its own severity
+   *  so the fan-out can flag which collapsed stories are hottest. Set by the UI declutter. */
+  stacked?: { id: string; title: string; severity: number }[];
 }
 
 /** Lookups used to geolocate a story (all built from the bundled country borders). */

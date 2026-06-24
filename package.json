@@ -14,7 +14,6 @@
     "test:watch": "jest --watch",
     "typecheck": "tsc --noEmit",
     "typecheck:server": "tsc --noEmit -p server/tsconfig.json",
-    "report:zones": "tsx scripts/zonesReport.ts",
     "gazetteer:fetch": "bash scripts/fetch-geonames.sh",
     "gazetteer:build": "tsx scripts/buildGazetteer.ts",
     "sources:wikidata": "tsx scripts/resolveSources.ts",

@@ -61,10 +61,10 @@ export interface Source {
    */
   lang?: string;
   /**
-   * Geographic / affiliation ZONE this outlet belongs to (e.g. "russia",
-   * "ukraine", "china"). Set ONLY on reactive international sources — outlets
-   * fetched on demand when a story involves their zone (see src/data/zones.ts).
-   * Absent for the default front-page sources (treated as "international").
+   * Legacy geographic/affiliation zone of an outlet. The discovered placeSources
+   * outlets carry NO zone — reactive SIDE coverage is tagged with the outlet's COUNTRY
+   * code on the FeedItem at fetch time (see feedService.addSideCoverage), not here.
+   * Kept optional for back-compat; absent on every current source.
    */
   zone?: string;
   /**
@@ -75,26 +75,6 @@ export interface Source {
   region?: string;
   /** Human-readable label for `region` (e.g. "Galicia"). */
   regionLabel?: string;
-}
-
-/**
- * A geographic / affiliation ZONE of reporting (e.g. Russia, Ukraine, China).
- * Its `sources` are NOT fetched by default; the server loads them REACTIVELY
- * only when a live story is detected to involve the zone (its `aliases` appear
- * in the coverage). This lets us reach toward "the whole world" of outlets
- * without paying to fetch every region on every build.
- */
-export interface Zone {
-  id: string;
-  /** Display label, e.g. "Russia". */
-  label: string;
-  /**
-   * Lowercase signal tokens (country, capital, leaders, demonyms, key terms)
-   * whose presence in a story's text marks the zone as involved.
-   */
-  aliases: string[];
-  /** Reactive RSS/Atom sources for this zone (fetched only when involved). */
-  sources: Source[];
 }
 
 /**
