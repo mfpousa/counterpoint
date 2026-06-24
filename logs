@@ -1,11 +1,12 @@
-{
-    "phase": "idle",
-    "active": true,
-    "done": 0,
-    "total": 0,
-    "pending": 2651,
-    "analyzed": 1588,
-    "world": "geo-es",
-    "label": "Spain",
-    "busyWith": null
-}
+nodes.current.get(...)?.setNativeProps is not a function
+Call Stack
+set
+src/components/globe/Globe.tsx
+onMarkersProject
+src/components/globe/Globe.tsx
+useFrame$argument_0
+src/components/globe/GlobeScene.tsx
+render$1
+node_modules/@react-three/fiber/dist/events-776716bd.esm.js
+loop
+node_modules/@react-three/fiber/dist/events-776716bd.esm.js
