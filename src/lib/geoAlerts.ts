@@ -12,7 +12,7 @@
 // Stories we cannot locate are dropped (no fabricated positions). Lives apart from
 // three.js so the geolocation logic is unit-tested once and reused on web + native.
 
-import type { LinkKind, Story } from "../types";
+import type { GatheringKind, LinkKind, Story } from "../types";
 import type { Vec3 } from "./globeLayout";
 
 /** A class of world EVENT we extract from the news to paint the globe's worldview. */
@@ -57,6 +57,29 @@ export const LINK_KINDS: Record<
   aid: { color: "#34d399", icon: "heart", dash: "dashed", label: "Aid" },
   transport: { color: "#c084fc", icon: "airplane", dash: "dotted", label: "Transport" },
   other: { color: "#9aa4b2", icon: "swap-horizontal", dash: "dashed", label: "Link" },
+};
+
+/** Per-gathering-kind visuals for a CO-LOCATED multi-party event (a summit, talks, a
+ *  signing, …). Drives the localized badge: a COLOUR + an Ionicons glyph for the event
+ *  nature (the involved parties ring it as small flags). `other` is a dead fallback. */
+export const GATHERING_KINDS: Record<
+  GatheringKind,
+  { color: string; icon: string; label: string }
+> = {
+  summit: { color: "#7dd3fc", icon: "people", label: "Summit" },
+  talks: { color: "#a5b4fc", icon: "chatbubbles", label: "Talks" },
+  agreement: { color: "#86efac", icon: "document-text", label: "Agreement" },
+  ceasefire: { color: "#fcd34d", icon: "flag", label: "Ceasefire" },
+  visit: { color: "#5eead4", icon: "airplane", label: "State visit" },
+  forum: { color: "#93c5fd", icon: "podium", label: "Forum" },
+  vote: { color: "#67e8f9", icon: "checkbox", label: "Vote" },
+  trial: { color: "#d8b4fe", icon: "hammer", label: "Trial" },
+  exercise: { color: "#fca5a5", icon: "shield", label: "Joint exercise" },
+  aid: { color: "#34d399", icon: "heart", label: "Aid effort" },
+  games: { color: "#fdba74", icon: "trophy", label: "Games" },
+  mission: { color: "#c4b5fd", icon: "rocket", label: "Mission" },
+  ceremony: { color: "#f9a8d4", icon: "ribbon", label: "Ceremony" },
+  other: { color: "#9aa4b2", icon: "people-circle", label: "Gathering" },
 };
 
 /** Keyword signatures per category (lowercase substrings scanned in title + dek). */

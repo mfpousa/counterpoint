@@ -57,6 +57,15 @@ export interface GeoCentroids {
   continents: ContinentCentroid[];
 }
 
+/** A country's lon/lat extent, for sanity-checking a model-supplied point against the
+ *  country it claims (a coarse, deliberately LENIENT point-in-country test). */
+export interface BBox {
+  minLon: number;
+  minLat: number;
+  maxLon: number;
+  maxLat: number;
+}
+
 /** Accent/space-insensitive slug ("North America" → "north-america"). */
 export function continentSlug(name: string): string {
   return name
@@ -372,4 +381,40 @@ export function computeCentroids(geo: GeoJson): GeoCentroids {
     continents.push({ slug, label: a.label || slug, dir });
   }
   return { byIso2, byContinent, countries, continents };
+}
+
+/** Per-country lon/lat bounding boxes (ISO-2 → BBox), accumulated over ALL of a country's
+ *  polygons. Used to REJECT a model's geolocation when its point lands far outside the
+ *  country it named. Intentionally lenient (whole-extent, no antimeridian unwrap): the goal
+ *  is to catch gross hallucinations, not to be a precise borders test — a too-wide box for a
+ *  trans-antimeridian country (Russia/Fiji) just makes validation more permissive, never
+ *  wrongly strict. */
+export function computeCountryBBoxes(geo: GeoJson): Map<string, BBox> {
+  const out = new Map<string, BBox>();
+  for (const f of geo.features) {
+    const iso = iso2Of(f.properties);
+    const g = f.geometry;
+    if (!iso || !g) continue;
+    const polys: Ring[] =
+      g.type === "Polygon"
+        ? (g.coordinates as Ring[])
+        : g.type === "MultiPolygon"
+          ? (g.coordinates as Ring[][]).flat()
+          : [];
+    let bb = out.get(iso);
+    for (const ring of polys) {
+      for (const [lon, lat] of ring) {
+        if (!bb) {
+          bb = { minLon: lon, minLat: lat, maxLon: lon, maxLat: lat };
+          out.set(iso, bb);
+        } else {
+          if (lon < bb.minLon) bb.minLon = lon;
+          if (lon > bb.maxLon) bb.maxLon = lon;
+          if (lat < bb.minLat) bb.minLat = lat;
+          if (lat > bb.maxLat) bb.maxLat = lat;
+        }
+      }
+    }
+  }
+  return out;
 }

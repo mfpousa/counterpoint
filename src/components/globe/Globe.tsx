@@ -58,12 +58,15 @@ import {
   buildOutline,
   buildRegionShapes,
   computeCentroids,
+  computeCountryBBoxes,
   continentSlug,
+  type BBox,
   type CountryShape,
   type GeoCentroids,
 } from "../../lib/geoShapes";
 import {
   EVENT_CATEGORIES,
+  GATHERING_KINDS,
   LINK_KINDS,
   RECENCY_OPACITY,
   buildAlerts,
@@ -77,7 +80,9 @@ import { countryLabel } from "../../lib/countries";
 import { searchPlaces, type PlaceHit } from "../../lib/placeSearch";
 import { appendAskStream, resetAskStream } from "../../lib/askStream";
 import { buildAskNameIndex, resolveAskPlace, scanCountries } from "../../lib/askLocate";
-import type { AnalysisStatus, AskResult, LinkKind, Story } from "../../types";
+import { lookupCity } from "../../lib/cityCoords";
+import { geocodeGathering } from "../../lib/placeGeocode";
+import type { AnalysisStatus, AskResult, GatheringKind, LinkKind, Story } from "../../types";
 import worldLand from "../../data/world/countries-50m.json";
 import { useApp, useT } from "../../store/AppContext";
 import { colors, font, radius, spacing } from "../../theme";
@@ -86,6 +91,7 @@ import {
   GlobeScene,
   type ArcData,
   type AskMarkerData,
+  type GatheringData,
   type GlobeCountry,
   type GlobeEntityData,
   type GlobeViewRefs,
@@ -111,6 +117,8 @@ const TIME_WINDOWS: TimeWindow[] = ["all", "week", "day", "now"];
 // Stable empty arcs reference — passed while an AI search owns the globe (so the tension
 // web hides), avoiding a fresh [] each render that would defeat React.memo(GlobeScene).
 const EMPTY_ARCS: ArcData[] = [];
+// Same, for the located GATHERINGS — hidden while an AI search owns the globe.
+const EMPTY_GATHERINGS: GatheringData[] = [];
 // Physical-LINK ties take their per-kind colour from LINK_KINDS (attack/spread/trade/… each
 // distinct) so every connection on the globe is self-explanatory.
 const WORLD_ZOOM = 0.9; // zoomed-OUT scale for the world landing (whole globe in view)
@@ -364,7 +372,7 @@ const MarkerLayer = forwardRef<
                 i.updatedAt ?? 0,
                 i.developing,
                 now,
-              )}:${i.linkKind ?? ""}:${i.fromCc ?? ""}:${i.toCc ?? ""}:${i.title ?? ""}:${i.label}:${i.detail}`,
+              )}:${i.linkKind ?? ""}:${i.fromCc ?? ""}:${i.toCc ?? ""}:${i.title ?? ""}:${i.gatheringKind ?? ""}:${(i.parties ?? []).join(",")}:${i.label}:${i.detail}`,
           )
           .join("|");
         if (key === prevKey.current) return;
@@ -426,6 +434,79 @@ const MarkerLayer = forwardRef<
           { transform },
           isFocused && styles.markerAnchorTop,
         ];
+        // CO-LOCATED GATHERING: a localized badge AT the place — the event-nature ICON ringed
+        // by a small FLAG per involved party (a "+N" chip when there are more), with the place
+        // name tagged beneath. HOVERING reveals the kind, place, headline and full party list
+        // and pauses the spin. NOT an arc: it happened AT one place, not between places.
+        if (it.kind === "gathering") {
+          const gk = (it.gatheringKind ?? "other") as GatheringKind;
+          const gStyle = GATHERING_KINDS[gk] ?? GATHERING_KINDS.other;
+          const parties = it.parties ?? [];
+          const shownParties = parties.slice(0, 4);
+          const moreParties = parties.length - shownParties.length;
+          const showBubble = hoverId === it.id && !!it.detail;
+          const partyNames = parties.map((cc) => countryLabel(cc)).join(" · ");
+          return (
+            <View key={it.id} ref={setNode(it.id)} style={anchorStyle} pointerEvents="box-none">
+              {showBubble && (
+                <View style={[styles.markerStack, { bottom: 34 }]} pointerEvents="none">
+                  <View style={[styles.markerBubble, { borderColor: it.color }]}>
+                    <Text style={styles.linkBubbleRoute} numberOfLines={1}>
+                      {gStyle.label} · {it.label}
+                    </Text>
+                    <Text style={styles.markerBubbleText} numberOfLines={2}>
+                      {it.detail}
+                    </Text>
+                    {!!partyNames && (
+                      <Text style={styles.gatheringParties} numberOfLines={1}>
+                        {partyNames}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              )}
+              <Pressable
+                style={styles.gatheringInner}
+                onHoverIn={() => {
+                  setHoverId(it.id);
+                  onHoverMarker(it.id);
+                }}
+                onHoverOut={() => {
+                  setHoverId((h) => (h === it.id ? null : h));
+                  onHoverMarker(null);
+                }}
+                accessibilityLabel={it.detail}
+              >
+                <View style={[styles.gatheringBadge, { backgroundColor: it.color }]}>
+                  <Ionicons name={gStyle.icon as IoniconName} size={16} color="#0b0f14" />
+                </View>
+                <View style={styles.partyRow} pointerEvents="none">
+                  {shownParties.map((cc) => (
+                    <View key={cc} style={styles.partyFlag}>
+                      {/* Country CODE shows through if the flag image can't load (offline). */}
+                      <Text style={styles.partyCode}>{cc.toUpperCase()}</Text>
+                      <Image
+                        source={{ uri: `https://flagcdn.com/w40/${cc}.png` }}
+                        style={styles.partyFlagImg}
+                        resizeMode="cover"
+                      />
+                    </View>
+                  ))}
+                  {moreParties > 0 && (
+                    <View style={styles.partyFlag}>
+                      <Text style={styles.partyCode}>+{moreParties}</Text>
+                    </View>
+                  )}
+                </View>
+                {!!it.label && (
+                  <Text style={styles.gatheringTag} numberOfLines={1}>
+                    {it.label}
+                  </Text>
+                )}
+              </Pressable>
+            </View>
+          );
+        }
         // PHYSICAL LINK: a small badge riding the connection arc. An ATTACK flies the ORIGIN
         // country's FLAG; every other kind shows its category icon (medical, ship, people…),
         // tinted the arc's colour. The line carries colour + dash; this badge says WHAT it is.
@@ -779,6 +860,7 @@ export function Globe({
     shapes: CountryShape[];
     centroids: GeoCentroids;
     countryOutline: Float32Array;
+    bboxes: Map<string, BBox>;
   } | null>(() => {
     try {
       const geo = worldLand as unknown as Parameters<
@@ -788,6 +870,7 @@ export function Globe({
         shapes: buildCountryShapes(geo, LAND_RADIUS),
         centroids: computeCentroids(geo),
         countryOutline: buildOutline(geo.features, COUNTRY_OUTLINE_RADIUS),
+        bboxes: computeCountryBBoxes(geo),
       };
     } catch (e) {
       console.warn("[globe] world borders unavailable:", e);
@@ -885,6 +968,51 @@ export function Globe({
     return out.slice(0, 20); // hard cap so the flow animation stays bounded
   }, [worldGeo, stories, timeWindow]);
 
+  // CO-LOCATED multi-party events ("gatherings") localized AT their place — a summit, talks,
+  // a signing, a forum, … — NOT drawn as arcs. Each story.gatherings entry is geolocated
+  // best-first (gazetteer name → validated model coords → country centroid), de-duped by
+  // resolved point, and time-windowed + capped like the arcs so the globe stays readable.
+  const gatheringMarkers = useMemo<GatheringData[]>(() => {
+    if (!worldGeo) return [];
+    const now = Date.now();
+    const ctx = {
+      lookupCity,
+      bboxes: worldGeo.bboxes,
+      byIso2: worldGeo.centroids.byIso2,
+    };
+    const out: GatheringData[] = [];
+    const seen = new Set<string>();
+    const withG = stories
+      .filter((s) => (s.gatherings?.length ?? 0) > 0 && withinWindow(s.updatedAt, timeWindow, now))
+      .sort((a, b) => (b.severity ?? 0) - (a.severity ?? 0))
+      .slice(0, 12);
+    for (const s of withG) {
+      const gs = s.gatherings ?? [];
+      for (let i = 0; i < gs.length; i++) {
+        const g = gs[i];
+        const dir = geocodeGathering(g, ctx);
+        if (!dir) continue;
+        // Collapse gatherings resolving to the same point (e.g. two summits in one capital).
+        const key = `${dir.x.toFixed(2)}|${dir.y.toFixed(2)}|${dir.z.toFixed(2)}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const style = GATHERING_KINDS[g.kind as GatheringKind] ?? GATHERING_KINDS.other;
+        out.push({
+          id: `gathering:${s.id}:${i}`,
+          dir,
+          kind: g.kind,
+          place: g.place,
+          parties: g.parties,
+          color: style.color,
+          title: s.title,
+        });
+        if (out.length >= 14) break;
+      }
+      if (out.length >= 14) break;
+    }
+    return out;
+  }, [worldGeo, stories, timeWindow]);
+
   // id → alert, so a focused chip's card can look up its full record (incl. the `stacked`
   // events it aggregates) without threading that whole list through the projected markers.
   const alertById = useMemo(
@@ -908,6 +1036,17 @@ export function Globe({
     const order: LinkKind[] = ["attack", "tension", "spread", "trade", "migration", "aid", "transport"];
     return order.filter((k) => present.has(k));
   }, [relationshipArcs]);
+
+  // The gathering KINDS currently on the globe, for the GATHERINGS legend (stable order).
+  const legendGatheringKinds = useMemo<GatheringKind[]>(() => {
+    const present = new Set<string>();
+    for (const g of gatheringMarkers) present.add(g.kind);
+    const order: GatheringKind[] = [
+      "summit", "talks", "agreement", "ceasefire", "visit", "forum", "vote",
+      "trial", "exercise", "aid", "games", "mission", "ceremony", "other",
+    ];
+    return order.filter((k) => present.has(k));
+  }, [gatheringMarkers]);
 
   // Unified place search (continents + countries) over the bundled centroids. Picking
   // a result flies the globe there, commits it as the feed pool, and opens articles.
@@ -1730,6 +1869,7 @@ export function Globe({
             alerts={visibleAlerts}
             arcs={askMarkers.length > 0 ? EMPTY_ARCS : relationshipArcs}
             askMarkers={askMarkers}
+            gatherings={askMarkers.length > 0 ? EMPTY_GATHERINGS : gatheringMarkers}
             onAskMarkerPress={onMarkerSelect}
             hoveredMarkerId={hoveredMarkerId}
             focusedMarkerId={focusedMarkerId}
@@ -1981,7 +2121,7 @@ export function Globe({
         {/* Worldview LENS DOCK (bottom-right): a TIME scrubber over the category legend.
             Together they answer "what kind of events, happening when?" — narrow by recency
             window and isolate a category, while the chips themselves encode freshness. */}
-        {hero && (legendCats.length > 0 || legendLinkKinds.length > 0) && (
+        {hero && (legendCats.length > 0 || legendLinkKinds.length > 0 || legendGatheringKinds.length > 0) && (
           <View
             style={[
               styles.lensDock,
@@ -2070,6 +2210,29 @@ export function Globe({
                   ))}
                 </View>
                 <Text style={styles.linkLegendHint}>{t("globe.links.hint")}</Text>
+              </View>
+            )}
+            {/* GATHERINGS legend — names each co-located multi-party event KIND on the globe
+                and teaches that those badges open their story. Static, like CONNECTIONS. */}
+            {legendGatheringKinds.length > 0 && (
+              <View style={styles.linkLegendWrap} pointerEvents="box-none">
+                <View style={styles.legend}>
+                  {legendGatheringKinds.map((k) => (
+                    <View key={k} style={styles.legendItem}>
+                      <View
+                        style={[styles.legendDot, { backgroundColor: GATHERING_KINDS[k].color }]}
+                      >
+                        <Ionicons
+                          name={GATHERING_KINDS[k].icon as IoniconName}
+                          size={9}
+                          color="#0b0f14"
+                        />
+                      </View>
+                      <Text style={styles.legendText}>{GATHERING_KINDS[k].label}</Text>
+                    </View>
+                  ))}
+                </View>
+                <Text style={styles.linkLegendHint}>{t("globe.gatherings.hint")}</Text>
               </View>
             )}
           </View>
@@ -2326,6 +2489,42 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     marginBottom: 2,
   },
+  // CO-LOCATED gathering badge: the event-nature ICON over a row of party flags + a place
+  // tag, centred on the resolved point (the column is wider than its content so they centre).
+  gatheringInner: { position: "absolute", left: -44, top: -18, width: 88, alignItems: "center" },
+  gatheringBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.65)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  partyRow: { flexDirection: "row", marginTop: 3, gap: 2 },
+  partyFlag: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.55)",
+    backgroundColor: colors.surface,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+  partyFlagImg: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 },
+  partyCode: { color: "#fff", fontSize: 7, fontWeight: "800" },
+  gatheringTag: {
+    color: colors.text,
+    fontSize: font.tiny,
+    fontWeight: "700",
+    marginTop: 2,
+    textShadowColor: "rgba(0,0,0,0.85)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  gatheringParties: { color: colors.textDim, fontSize: font.tiny, marginTop: 2 },
   // CONNECTIONS legend block (sits under the category lenses): the kind chips + a hover hint
   // teaching that the travelling badges open their story.
   linkLegendWrap: { marginTop: spacing.xs, alignItems: "flex-end", gap: 4 },

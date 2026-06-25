@@ -16,6 +16,8 @@
     "typecheck:server": "tsc --noEmit -p server/tsconfig.json",
     "gazetteer:fetch": "bash scripts/fetch-geonames.sh",
     "gazetteer:build": "tsx scripts/buildGazetteer.ts",
+    "cities:fetch": "bash scripts/fetch-cities.sh",
+    "cities:build": "tsx scripts/buildCityCoords.ts",
     "sources:wikidata": "tsx scripts/resolveSources.ts",
     "sources:mediacloud": "tsx scripts/resolveSourcesMediaCloud.ts",
     "discover:feeds": "tsx scripts/discoverFeeds.ts",

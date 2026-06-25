@@ -628,10 +628,29 @@ function AskMarkers({
   );
 }
 
+/** One CO-LOCATED multi-party event ("gathering") to localize on the globe: a single badge
+ *  AT `dir` showing the event-nature icon ringed by a flag per involved party. Resolved
+ *  (gazetteer → validated coords → centroid) by the wrapper; drawn as a 2D overlay badge,
+ *  NOT an arc — because it happened AT one place, not between places. */
+export interface GatheringData {
+  id: string;
+  dir: Vec3;
+  /** Event nature (GatheringKind) — maps to an icon + colour via GATHERING_KINDS. */
+  kind: string;
+  /** Place name where it happens (always-on tag). */
+  place: string;
+  /** Involved parties' ISO-2 codes (lowercase) — drawn as a ring of flags. */
+  parties: string[];
+  /** Accent colour (the kind's colour). */
+  color: string;
+  /** Story headline (hover tooltip). */
+  title: string;
+}
+
 /** A marker projected to 2D screen space, for the wrapper's overlay chips/bubbles. */
 export interface ProjectedMarker {
   id: string;
-  kind: "ask" | "alert" | "link";
+  kind: "ask" | "alert" | "link" | "gathering";
   /** Screen position (px) of the marker's anchor on the globe. */
   x: number;
   y: number;
@@ -664,6 +683,10 @@ export interface ProjectedMarker {
   /** TENSION links only — a per-frame badge SCALE (≈0.8→1.2) so it throbs in place; the
    *  overlay writes it imperatively (never re-renders). Undefined for directional links. */
   pulse?: number;
+  /** Gathering KIND (gatherings only) — drives the localized badge's icon + colour. */
+  gatheringKind?: string;
+  /** Involved parties' ISO-2 codes (gatherings only) — drawn as a ring of small flags. */
+  parties?: string[];
 }
 
 /** Reported up when the pointer is over a LINK arc LINE (not just its badge): the screen
@@ -691,6 +714,7 @@ export const GlobeScene = memo(function GlobeScene({
   alerts,
   arcs = [],
   askMarkers = [],
+  gatherings = [],
   onAskMarkerPress,
   hoveredMarkerId = null,
   focusedMarkerId = null,
@@ -716,6 +740,9 @@ export const GlobeScene = memo(function GlobeScene({
   arcs?: ArcData[];
   /** Located results from an AI news search to mark on the globe (empty = none). */
   askMarkers?: AskMarkerData[];
+  /** CO-LOCATED multi-party events to localize as badges (empty = none). Static like the
+   *  worldview chips — projected on data/gesture change, they don't keep the loop awake. */
+  gatherings?: GatheringData[];
   /** Tap an ask marker → recenter the globe on it. */
   onAskMarkerPress?: (id: string) => void;
   /** The marker currently under the pointer (its core pops + detail bubble shows). */
@@ -821,6 +848,7 @@ export const GlobeScene = memo(function GlobeScene({
     rightInset,
     alerts,
     askMarkers,
+    gatherings,
     gizmos,
     countries,
     regions,
@@ -933,7 +961,7 @@ export const GlobeScene = memo(function GlobeScene({
       const out: ProjectedMarker[] = [];
       const add = (
         id: string,
-        kind: "ask" | "alert",
+        kind: "ask" | "alert" | "gathering",
         dir: Vec3,
         label: string,
         detail: string,
@@ -941,7 +969,13 @@ export const GlobeScene = memo(function GlobeScene({
         extra?: Partial<
           Pick<
             ProjectedMarker,
-            "category" | "severity" | "count" | "developing" | "updatedAt"
+            | "category"
+            | "severity"
+            | "count"
+            | "developing"
+            | "updatedAt"
+            | "gatheringKind"
+            | "parties"
           >
         >,
       ) => {
@@ -975,6 +1009,15 @@ export const GlobeScene = memo(function GlobeScene({
           count: a.count,
           developing: a.developing,
           updatedAt: a.updatedAt,
+        });
+      }
+      // CO-LOCATED GATHERINGS: one localized badge per multi-party event, at its resolved
+      // place. Static like the event chips (no animation), so projected here but never part
+      // of `markersLive` — the globe still sleeps with gatherings on screen.
+      for (const gth of gatherings) {
+        add(gth.id, "gathering", gth.dir, gth.place, gth.title, gth.color, {
+          gatheringKind: gth.kind,
+          parties: gth.parties,
         });
       }
       // LINK ties: a flag/icon BADGE rides each link arc (origin → destination). Sample the

@@ -373,6 +373,30 @@ export type LinkKind =
   | "other";
 
 /**
+ * The nature of a CO-LOCATED, multi-party event a story is about — parties (countries)
+ * CONVENING at ONE place, rather than something moving BETWEEN places (that's a LinkKind).
+ * Spans diplomacy (summit/talks/agreement/ceasefire/visit), assemblies (forum/vote),
+ * justice (trial), the military (exercise), humanitarian work (aid), sport (games),
+ * science (mission) and state occasions (ceremony). Drives the localized globe badge's
+ * icon. `other` is a defensive fallback (dropped by coercion, never shown).
+ */
+export type GatheringKind =
+  | "summit"
+  | "talks"
+  | "agreement"
+  | "ceasefire"
+  | "visit"
+  | "forum"
+  | "vote"
+  | "trial"
+  | "exercise"
+  | "aid"
+  | "games"
+  | "mission"
+  | "ceremony"
+  | "other";
+
+/**
  * An AI-synthesized story aggregating multiple outlets' coverage of ONE event.
  * The synthesis is neutral and cites every contributing source; `angles` and
  * `contradictions` surface HOW the reporting differs across outlets.
@@ -447,6 +471,27 @@ export interface Story {
    * isn't about a place-to-place connection.
    */
   links?: { from: string; to: string; kind: LinkKind }[];
+  /**
+   * CO-LOCATED multi-party events: parties (countries, ISO 3166-1 alpha-2 lowercase)
+   * CONVENING at ONE specific place — a summit, peace talks, a treaty signing, a ceasefire,
+   * a joint exercise, an international trial/vote, etc. Unlike `links` (a directional flow
+   * BETWEEN two places), a gathering is anchored AT its `place`: the globe draws a localized
+   * badge there (an event-nature icon ringed by a flag per party), NOT an arc. `lat`/`lon` are
+   * the model's best point for the place (validated client-side, with a gazetteer/centroid
+   * fallback). Absent when the story isn't about parties meeting somewhere.
+   */
+  gatherings?: {
+    kind: GatheringKind;
+    /** Human place name where it happens, e.g. "Geneva". */
+    place: string;
+    /** Host country ISO-2 (lowercase) — for bbox validation + centroid fallback. */
+    iso2: string;
+    /** Involved parties' ISO-2 codes (lowercase), two or more. */
+    parties: string[];
+    /** The model's best latitude/longitude for `place` (validated before use). */
+    lat?: number;
+    lon?: number;
+  }[];
   /**
    * True when synthesis is a graceful FALLBACK (model offline/failed): built
    * from the source one-line summaries without cross-outlet analysis. The UI

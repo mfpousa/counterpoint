@@ -7,6 +7,7 @@
 // stitches the source summaries together when the model is offline or unusable.
 
 import type {
+  GatheringKind,
   Lang,
   Lean,
   LinkKind,
@@ -79,8 +80,26 @@ const SYNTH_SCHEMA: JsonSchema = {
           additionalProperties: false,
         },
       },
+      gatherings: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            kind: {
+              type: "string",
+              enum: ["summit", "talks", "agreement", "ceasefire", "visit", "forum", "vote", "trial", "exercise", "aid", "games", "mission", "ceremony"],
+            },
+            place: { type: "string" },
+            iso2: { type: "string" },
+            parties: { type: "array", items: { type: "string" } },
+            coords: { type: "string" },
+          },
+          required: ["kind", "place", "iso2", "parties", "coords"],
+          additionalProperties: false,
+        },
+      },
     },
-    required: ["title", "summary", "synthesis", "angles", "sides", "contradictions", "protagonist", "links"],
+    required: ["title", "summary", "synthesis", "angles", "sides", "contradictions", "protagonist", "links", "gatherings"],
     additionalProperties: false,
   },
 };
@@ -98,7 +117,8 @@ const SYNTH_RULES =
   '  "sides": [ { "label": "<short side label, e.g. \'Western media\', \'Russian media\', \'Ukrainian media\'>", "outlets": ["<exact outlet names on this side>"], "framing": "1-2 sentences on how THIS side frames/emphasizes the story" } ],\n' +
   '  "contradictions": ["specific points where the outlets disagree or report differently; [] if none are evident"],\n' +
   '  "protagonist": { "name": "the central actor/subject the story is MOST about (a country, organisation, or person)", "iso2": "if that protagonist IS a country or a national government/actor, its ISO 3166-1 alpha-2 code in lowercase (e.g. us, es, ua); otherwise an empty string" },\n' +
-  '  "links": [ { "from": "<ISO-2 ORIGIN>", "to": "<ISO-2 DESTINATION>", "kind": "attack|tension|spread|trade|migration|aid|transport" } ]\n' +
+  '  "links": [ { "from": "<ISO-2 ORIGIN>", "to": "<ISO-2 DESTINATION>", "kind": "attack|tension|spread|trade|migration|aid|transport" } ],\n' +
+  '  "gatherings": [ { "kind": "summit|talks|agreement|ceasefire|visit|forum|vote|trial|exercise|aid|games|mission|ceremony", "place": "<city/venue>", "iso2": "<ISO-2 of its country>", "parties": ["<ISO-2>", "<ISO-2>", "..."], "coords": "<lat,lon or empty>" } ]\n' +
   "}\n" +
   "For 'links', emit a DIRECTED connection ONLY when the story describes a PHYSICAL link/movement " +
   "OR a hostile/contested RELATIONSHIP between two DISTINCT countries, from an ORIGIN ('from') to a " +
@@ -110,6 +130,16 @@ const SYNTH_RULES =
   "(flight/route/travel). Only emit a link you can classify into ONE of these " +
   "SPECIFIC kinds; if the relationship doesn't clearly fit one, OMIT that link (do NOT guess or " +
   "use a generic kind). Return [] when the story is not about a place-to-place connection. " +
+  "For 'gatherings', emit a CO-LOCATED multi-party event: TWO OR MORE countries (ISO 3166-1 alpha-2 " +
+  "lowercase in 'parties') CONVENING AT ONE place \u2014 'summit' (leaders meet), 'talks' (negotiations), " +
+  "'agreement' (treaty/deal signed), 'ceasefire' (truce), 'visit' (state visit), 'forum' " +
+  "(conference/assembly, e.g. G20/UN/COP), 'vote' (international resolution/ballot), 'trial' " +
+  "(international court), 'exercise' (joint military drills), 'aid' (donor/relief operation), 'games' " +
+  "(sporting event), 'mission' (joint scientific/space effort) or 'ceremony' " +
+  "(commemoration/inauguration). Set 'place' to the city/venue, 'iso2' to that place's country, and " +
+  "'coords' to its 'latitude,longitude' in decimal degrees (\"\" if unsure). A gathering is anchored AT " +
+  "ONE place (NOT a flow between places \u2014 that's 'links') and needs AT LEAST TWO parties; return [] " +
+  "when no such event is described. " +
   "For 'protagonist', pick the single entity the story most centres on and name it; set 'iso2' ONLY " +
   "when that protagonist is a nation/national actor (use \"\" for organisations, people, or anything " +
   "non-national). Each outlet has a geographic/affiliation 'zone'. For 'sides', GROUP the outlets into the " +
@@ -259,6 +289,84 @@ export function coerceLinks(
     if (seen.has(key)) continue;
     seen.add(key);
     out.push({ from, to, kind: k });
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
+const GATHERING_KIND_SET = new Set<GatheringKind>([
+  "summit",
+  "talks",
+  "agreement",
+  "ceasefire",
+  "visit",
+  "forum",
+  "vote",
+  "trial",
+  "exercise",
+  "aid",
+  "games",
+  "mission",
+  "ceremony",
+]);
+
+/** Parse a model "lat,lon" string into validated decimal degrees, or null. Rejects
+ *  out-of-range values and the (0,0) "null island" the model emits when it's unsure. */
+function parseLatLon(raw: unknown): { lat: number; lon: number } | null {
+  if (typeof raw !== "string") return null;
+  const m = raw.trim().match(/^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)$/);
+  if (!m) return null;
+  const lat = Number(m[1]);
+  const lon = Number(m[2]);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;
+  if (Math.abs(lat) < 0.01 && Math.abs(lon) < 0.01) return null; // null island → unknown
+  return { lat, lon };
+}
+
+/**
+ * Parse the model's CO-LOCATED gatherings — multi-party events anchored AT one place (a
+ * summit, talks, signing, forum, trial, joint exercise, games, …). Validates the kind
+ * against the known set (unknown → "other"), requires a place name + a valid host ISO-2 +
+ * AT LEAST TWO distinct party ISO-2 codes (it must be MULTI-party, else it's just a located
+ * event, not a gathering), carries the place's coords when the model gave usable ones,
+ * de-dupes by place, and caps the count. The globe draws a localized badge per gathering.
+ */
+export function coerceGatherings(
+  raw: unknown,
+  max = 3,
+): NonNullable<Story["gatherings"]> {
+  if (!Array.isArray(raw)) return [];
+  const out: NonNullable<Story["gatherings"]> = [];
+  const seen = new Set<string>();
+  for (const row of raw) {
+    if (!row || typeof row !== "object") continue;
+    const r = row as Record<string, unknown>;
+    const kRaw = typeof r["kind"] === "string" ? r["kind"].trim().toLowerCase() : "";
+    const kind: GatheringKind = GATHERING_KIND_SET.has(kRaw as GatheringKind)
+      ? (kRaw as GatheringKind)
+      : "other";
+    const place = typeof r["place"] === "string" ? r["place"].trim().slice(0, 80) : "";
+    if (!place) continue;
+    const iso2 = typeof r["iso2"] === "string" ? r["iso2"].trim().toLowerCase() : "";
+    if (!/^[a-z]{2}$/.test(iso2)) continue;
+    // Parties must be MULTI: ≥ 2 distinct valid ISO-2 codes (the point of a gathering).
+    const parties: string[] = [];
+    const pseen = new Set<string>();
+    const rawParties = Array.isArray(r["parties"]) ? r["parties"] : [];
+    for (const p of rawParties) {
+      const cc = typeof p === "string" ? p.trim().toLowerCase() : "";
+      if (!/^[a-z]{2}$/.test(cc) || pseen.has(cc)) continue;
+      pseen.add(cc);
+      parties.push(cc);
+      if (parties.length >= 8) break;
+    }
+    if (parties.length < 2) continue;
+    const key = `${iso2}|${place.toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const coords = parseLatLon(r["coords"]);
+    out.push({ kind, place, iso2, parties, ...(coords ?? {}) });
     if (out.length >= max) break;
   }
   return out;
@@ -423,6 +531,7 @@ export async function buildStory(members: StoredItem[], lang: Lang = "en"): Prom
   const sides = finalizeSides(coerceSides(obj["sides"], members), members);
   const contradictions = coerceStringArray(obj["contradictions"], 6);
   const links = coerceLinks(obj["links"]);
+  const gatherings = coerceGatherings(obj["gatherings"]);
 
   // Nothing usable came back — fall back rather than ship an empty story.
   if (!title && synthesis.length === 0) return fallbackStory(members);
@@ -441,6 +550,7 @@ export async function buildStory(members: StoredItem[], lang: Lang = "en"): Prom
     angles,
     ...(sides ? { sides } : {}),
     ...(links.length > 0 ? { links } : {}),
+    ...(gatherings.length > 0 ? { gatherings } : {}),
     contradictions,
     ...(coerceProtagonist(obj["protagonist"]) ? { protagonist: coerceProtagonist(obj["protagonist"]) } : {}),
     relatedIds: [],
@@ -523,6 +633,24 @@ const DEVELOPING_SCHEMA: JsonSchema = {
           additionalProperties: false,
         },
       },
+      gatherings: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            kind: {
+              type: "string",
+              enum: ["summit", "talks", "agreement", "ceasefire", "visit", "forum", "vote", "trial", "exercise", "aid", "games", "mission", "ceremony"],
+            },
+            place: { type: "string" },
+            iso2: { type: "string" },
+            parties: { type: "array", items: { type: "string" } },
+            coords: { type: "string" },
+          },
+          required: ["kind", "place", "iso2", "parties", "coords"],
+          additionalProperties: false,
+        },
+      },
     },
     required: [
       "title",
@@ -535,6 +663,7 @@ const DEVELOPING_SCHEMA: JsonSchema = {
       "contradictions",
       "protagonist",
       "links",
+      "gatherings",
     ],
     additionalProperties: false,
   },
@@ -572,6 +701,11 @@ const DEVELOPING_RULES =
   "a standoff/rivalry/conflict with no single discrete attack). Only emit a link you can classify " +
   "into ONE of these SPECIFIC kinds; OMIT any link that doesn't clearly fit one (do NOT guess). " +
   "[] when it is not about a place-to-place connection. " +
+  'Also include "gatherings": [ { "kind": "summit|talks|agreement|ceasefire|visit|forum|vote|trial|exercise|aid|games|mission|ceremony", "place": "<city/venue>", "iso2": "<ISO-2 of its country>", "parties": ["<ISO-2>", "..."], "coords": "<lat,lon or empty>" } ] ' +
+  "\u2014 a CO-LOCATED event where TWO OR MORE countries CONVENE at ONE place (a summit, talks, treaty " +
+  "signing, ceasefire, forum, vote, trial, joint exercise, aid effort, games, mission or ceremony), " +
+  "anchored AT 'place' (NOT a flow between places). Set 'iso2' to the place's country and 'coords' to " +
+  "its 'latitude,longitude' (\"\" if unsure). Needs \u2265 2 parties; [] when none. " +
   "No prose outside the JSON.";
 
 function earliestAt(members: StoredItem[]): number {
@@ -694,6 +828,7 @@ export async function buildDevelopingStory(
   const spectrum = coerceSpectrum(obj["spectrum"]);
   const sides = finalizeSides(coerceSides(obj["sides"], members), members);
   const links = coerceLinks(obj["links"]);
+  const gatherings = coerceGatherings(obj["gatherings"]);
   const resolved = sanitizeModelText(obj["status"]).toLowerCase() === "resolved";
 
   if (!title && synthesis.length === 0) return fallbackDevelopingStory(orderedEvents);
@@ -720,6 +855,7 @@ export async function buildDevelopingStory(
     spectrum,
     ...(sides ? { sides } : {}),
     ...(links.length > 0 ? { links } : {}),
+    ...(gatherings.length > 0 ? { gatherings } : {}),
     ...(coerceProtagonist(obj["protagonist"]) ? { protagonist: coerceProtagonist(obj["protagonist"]) } : {}),
   };
 }
