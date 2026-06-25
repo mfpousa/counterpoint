@@ -64,4 +64,16 @@ describe("coerceLinks (place-to-place flow arcs)", () => {
     expect(coerceLinks("nope")).toEqual([]);
     expect(coerceLinks([{}, 3, null, { from: "x" }])).toEqual([]);
   });
+
+  it("keeps the model's rationale (what the connection indicates), trimmed", () => {
+    expect(
+      coerceLinks([
+        { from: "ru", to: "ua", kind: "attack", rationale: "  Strikes on the grid to break winter morale.  " },
+      ]),
+    ).toEqual([
+      { from: "ru", to: "ua", kind: "attack", rationale: "Strikes on the grid to break winter morale." },
+    ]);
+    // No rationale supplied → omitted (the globe falls back to the headline on hover).
+    expect(coerceLinks([{ from: "cd", to: "fr", kind: "spread" }])[0]).not.toHaveProperty("rationale");
+  });
 });

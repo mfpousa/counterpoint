@@ -335,14 +335,18 @@ const MarkerLayer = forwardRef<
   // surface while dragging (a state/Animated round-trip lands a frame late and trails).
   const nodes = useRef<Map<string, React.ElementRef<typeof View>>>(new Map());
   const pos = useRef<Map<string, { x: number; y: number }>>(new Map());
+  // Last eased APPEAR scale per marker (driven by the scene loop's magnetic animation), written
+  // imperatively each frame and reused as the initial transform when a node (re)mounts.
+  const scl = useRef<Map<string, number>>(new Map());
   const prevKey = useRef(""); // signature of the marker SET + static content (NOT position)
   const setNode = (id: string) => (node: React.ElementRef<typeof View> | null) => {
     if (node) nodes.current.set(id, node);
     else nodes.current.delete(id);
   };
-  const transformOf = (p: { x: number; y: number }) => [
+  const transformOf = (p: { x: number; y: number }, scale = 1) => [
     { translateX: p.x },
     { translateY: p.y },
+    { scale },
   ];
   // Move a marker's node imperatively (no React render, no commit lag). Cross-platform: on
   // native the ref exposes setNativeProps; on web (react-native-web) the ref IS the DOM node,
@@ -351,6 +355,7 @@ const MarkerLayer = forwardRef<
     node: React.ElementRef<typeof View> | null | undefined,
     x: number,
     y: number,
+    scale = 1,
   ) => {
     if (!node) return;
     const n = node as unknown as {
@@ -358,9 +363,9 @@ const MarkerLayer = forwardRef<
       style?: { transform: string };
     };
     if (typeof n.setNativeProps === "function") {
-      n.setNativeProps({ style: { transform: transformOf({ x, y }) } });
+      n.setNativeProps({ style: { transform: transformOf({ x, y }, scale) } });
     } else if (n.style) {
-      n.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+      n.style.transform = `translate3d(${x}px, ${y}px, 0) scale(${scale})`;
     }
   };
   const badges = useRef<Map<string, React.ElementRef<typeof View>>>(new Map());
@@ -390,11 +395,17 @@ const MarkerLayer = forwardRef<
         const seen = new Set<string>();
         for (const it of next) {
           seen.add(it.id);
+          const s = it.scale ?? 1;
           pos.current.set(it.id, { x: it.x, y: it.y });
-          moveNode(nodes.current.get(it.id), it.x, it.y);
+          scl.current.set(it.id, s);
+          moveNode(nodes.current.get(it.id), it.x, it.y, s);
           if (it.pulse != null) scaleNode(badges.current.get(it.id), it.pulse);
         }
-        for (const id of [...pos.current.keys()]) if (!seen.has(id)) pos.current.delete(id);
+        for (const id of [...pos.current.keys()])
+          if (!seen.has(id)) {
+            pos.current.delete(id);
+            scl.current.delete(id);
+          }
         // Re-render ONLY when the set, a chip's static content, its hovered flag, OR its
         // recency BAND changes (NOT its position — that's imperative; NOT per-frame, since the
         // band only flips at the 6h/24h/7d thresholds). The band drives the fade + the pulse.
@@ -460,7 +471,10 @@ const MarkerLayer = forwardRef<
         // A zero-size anchor pinned to the marker's screen point (its transform is written
         // imperatively each frame); content positions relative to that point, so it tracks
         // the spinning globe. Initial transform = last known position (fresh on re-render).
-        const transform = transformOf(pos.current.get(it.id) ?? { x: it.x, y: it.y });
+        const transform = transformOf(
+          pos.current.get(it.id) ?? { x: it.x, y: it.y },
+          scl.current.get(it.id) ?? it.scale ?? 1,
+        );
         const isFocused = it.id === focusedId;
         // The focused anchor jumps to the TOP: every anchor's `transform` makes its own
         // stacking context, so an inner zIndex can't lift the card above sibling chips — the
@@ -470,6 +484,20 @@ const MarkerLayer = forwardRef<
           { transform },
           isFocused && styles.markerAnchorTop,
         ];
+        // GROUND ANCHOR: a small contact dot painted at the marker's exact spot on the surface,
+        // so a chip/puck/pin (lifted off the globe) and an arc endpoint read as PINNED to the
+        // earth rather than floating. Projected per DISPLAYED marker, so it follows the magnetic
+        // clustering. Non-interactive (pointerEvents none) and rendered behind the chips.
+        if (it.kind === "anchor") {
+          return (
+            <View key={it.id} ref={setNode(it.id)} style={anchorStyle} pointerEvents="none">
+              <View
+                style={[styles.groundDot, { backgroundColor: it.color }]}
+                pointerEvents="none"
+              />
+            </View>
+          );
+        }
         // MAGNETIC CLUSTER: several nearby point markers (events + gatherings) folded into one
         // "+N" puck — a count ringed in the strongest member's colour. TAP it to fly-to its
         // centroid and zoom to the tier where it splits apart (recursive explode); when it can't
@@ -514,21 +542,21 @@ const MarkerLayer = forwardRef<
             </View>
           );
         }
-        // CO-LOCATED GATHERING: a localized badge AT the place — the event-nature ICON ringed
-        // by a small FLAG per involved party (a "+N" chip when there are more), with the place
-        // name tagged beneath. HOVERING reveals the kind, place, headline and full party list
-        // and pauses the spin. NOT an arc: it happened AT one place, not between places.
+        // CO-LOCATED GATHERING: a COMPACT localized badge AT the place — the event-nature ICON
+        // followed by an overlapping stack of party FLAGS (a "+N" chip when there are more) in a
+        // single tight row. HOVERING reveals the kind, place, headline and full party list and
+        // pauses the spin. NOT an arc: it happened AT one place, not between places.
         if (it.kind === "gathering") {
           const gLabel = it.kindLabel ?? "Gathering";
           const parties = it.parties ?? [];
-          const shownParties = parties.slice(0, 4);
+          const shownParties = parties.slice(0, 3);
           const moreParties = parties.length - shownParties.length;
           const showBubble = hoverId === it.id && !!it.detail;
           const partyNames = parties.map((cc) => countryLabel(cc)).join(" · ");
           return (
             <View key={it.id} ref={setNode(it.id)} style={anchorStyle} pointerEvents="box-none">
               {showBubble && (
-                <View style={[styles.markerStack, { bottom: 34 }]} pointerEvents="none">
+                <View style={[styles.markerStack, { bottom: 22 }]} pointerEvents="none">
                   <View style={[styles.markerBubble, { borderColor: it.color }]}>
                     <Text style={styles.linkBubbleRoute} numberOfLines={1}>
                       {gLabel} · {it.label}
@@ -544,6 +572,9 @@ const MarkerLayer = forwardRef<
                   </View>
                 </View>
               )}
+              {/* COMPACT capsule: the kind icon + an overlapping stack of party flags in one
+                  small horizontal unit, centred on the point. The place name moved to the hover
+                  bubble (it.label above) so the on-globe marker stays tight. */}
               <Pressable
                 style={styles.gatheringInner}
                 onPress={() => it.storyId && onOpenStory(it.storyId)}
@@ -556,33 +587,26 @@ const MarkerLayer = forwardRef<
                   onHoverMarker(null);
                 }}
                 accessibilityRole="link"
-                accessibilityLabel={it.detail}
+                accessibilityLabel={`${gLabel} · ${it.label}`}
               >
-                <View style={[styles.gatheringBadge, { backgroundColor: it.color }]}>
-                  <Ionicons name={safeIonicon(it.icon, "people-circle")} size={16} color="#0b0f14" />
+                <View style={[styles.gatheringIcon, { backgroundColor: it.color }]}>
+                  <Ionicons name={safeIonicon(it.icon, "people-circle")} size={13} color="#0b0f14" />
                 </View>
-                <View style={styles.partyRow} pointerEvents="none">
-                  {shownParties.map((cc) => (
-                    <View key={cc} style={styles.partyFlag}>
-                      {/* Country CODE shows through if the flag image can't load (offline). */}
-                      <Text style={styles.partyCode}>{cc.toUpperCase()}</Text>
-                      <Image
-                        source={{ uri: `https://flagcdn.com/w40/${cc}.png` }}
-                        style={styles.partyFlagImg}
-                        resizeMode="cover"
-                      />
-                    </View>
-                  ))}
-                  {moreParties > 0 && (
-                    <View style={styles.partyFlag}>
-                      <Text style={styles.partyCode}>+{moreParties}</Text>
-                    </View>
-                  )}
-                </View>
-                {!!it.label && (
-                  <Text style={styles.gatheringTag} numberOfLines={1}>
-                    {it.label}
-                  </Text>
+                {shownParties.map((cc, i) => (
+                  <View key={cc} style={[styles.partyFlag, i === 0 ? styles.partyFlagLead : styles.partyFlagStacked]}>
+                    {/* Country CODE shows through if the flag image can't load (offline). */}
+                    <Text style={styles.partyCode}>{cc.toUpperCase()}</Text>
+                    <Image
+                      source={{ uri: `https://flagcdn.com/w40/${cc}.png` }}
+                      style={styles.partyFlagImg}
+                      resizeMode="cover"
+                    />
+                  </View>
+                ))}
+                {moreParties > 0 && (
+                  <View style={[styles.partyFlag, styles.partyFlagStacked, styles.partyMore]}>
+                    <Text style={styles.partyCode}>+{moreParties}</Text>
+                  </View>
                 )}
               </Pressable>
             </View>
@@ -1083,6 +1107,7 @@ export function Globe({
           toCc: lk.to,
           storyId: s.id,
           title: s.title,
+          rationale: lk.rationale,
         });
       }
     }
@@ -1130,6 +1155,7 @@ export function Globe({
           parties: g.parties,
           color: v.color,
           title: s.title,
+          rationale: g.rationale,
         });
         if (out.length >= 14) break;
       }
@@ -2772,6 +2798,20 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
   },
   clusterCount: { fontSize: 14, fontWeight: "900" },
+  // GROUND ANCHOR contact dot: a small disc painted at a marker's / arc endpoint's exact spot on
+  // the surface (the floating chip/pin/puck sits above it). Centred on its zero-size anchor via
+  // the negative offsets; a thin dark ring keeps it legible over bright land. Colour set inline.
+  groundDot: {
+    position: "absolute",
+    left: -3.5,
+    top: -3.5,
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.5)",
+    opacity: 0.95,
+  },
   // Travelling badge on a physical-LINK arc (flag image for attacks, kind icon otherwise),
   // centred on the arc's flowing point. SOLID per-kind fill (set inline) + a dark icon keeps
   // it legible under motion, like the event chips.
@@ -2798,41 +2838,44 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     marginBottom: 2,
   },
-  // CO-LOCATED gathering badge: the event-nature ICON over a row of party flags + a place
-  // tag, centred on the resolved point (the column is wider than its content so they centre).
-  gatheringInner: { position: "absolute", left: -44, top: -18, width: 88, alignItems: "center" },
-  gatheringBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+  // CO-LOCATED gathering badge (COMPACT): the event-nature ICON + an overlapping stack of party
+  // flags in one tight horizontal row, centred on the resolved point (the box is wider than its
+  // content so it centres). The place name lives in the hover bubble, not an always-on tag.
+  gatheringInner: {
+    position: "absolute",
+    left: -42,
+    top: -13,
+    width: 84,
+    height: 26,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  gatheringIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     borderWidth: 1.5,
     borderColor: "rgba(255,255,255,0.65)",
     alignItems: "center",
     justifyContent: "center",
   },
-  partyRow: { flexDirection: "row", marginTop: 3, gap: 2 },
   partyFlag: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.55)",
+    borderColor: "rgba(255,255,255,0.6)",
     backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
   },
+  partyFlagLead: { marginLeft: 4 }, // small gap from the kind icon
+  partyFlagStacked: { marginLeft: -5 }, // overlap the previous flag (avatar-stack)
+  partyMore: { backgroundColor: "rgba(11,15,20,0.92)" }, // dark "+N" chip
   partyFlagImg: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 },
   partyCode: { color: "#fff", fontSize: 7, fontWeight: "800" },
-  gatheringTag: {
-    color: colors.text,
-    fontSize: font.tiny,
-    fontWeight: "700",
-    marginTop: 2,
-    textShadowColor: "rgba(0,0,0,0.85)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
-  },
   gatheringParties: { color: colors.textDim, fontSize: font.tiny, marginTop: 2 },
   // CONNECTIONS / GATHERINGS legend block (sits under the category lenses): the kind chips,
   // each a toggle lens that hides/shows that kind on the globe.

@@ -311,8 +311,12 @@ export interface ArcData {
   toCc?: string;
   /** Id of the story this link came from (links only) — the handle back to its story. */
   storyId?: string;
-  /** The story's neutral headline (links only) — shown in the badge's hover tooltip. */
+  /** The story's neutral headline (links only) — the hover FALLBACK when no rationale. */
   title?: string;
+  /** Model-written ONE-sentence rationale on what this link INDICATES — shown on hover (badge +
+   *  line tooltip) IN PLACE of the headline (which often buries the reason). Click still opens
+   *  the story. Absent on older/degraded stories → falls back to `title`. */
+  rationale?: string;
 }
 
 const ARC_SEGMENTS = 56; // polyline resolution along the great circle
@@ -398,7 +402,7 @@ function Arcs({
     onLinkHover?.({
       x: ((v.x + 1) / 2) * size.width,
       y: ((1 - v.y) / 2) * size.height,
-      title: g.title,
+      title: g.rationale || g.title, // the rationale (what it indicates) over the headline
       fromCc: g.fromCc,
       toCc: g.toCc,
       kind: g.kind,
@@ -693,8 +697,11 @@ export interface GatheringData {
   parties: string[];
   /** Accent colour (the kind's colour). */
   color: string;
-  /** Story headline (hover tooltip). */
+  /** Story headline — the hover FALLBACK when no rationale. */
   title: string;
+  /** Model-written ONE-sentence rationale on what this gathering is ABOUT — shown on hover IN
+   *  PLACE of the headline. Click still opens the story. Absent → falls back to `title`. */
+  rationale?: string;
 }
 
 /** One point marker folded into a magnetic CLUSTER — its essentials for the "+N" badge's count
@@ -713,7 +720,7 @@ export interface ClusterMember {
 /** A marker projected to 2D screen space, for the wrapper's overlay chips/bubbles. */
 export interface ProjectedMarker {
   id: string;
-  kind: "ask" | "alert" | "link" | "gathering" | "cluster";
+  kind: "ask" | "alert" | "link" | "gathering" | "cluster" | "anchor";
   /** Screen position (px) of the marker's anchor on the globe. */
   x: number;
   y: number;
@@ -724,6 +731,10 @@ export interface ProjectedMarker {
   /** Tag/bubble accent colour. */
   color: string;
   hovered: boolean;
+  /** Per-frame appear/collapse SCALE (0→1), eased by the scene loop's magnetic animation. The
+   *  overlay writes it imperatively to the marker's transform so pins grow in / shrink out and
+   *  fan apart smoothly. Undefined (≡ 1) for un-animated markers (anchors, link badges). */
+  scale?: number;
   /** Event category (alerts only) — a known category or a model-invented slug; the chip's
    *  resolved ICON rides `icon` and its colour rides `color`. */
   category?: string;
@@ -788,77 +799,29 @@ type ClusterPayload =
 // gravity of its own): mid-pack, so a hot conflict alert reps a mixed cluster but a gathering
 // still out-reps low-severity events.
 const GATHERING_CLUSTER_SEVERITY = 0.55;
+// GROUND ANCHORS — every marker (event chips, gatherings, clusters, ask pins) is lifted off the
+// land and the connection arcs bow ABOVE the surface, so without a contact mark they read as
+// floating. The scene loop projects each DISPLAYED marker's (and each arc endpoint's) GROUND
+// point at this radius to a small 2D dot in the overlay — so the anchors track the magnetic
+// CLUSTERING (one dot per puck/chip, not one per raw pin) and stay a crisp constant size.
+const ANCHOR_RADIUS = 1.0; // the land surface itself — the exact spot the marker sits over
 
-// ---------------------------------------------------------------------------
-// GROUND ANCHORS — every marker (event chips, gatherings, clusters, ask pins) is lifted ~0.06
-// off the land and the connection arcs bow ABOVE the surface, so without a contact mark they
-// read as floating. This paints a small flat disc ON the surface directly beneath each marker
-// AND at each arc ENDPOINT, in the element's colour, to pin it to an exact spot on the earth.
-// Drawn inside the rotating group so the discs ride + depth-occlude with the globe; static
-// (no per-frame work) and memoised so they only rebuild when the data changes.
-// ---------------------------------------------------------------------------
+// MAGNETIC MARKER ANIMATION. Pins don't snap between clustered/un-clustered — the scene loop
+// eases each marker's APPEAR scale (grow-in / shrink-out) and a screen-space DISPLACEMENT so a
+// collapse pulls the pins magnetically into the puck and an expand throws them back out.
+const MARKER_EASE = 0.22; // per-frame lerp toward the target scale/displacement (~200ms settle)
+// SPIDERFY: a tiny cluster whose pins are so close they can't be separated by zooming (breakZoom
+// past the cap) FANS OUT into a screen-space ring so each pin is individually visible + tappable,
+// even though that nudges them off their true spot (the ground-anchor dots stay put to show it).
+const SPIDERFY_MAX = 7; // fan out up to this many; larger coincident clusters keep the "+N" puck
+const SPIDERFY_RADIUS = 30; // base ring radius (px); grows a little with the member count
 
-const GROUND_ANCHOR_RADIUS = 1.009; // surface shell for the disc (just above the outlines at 1.006)
-const GROUND_ANCHOR_SIZE = 0.014; // disc radius (world units — scales with the globe, like the map)
-const FORWARD = new Vector3(0, 0, 1);
-
-/** Quaternion (as [x,y,z,w]) laying a +Z-facing disc (circleGeometry's default) TANGENT to the
- *  sphere at `dir` — its normal points outward — so it reads as a mark painted on the ground. */
-function faceOutQuat(dir: Vec3): [number, number, number, number] {
-  const q = new Quaternion().setFromUnitVectors(
-    FORWARD,
-    new Vector3(dir.x, dir.y, dir.z).normalize(),
-  );
-  return [q.x, q.y, q.z, q.w];
-}
-
-function GroundAnchors({
-  alerts,
-  gatherings,
-  askMarkers,
-  arcs,
-}: {
-  alerts: GeoAlert[];
-  gatherings: GatheringData[];
-  askMarkers: AskMarkerData[];
-  arcs: ArcData[];
-}) {
-  // One disc per marker location + per arc endpoint, rebuilt only when the data changes.
-  const dots = useMemo(() => {
-    const out: { key: string; dir: Vec3; color: string }[] = [];
-    for (const a of alerts) out.push({ key: `a:${a.id}`, dir: a.dir, color: a.color });
-    for (const gth of gatherings) out.push({ key: `g:${gth.id}`, dir: gth.dir, color: gth.color });
-    for (const m of askMarkers) out.push({ key: `k:${m.id}`, dir: m.dir, color: colors.accent });
-    for (const arc of arcs) {
-      out.push({ key: `arcA:${arc.id}`, dir: arc.a, color: arc.color ?? ARC_COLOR });
-      out.push({ key: `arcB:${arc.id}`, dir: arc.b, color: arc.color ?? ARC_COLOR });
-    }
-    return out;
-  }, [alerts, gatherings, askMarkers, arcs]);
-  return (
-    <>
-      {dots.map((d) => (
-        <mesh
-          key={d.key}
-          position={[
-            d.dir.x * GROUND_ANCHOR_RADIUS,
-            d.dir.y * GROUND_ANCHOR_RADIUS,
-            d.dir.z * GROUND_ANCHOR_RADIUS,
-          ]}
-          quaternion={faceOutQuat(d.dir)}
-        >
-          <circleGeometry args={[GROUND_ANCHOR_SIZE, 20]} />
-          <meshBasicMaterial
-            color={d.color}
-            transparent
-            opacity={0.85}
-            side={DoubleSide}
-            depthWrite={false}
-          />
-        </mesh>
-      ))}
-    </>
-  );
+/** Screen-space ring offset (px) for member `i` of `n` fanned-out pins. Starts at the top and
+ *  spreads evenly; the radius grows with `n` so the chips never crowd. */
+function spiderfyOffset(i: number, n: number): { dx: number; dy: number } {
+  const r = SPIDERFY_RADIUS + n * 3;
+  const theta = -Math.PI / 2 + (i / n) * Math.PI * 2;
+  return { dx: Math.cos(theta) * r, dy: Math.sin(theta) * r };
 }
 
 // memo'd so the scene only re-renders when its OWN inputs change. Without this, every
@@ -956,6 +919,29 @@ export const GlobeScene = memo(function GlobeScene({
     gatherings: GatheringData[] | null;
     nodes: Cluster<ClusterPayload>[];
   }>({ tier: NaN, alerts: null, gatherings: null, nodes: [] });
+  // MAGNETIC MARKER ANIMATION state, keyed by marker id. `m` is the last projected marker (kept
+  // for a LEAVER so it can finish animating out after its source is gone); dx/dy is the current
+  // eased screen displacement (→ tdx/tdy, e.g. the spiderfy fan offset, or toward a puck when
+  // collapsing); appear is the eased 0→1 scale (→ tappear, which drops to 0 for a leaver); trueX/
+  // trueY is the marker's un-displaced projected anchor. Entries are added on first sight and
+  // dropped once a leaver has faded. Held in a ref so easing never re-renders React.
+  const markerAnim = useRef<
+    Map<
+      string,
+      {
+        m: ProjectedMarker;
+        trueX: number;
+        trueY: number;
+        dx: number;
+        dy: number;
+        tdx: number;
+        tdy: number;
+        appear: number;
+        tappear: number;
+        leaving: boolean;
+      }
+    >
+  >(new Map());
 
   // --- Render governor (on-demand rendering) ---------------------------------
   // The <Canvas> runs frameloop="demand": it only paints when invalidate() is called.
@@ -1202,12 +1188,41 @@ export const GlobeScene = memo(function GlobeScene({
     // bubbles: every ask result (always-on place tag) + the hovered marker (detail).
     // Front-hemisphere only, so labels never bleed through from the far side. The
     // overlay de-dupes identical frames, so a still globe costs zero React updates.
+    let markersAnimating = false; // true while any marker is mid grow/shrink/fan ease (keeps the loop awake)
     if (onMarkersProject) {
       // Refresh ONLY this group's own matrix (cheap) — never updateMatrixWorld(), which
       // would recurse into the hundreds of country meshes every frame. The group is a
       // direct scene child (identity parent), so its local matrix IS its world matrix.
       g.updateMatrix();
       const out: ProjectedMarker[] = [];
+      // Markers the scene WANTS to show this frame (keyed by id) with their TRUE projected anchor
+      // + a target screen DISPLACEMENT (0, or the spiderfy fan offset). The magnetic-animation
+      // pass below reconciles this against `markerAnim` to ease scale + displacement and emit the
+      // final, animated markers into `out`. Link badges (no clustering) bypass it into `linkOut`.
+      const desired = new Map<string, { m: ProjectedMarker; tdx: number; tdy: number }>();
+      const linkOut: ProjectedMarker[] = [];
+      // GROUND ANCHORS: a small dot at the GROUND point beneath each DISPLAYED marker + each arc
+      // endpoint, projected the same way so it tracks the globe AND the magnetic clustering (one
+      // dot per puck/chip, since it's driven off the SAME cluster nodes). Collected separately
+      // and PREPENDED below, so the dots paint BEHIND the chips/badges/pucks.
+      const anchorsOut: ProjectedMarker[] = [];
+      const addAnchor = (id: string, dir: Vec3, color: string) => {
+        _proj.set(dir.x * ANCHOR_RADIUS, dir.y * ANCHOR_RADIUS, dir.z * ANCHOR_RADIUS);
+        _proj.applyMatrix4(g.matrix);
+        if (_proj.z <= 0.02) return; // far hemisphere → behind the globe
+        _proj.project(cam);
+        if (_proj.z > 1) return;
+        anchorsOut.push({
+          id,
+          kind: "anchor",
+          x: ((_proj.x + 1) / 2) * size.width,
+          y: ((1 - _proj.y) / 2) * size.height,
+          label: "",
+          detail: "",
+          color,
+          hovered: false,
+        });
+      };
       const add = (
         id: string,
         kind: "ask" | "alert" | "gathering" | "cluster",
@@ -1234,26 +1249,32 @@ export const GlobeScene = memo(function GlobeScene({
             | "clusterZoom"
           >
         >,
+        fan?: { dx: number; dy: number },
       ) => {
         _proj.set(dir.x * ALERT_RADIUS, dir.y * ALERT_RADIUS, dir.z * ALERT_RADIUS);
         _proj.applyMatrix4(g.matrix); // group local matrix == world matrix
         if (_proj.z <= 0.02) return; // far hemisphere → occluded by the globe
         _proj.project(cam);
         if (_proj.z > 1) return; // behind the camera/far plane
-        out.push({
-          id,
-          kind,
-          x: ((_proj.x + 1) / 2) * size.width,
-          y: ((1 - _proj.y) / 2) * size.height,
-          label,
-          detail,
-          color,
-          hovered: id === hoveredMarkerId,
-          ...extra,
+        desired.set(id, {
+          m: {
+            id,
+            kind,
+            x: ((_proj.x + 1) / 2) * size.width,
+            y: ((1 - _proj.y) / 2) * size.height,
+            label,
+            detail,
+            color,
+            hovered: id === hoveredMarkerId,
+            ...extra,
+          },
+          tdx: fan?.dx ?? 0,
+          tdy: fan?.dy ?? 0,
         });
       };
       for (const m of askMarkers) {
         add(m.id, "ask", m.dir, m.label, m.detail ?? "", colors.accent);
+        addAnchor(`ga:${m.id}`, m.dir, colors.accent);
       }
       // MAGNETIC CLUSTERING. The worldview EVENT chips + CO-LOCATED GATHERING badges (all the
       // POINT markers — link arcs stay lines) fold into one another by ANGULAR distance, with a
@@ -1293,16 +1314,63 @@ export const GlobeScene = memo(function GlobeScene({
               developing: a.developing,
               updatedAt: a.updatedAt,
             });
+            addAnchor(`ga:${a.id}`, a.dir, a.color);
           } else {
             const gth = p.gathering;
-            add(gth.id, "gathering", gth.dir, gth.place, gth.title, gth.color, {
+            add(gth.id, "gathering", gth.dir, gth.place, gth.rationale || gth.title, gth.color, {
               gatheringKind: gth.kind,
               parties: gth.parties,
               icon: gth.icon,
               kindLabel: gth.label,
               storyId: gth.storyId,
             });
+            addAnchor(`ga:${gth.id}`, gth.dir, gth.color);
           }
+          continue;
+        }
+        // SPIDERFY: a small cluster whose pins are too close to ever separate by zooming
+        // (breakZoom past the cap) fans its members OUT into a screen-space ring so each is
+        // individually visible + tappable — the magnetic "fan-out". Each member is emitted as
+        // its own chip with a ring displacement; the anchor dots stay at the (shared) true spot.
+        // Sort by id so a given pin always takes the same ring slot (stable across frames).
+        if (breakZoom(node.radius) > ZOOM_MAX && node.members.length <= SPIDERFY_MAX) {
+          const ring = [...node.members].sort((a, b) =>
+            a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
+          );
+          ring.forEach((mem, i) => {
+            const fan = spiderfyOffset(i, ring.length);
+            const p = mem.data;
+            if (p.kind === "alert") {
+              const a = p.alert;
+              add(
+                a.id, "alert", a.dir, "", a.title, a.color,
+                {
+                  category: a.category,
+                  icon: a.icon,
+                  severity: a.severity,
+                  count: a.count,
+                  developing: a.developing,
+                  updatedAt: a.updatedAt,
+                },
+                fan,
+              );
+              addAnchor(`ga:${a.id}`, a.dir, a.color);
+            } else {
+              const gth = p.gathering;
+              add(
+                gth.id, "gathering", gth.dir, gth.place, gth.rationale || gth.title, gth.color,
+                {
+                  gatheringKind: gth.kind,
+                  parties: gth.parties,
+                  icon: gth.icon,
+                  kindLabel: gth.label,
+                  storyId: gth.storyId,
+                },
+                fan,
+              );
+              addAnchor(`ga:${gth.id}`, gth.dir, gth.color);
+            }
+          });
           continue;
         }
         // AGGREGATE → one "+N" puck tinted the strongest member's colour. Its `members` ride
@@ -1333,12 +1401,17 @@ export const GlobeScene = memo(function GlobeScene({
           clusterDir: node.dir,
           clusterZoom: Math.min(ZOOM_MAX, breakZoom(node.radius)),
         });
+        addAnchor(`ga:${node.id}`, node.dir, repColor);
       }
       // LINK ties: a flag/icon BADGE rides each link arc (origin → destination). Sample the
       // point on the SAME bowed great circle as the line and project it so the badge sits ON
       // the arc. A DIRECTIONAL kind FLOWS A→B; TENSION is mutual, so its badge stays at the
       // MIDPOINT and THROBS in place (no implied "sender"), in sync with the line's opacity.
       arcs.forEach((arc, i) => {
+        // Anchor BOTH endpoints where the tie touches down (independent of kind, so even a
+        // plain line gets its contact points).
+        addAnchor(`gaA:${arc.id}`, arc.a, arc.color ?? ARC_COLOR);
+        addAnchor(`gaB:${arc.id}`, arc.b, arc.color ?? ARC_COLOR);
         if (!arc.kind) return;
         const tension = arc.kind === "tension";
         let t: number;
@@ -1363,7 +1436,7 @@ export const GlobeScene = memo(function GlobeScene({
         if (_proj.z <= 0.02) return; // far hemisphere → occluded by the globe
         _proj.project(cam);
         if (_proj.z > 1) return;
-        out.push({
+        linkOut.push({
           id: `link:${arc.id}`,
           kind: "link",
           x: ((_proj.x + 1) / 2) * size.width,
@@ -1375,14 +1448,76 @@ export const GlobeScene = memo(function GlobeScene({
           linkKind: arc.kind,
           fromCc: arc.fromCc,
           toCc: arc.toCc,
-          title: arc.title,
+          title: arc.rationale || arc.title, // the rationale (what it indicates) over the headline
           icon: arc.icon,
           kindLabel: arc.label,
           storyId: arc.storyId,
           pulse,
         });
       });
-      onMarkersProject(out);
+      // --- MAGNETIC ANIMATION PASS ------------------------------------------------------------
+      // Reconcile `desired` against the per-id `markerAnim` state and ease each marker's APPEAR
+      // scale + screen DISPLACEMENT toward its target, so collapse/expand/fan glide instead of
+      // snapping. A pin newly shown grows from scale 0 (and a spiderfied one spreads out from the
+      // centroid); a pin that just left fades out as it flies INTO the puck it merged into (or
+      // retracts to its spot). Emits the animated markers into `out`.
+      const anim = markerAnim.current;
+      // Where each member id is collapsing TO this frame: the screen pos of the puck that now
+      // holds it — so a leaver flies into the puck rather than fading in place.
+      const puckOf = new Map<string, { x: number; y: number }>();
+      for (const d of desired.values()) {
+        if (d.m.kind === "cluster" && d.m.members)
+          for (const mem of d.m.members) puckOf.set(mem.id, { x: d.m.x, y: d.m.y });
+      }
+      // 1) Desired markers → refresh/seed their state with target appear 1 + target displacement.
+      for (const [id, d] of desired) {
+        let a = anim.get(id);
+        if (!a) {
+          // New pin: start collapsed at the centroid (dx/dy 0) and invisible, so it grows + fans.
+          a = { m: d.m, trueX: d.m.x, trueY: d.m.y, dx: 0, dy: 0, tdx: d.tdx, tdy: d.tdy, appear: 0, tappear: 1, leaving: false };
+          anim.set(id, a);
+        }
+        a.m = d.m;
+        a.trueX = d.m.x;
+        a.trueY = d.m.y;
+        a.tdx = d.tdx;
+        a.tdy = d.tdy;
+        a.tappear = 1;
+        a.leaving = false;
+      }
+      // 2) Leavers (in state but no longer desired) → fade out, flying into their puck if any.
+      for (const [id, a] of anim) {
+        if (desired.has(id)) continue;
+        a.leaving = true;
+        a.tappear = 0;
+        const pp = puckOf.get(id);
+        a.tdx = pp ? pp.x - a.trueX : 0;
+        a.tdy = pp ? pp.y - a.trueY : 0;
+      }
+      // 3) Ease every entry toward its target; snap + finish when within a hair; emit the result.
+      for (const [id, a] of anim) {
+        a.dx += (a.tdx - a.dx) * MARKER_EASE;
+        a.dy += (a.tdy - a.dy) * MARKER_EASE;
+        a.appear += (a.tappear - a.appear) * MARKER_EASE;
+        const near =
+          Math.abs(a.tdx - a.dx) < 0.5 &&
+          Math.abs(a.tdy - a.dy) < 0.5 &&
+          Math.abs(a.tappear - a.appear) < 0.012;
+        if (near) {
+          a.dx = a.tdx;
+          a.dy = a.tdy;
+          a.appear = a.tappear;
+        } else {
+          markersAnimating = true;
+        }
+        if (a.leaving && a.appear <= 0.02) {
+          anim.delete(id); // fully gone → stop tracking it
+          continue;
+        }
+        out.push({ ...a.m, x: a.trueX + a.dx, y: a.trueY + a.dy, scale: a.appear });
+      }
+      // Anchors FIRST (paint behind), then the animated chips/pucks, then link badges on top.
+      onMarkersProject(anchorsOut.concat(out).concat(linkOut));
     }
 
     // Keep the on-demand loop alive at ~30fps only while something is actually moving;
@@ -1415,11 +1550,14 @@ export const GlobeScene = memo(function GlobeScene({
     // `markersLive` joins it so the ARC flow + ask-pin PULSE animate at full vsync rate (the
     // small travelling badges judder at the throttled, non-vsync 30fps). Costs more GPU while
     // arcs/ask-pins are on screen — the globe still sleeps to 0fps once they're gone.
-    const fullRate = easingCamera || refs.dragging.current || markersLive;
+    // `markersAnimating` (a marker mid grow/shrink/fan) joins both so the magnetic collapse/expand
+    // runs at full vsync and the loop stays awake until it settles, even with the globe otherwise idle.
+    const fullRate = easingCamera || refs.dragging.current || markersLive || markersAnimating;
     const needsMore =
       refs.dragging.current ||
       easingCamera ||
       markersLive ||
+      markersAnimating ||
       Date.now() < settleUntil.current;
     if (nextFrame.current) {
       clearTimeout(nextFrame.current);
@@ -1549,15 +1687,6 @@ export const GlobeScene = memo(function GlobeScene({
         {/* Worldview EVENTS are no longer drawn in 3D — they're projected (above) to legible
             2D icon CHIPS in the wrapper's overlay (crisp, constant on-screen size, tappable),
             which reads far better than abstract shapes and lets the globe sleep when idle. */}
-        {/* GROUND ANCHORS: a contact disc on the surface beneath every (lifted) marker + at each
-            arc endpoint, so nothing reads as floating without a point on the earth. Under the
-            land-occlusion path so far-side anchors hide behind the planet. */}
-        <GroundAnchors
-          alerts={alerts}
-          gatherings={gatherings}
-          askMarkers={askMarkers}
-          arcs={arcs}
-        />
         {/* CONNECTIONS: flowing great-circle LINK ties (Story.links, typed per kind). In the
             rotating group so the arcs ride the globe; drawn over the land but depth-tested, so
             ties on the far hemisphere are hidden behind the planet. */}

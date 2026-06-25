@@ -71,4 +71,31 @@ describe("coerceGatherings (co-located multi-party events)", () => {
     ]);
     expect(out).toHaveLength(1);
   });
+
+  it("keeps the model's rationale (what the gathering indicates)", () => {
+    expect(
+      coerceGatherings([
+        {
+          kind: "summit",
+          place: "Geneva",
+          iso2: "ch",
+          parties: ["us", "ru"],
+          coords: "",
+          rationale: "US and Russia meet to negotiate a Ukraine ceasefire.",
+        },
+      ]),
+    ).toEqual([
+      {
+        kind: "summit",
+        place: "Geneva",
+        iso2: "ch",
+        parties: ["us", "ru"],
+        rationale: "US and Russia meet to negotiate a Ukraine ceasefire.",
+      },
+    ]);
+    // No rationale supplied → omitted (the globe falls back to the headline on hover).
+    expect(
+      coerceGatherings([{ kind: "summit", place: "Geneva", iso2: "ch", parties: ["us", "ru"], coords: "" }])[0],
+    ).not.toHaveProperty("rationale");
+  });
 });

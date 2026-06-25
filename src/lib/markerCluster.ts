@@ -42,10 +42,12 @@ export interface Cluster<T> {
   isCluster: boolean;
 }
 
-/** Angular merge radius (rad, ~9.2°) at zoom = 1. The per-tier threshold is this divided by the
- *  tier's zoom, so the cap shrinks the more you zoom in. Tuned so neighbouring countries fold at
- *  the world landing and cleanly separate a couple of zoom steps in. */
-export const CLUSTER_MERGE_ANGLE = 0.16;
+/** Angular merge radius (rad, ~5.7°) at zoom = 1. The per-tier threshold is this divided by the
+ *  tier's zoom, so the cap shrinks the more you zoom in. Tuned DELIBERATELY TIGHT so pins only
+ *  fold once they'd genuinely overlap on screen — they used to collapse far too eagerly, hiding
+ *  pins with plenty of room between them. Coincident/near-coincident pins that still can't be
+ *  separated by zooming (breakZoom > the zoom cap) are FANNED OUT by the caller instead. */
+export const CLUSTER_MERGE_ANGLE = 0.1;
 /** Re-cluster granularity, in zoom units: the clustering is recomputed only when the quantized
  *  zoom TIER changes (not every frame), so a steady zoom costs nothing. */
 export const CLUSTER_ZOOM_STEP = 0.15;

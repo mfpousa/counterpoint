@@ -470,7 +470,16 @@ export interface Story {
    * The globe draws a flowing arc per link (origin → destination). Absent when the story
    * isn't about a place-to-place connection.
    */
-  links?: { from: string; to: string; kind: string; icon?: string }[];
+  links?: {
+    from: string;
+    to: string;
+    kind: string;
+    icon?: string;
+    /** ONE plain-language sentence on what this connection INDICATES / why it matters — the
+     *  reason is often buried in the article, so the globe shows THIS on hover (not the
+     *  headline). Absent on older/degraded stories (the globe falls back to the headline). */
+    rationale?: string;
+  }[];
   /**
    * CO-LOCATED multi-party events: parties (countries, ISO 3166-1 alpha-2 lowercase)
    * CONVENING at ONE specific place — a summit, peace talks, a treaty signing, a ceasefire,
@@ -495,6 +504,9 @@ export interface Story {
     /** The model's best latitude/longitude for `place` (validated before use). */
     lat?: number;
     lon?: number;
+    /** ONE plain-language sentence on what this gathering is ABOUT / what it indicates — the
+     *  globe shows THIS on hover (not the headline). Absent on older/degraded stories. */
+    rationale?: string;
   }[];
   /**
    * Worldview EVENT category for the globe's map chip — a known EventCategory (conflict,
