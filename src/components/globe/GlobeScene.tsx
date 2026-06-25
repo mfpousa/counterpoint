@@ -19,6 +19,9 @@ import {
   BackSide,
   DoubleSide,
   Quaternion,
+  Raycaster,
+  Sphere,
+  Vector2,
   Vector3,
 } from "three";
 import type { Group, LineBasicMaterial, Mesh, MeshBasicMaterial, PerspectiveCamera } from "three";
@@ -62,6 +65,15 @@ export interface GlobeViewRefs {
    *  which never re-renders React — still kicks the throttled frame loop). Assigned
    *  by GlobeScene; a no-op until the scene mounts. */
   wake: MutableRefObject<() => void>;
+  /** TRACKBALL GRAB (assigned by GlobeScene). On press the gesture layer calls
+   *  `grab(ndcX, ndcY)` to capture the surface point under the cursor in the globe's LOCAL
+   *  frame (so it rides the rotation); returns false if the press missed the globe (the
+   *  caller then falls back to a plain rotate). Each move calls `dragTo(ndcX, ndcY)` with the
+   *  live cursor NDC; the frame loop steers yaw/pitch so the grabbed point stays pinned under
+   *  the pointer. `release()` ends the grab. NDC are -1..1, y-up. */
+  grab: MutableRefObject<(ndcX: number, ndcY: number) => boolean>;
+  dragTo: MutableRefObject<(ndcX: number, ndcY: number) => void>;
+  release: MutableRefObject<() => void>;
 }
 
 const PLANET_RADIUS = 0.975; // ocean sphere — a small gap below the land (1.0) so the flat triangles don't clip through, while still hugging
@@ -476,6 +488,13 @@ const Countries = memo(function Countries({
 const UP = new Vector3(0, 1, 0);
 const _proj = new Vector3(); // reused scratch for per-frame marker screen projection
 const _anchor = new Vector3(); // reused scratch for the scroll-zoom cursor-lock projection
+// Reused scratch for the trackball GRAB: a raycaster + sphere to hit-test the cursor against
+// the globe, a Vector2 for the cursor NDC, and a Vector3 for the steered target surface point.
+const _ray = new Raycaster();
+const _sphere = new Sphere();
+const _ndc = new Vector2();
+const _grabTgt = new Vector3();
+const _ORIGIN = new Vector3(0, 0, 0);
 
 /** Quaternion (as [x,y,z,w]) orienting a marker's local +Y OUTWARD along `dir`, so
  *  shapes sit upright on the globe like pins/spikes rather than lying flat. */
@@ -846,6 +865,10 @@ export const GlobeScene = memo(function GlobeScene({
   // set, the frame loop steers the rotation each tick so this point stays pinned under the
   // cursor as the scale eases — a true, jitter-free zoom-to-pointer. Cleared once settled.
   const zoomAnchor = useRef<{ dir: Vector3; ndcX: number; ndcY: number } | null>(null);
+  // TRACKBALL GRAB: the surface point the reader pressed on, in the globe's LOCAL frame (so it
+  // rides the rotation), plus the LIVE cursor NDC it should track. While set, the frame loop
+  // steers yaw/pitch each tick so this exact point stays pinned under the moving pointer.
+  const grabAnchor = useRef<{ dir: Vector3; ndcX: number; ndcY: number } | null>(null);
   // Eased horizontal CAMERA view-offset (px) so the globe slides smoothly when the side
   // panel opens/closes. A projection offset (not a world translation) shifts EVERY depth
   // by the same pixels, so the focused country on the near surface lands exactly on the
@@ -881,6 +904,50 @@ export const GlobeScene = memo(function GlobeScene({
       refs.wake.current = () => {};
     };
   }, [invalidate, refs]);
+
+  // TRACKBALL GRAB plumbing. The gesture layer (wrapper PanResponder) owns press/move/release
+  // but has no camera or geometry, so it delegates the 3D part here:
+  //  • grab(ndc): raycast the cursor against the globe's SPHERE; on a hit, store the surface
+  //    point in the LOCAL frame (worldToLocal strips rotation+scale, so it rides the globe) and
+  //    seed the cursor target. Returns false on a miss so the caller can fall back to a plain
+  //    rotate (a press in empty space has nothing to grab).
+  //  • dragTo(ndc): just update the live cursor target; the frame loop does the steering.
+  //  • release(): drop the grab.
+  useEffect(() => {
+    refs.grab.current = (ndcX, ndcY) => {
+      const g = group.current;
+      if (!g) return false;
+      refs.target.current = null; // a manual grab cancels any fly-to
+      zoomAnchor.current = null; // …and any scroll-zoom lock
+      g.updateMatrix();
+      _ndc.set(ndcX, ndcY);
+      _ray.setFromCamera(_ndc, camera);
+      _sphere.set(_ORIGIN, g.scale.x * PLANET_RADIUS); // world-space globe sphere
+      if (!_ray.ray.intersectSphere(_sphere, _grabTgt)) {
+        grabAnchor.current = null;
+        return false; // pressed off the globe
+      }
+      const dir = g.worldToLocal(_grabTgt.clone()).normalize();
+      grabAnchor.current = { dir, ndcX, ndcY };
+      refs.wake.current?.();
+      return true;
+    };
+    refs.dragTo.current = (ndcX, ndcY) => {
+      const a = grabAnchor.current;
+      if (!a) return;
+      a.ndcX = ndcX;
+      a.ndcY = ndcY;
+      refs.wake.current?.();
+    };
+    refs.release.current = () => {
+      grabAnchor.current = null;
+    };
+    return () => {
+      refs.grab.current = () => false;
+      refs.dragTo.current = () => {};
+      refs.release.current = () => {};
+    };
+  }, [camera, refs]);
 
   // The tension arcs flow continuously, so when the set of ties CHANGES (incl. first
   // appearing) kick the loop — otherwise a sleeping globe wouldn't start animating them.
@@ -1012,6 +1079,50 @@ export const GlobeScene = memo(function GlobeScene({
         g.rotation.x = refs.rot.current.pitch;
         g.updateMatrix();
         if (Math.abs(refs.zoom.current - g.scale.x) < 1e-3) zoomAnchor.current = null;
+      }
+    }
+
+    // TRACKBALL GRAB steering. While the reader holds the globe, steer the rotation each tick so
+    // the grabbed surface point chases the LIVE cursor — the world rolls under the finger and that
+    // exact point lands where the pointer is. Same closed-loop controller as the zoom lock above
+    // (reproject the grabbed local point → NDC, turn the NDC error into a yaw/pitch step), but the
+    // target is the MOVING cursor rather than a fixed zoom focus. The target is CLAMPED to the
+    // globe's silhouette: when the cursor leaves the disk we steer toward the nearest limb point
+    // instead of chasing an unreachable spot — which is exactly what made the old drag fling/spin.
+    const grab = grabAnchor.current;
+    if (grab) {
+      g.updateMatrix();
+      _anchor.copy(grab.dir).multiplyScalar(PLANET_RADIUS).applyMatrix4(g.matrix); // grabbed pt → world
+      const frontZ = _anchor.z;
+      // Target surface point under the cursor: the ray∩sphere hit, or — when the cursor is OFF the
+      // globe — the sphere point nearest the ray (its silhouette), so the target is always reachable.
+      const Rw = g.scale.x * PLANET_RADIUS;
+      _ndc.set(grab.ndcX, grab.ndcY);
+      _ray.setFromCamera(_ndc, cam);
+      _sphere.set(_ORIGIN, Rw);
+      if (!_ray.ray.intersectSphere(_sphere, _grabTgt)) {
+        _ray.ray.closestPointToPoint(_ORIGIN, _grabTgt);
+        _grabTgt.setLength(Rw); // snap the nearest ray point onto the silhouette
+      }
+      // Skip only if the grabbed point has rolled behind the limb (shouldn't happen with the clamp,
+      // but a behind-the-globe point projects unreliably) — keep the grab so the drag can recover.
+      if (frontZ > -0.15) {
+        _anchor.project(cam); // current grabbed point → NDC
+        _grabTgt.project(cam); // target (cursor or clamped limb) → NDC
+        const CAM_Z = 3.2; // camera sits at z = 3.2 (see <Canvas camera> in Globe)
+        const persp = Math.max(0.12, (CAM_Z - Rw) / CAM_Z);
+        const gain = (DRAG_K / (g.scale.x * (size.height || 600))) * persp * 0.9;
+        const STEP = 0.3; // generous per-tick cap (snappy tracking) that still blocks a lurch
+        const dyaw = (_grabTgt.x - _anchor.x) * (size.width / 2) * gain;
+        const dpitch = -(_grabTgt.y - _anchor.y) * (size.height / 2) * gain;
+        refs.rot.current.yaw += Math.max(-STEP, Math.min(STEP, dyaw));
+        refs.rot.current.pitch = Math.max(
+          -1.2,
+          Math.min(1.2, refs.rot.current.pitch + Math.max(-STEP, Math.min(STEP, dpitch))),
+        );
+        g.rotation.y = refs.rot.current.yaw;
+        g.rotation.x = refs.rot.current.pitch;
+        g.updateMatrix();
       }
     }
 
@@ -1214,7 +1325,9 @@ export const GlobeScene = memo(function GlobeScene({
     // so they alone never keep it awake — the globe sleeps (0fps) with events on screen and
     // only re-projects them on a gesture/data change.
     const markersLive = askMarkers.length > 0 || arcs.length > 0;
-    const locking = zoomAnchor.current !== null; // cursor-lock needs full-rate steering
+    // Cursor-lock (zoom) and trackball GRAB (drag) both steer the rotation each tick toward the
+    // pointer, so both need the full-rate loop running.
+    const locking = zoomAnchor.current !== null || grabAnchor.current !== null;
     // Transient camera EASES move the whole globe and are loop-driven (no per-event driver
     // once kicked): the fly-to (auto focus/zoom), the scroll/pinch ZOOM ease (a wheel notch
     // sets a target, then `scale` chases it over many frames), and the panel OFFSET shift.

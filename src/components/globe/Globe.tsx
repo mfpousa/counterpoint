@@ -899,6 +899,11 @@ export function Globe({
   const targetRef = useRef<{ yaw: number; pitch: number; zoom: number } | null>(null);
   // Assigned by GlobeScene once mounted; gestures call it to wake the on-demand loop.
   const wakeRef = useRef<() => void>(() => {});
+  // Trackball GRAB handles, assigned by GlobeScene (it owns the camera + geometry). The drag
+  // gesture below calls grab() on press, dragTo() each move, and release() on lift.
+  const grabRef = useRef<(ndcX: number, ndcY: number) => boolean>(() => false);
+  const dragToRef = useRef<(ndcX: number, ndcY: number) => void>(() => {});
+  const releaseRef = useRef<() => void>(() => {});
   // Bundle the refs ONCE (stable identity). A fresh object literal each render would change
   // the `refs` prop every tick and defeat React.memo(GlobeScene) — re-reconciling the whole
   // scene graph on every status poll (the periodic stutter).
@@ -909,6 +914,9 @@ export function Globe({
       dragging: draggingRef,
       target: targetRef,
       wake: wakeRef,
+      grab: grabRef,
+      dragTo: dragToRef,
+      release: releaseRef,
     }),
     [],
   );
@@ -921,6 +929,13 @@ export function Globe({
   const didDrag = useRef(false);
   const canvasH = useRef(0); // measured canvas height (px) for surface-correct drag gain
   const canvasW = useRef(0); // measured canvas width (px) for the cursor-pin placement
+  // The canvas's absolute page origin (measured), so a PanResponder page coordinate can be made
+  // canvas-relative → NDC for the trackball grab. Refreshed on layout.
+  const canvasPage = useRef({ x: 0, y: 0 });
+  const canvasViewRef = useRef<View>(null);
+  // True when the press actually landed ON the globe (grab() hit the sphere). A miss → fall back
+  // to the legacy delta-rotate for that gesture, so a drag begun in empty space still turns it.
+  const grabHit = useRef(false);
   const pinRef = useRef<{ move: (x: number, y: number) => void }>(null);
 
   // Follow an externally-committed pool so the globe opens where the feed is.
@@ -2000,11 +2015,28 @@ export function Globe({
         ) =>
           Math.abs(g.dx) + Math.abs(g.dy) > 4 ||
           (e.nativeEvent.touches?.length ?? 0) >= 2,
-        onPanResponderGrant: () => {
+        onPanResponderGrant: (
+          e: GestureResponderEvent,
+          g: PanResponderGestureState,
+        ) => {
           refs.dragging.current = true;
           didDrag.current = true; // moved past the slop → this gesture is a drag, not a tap
-          lastDrag.current = { x: 0, y: 0 };
+          lastDrag.current = { x: g.dx, y: g.dy };
           pinchDist.current = 0;
+          // TRACKBALL GRAB: capture the surface point under the press so the world rolls to
+          // keep it under the cursor. grant fires after the 4px slop, so (x0,y0) is the press
+          // point. Skip for a two-finger start (that's a pinch). A miss (empty space) → legacy
+          // delta-rotate fallback for this gesture.
+          const isPinch = (e.nativeEvent.touches?.length ?? 0) >= 2;
+          if (isPinch) {
+            grabHit.current = false;
+          } else {
+            const w = canvasW.current || 1;
+            const h = canvasH.current || 1;
+            const ndcX = ((g.x0 - canvasPage.current.x) / w) * 2 - 1;
+            const ndcY = 1 - ((g.y0 - canvasPage.current.y) / h) * 2;
+            grabHit.current = refs.grab.current(ndcX, ndcY);
+          }
           refs.wake.current?.(); // start the render loop for the drag
         },
         onPanResponderMove: (
@@ -2014,6 +2046,11 @@ export function Globe({
           refs.wake.current?.(); // ref-only mutation → keep the loop awake while moving
           const touches = e.nativeEvent.touches;
           if (touches && touches.length >= 2) {
+            // A second finger → pinch-zoom. Drop any single-finger grab so this is pure zoom.
+            if (grabHit.current) {
+              refs.release.current();
+              grabHit.current = false;
+            }
             const dx = touches[0].pageX - touches[1].pageX;
             const dy = touches[0].pageY - touches[1].pageY;
             const dist = Math.hypot(dx, dy);
@@ -2022,10 +2059,19 @@ export function Globe({
             pinchDist.current = dist;
             return;
           }
-          // Incremental delta since the last move event → smooth rotation. The gain
-          // scales with the on-screen globe size (∝ zoom) so the drag STICKS to the
-          // surface — the same world arc stays under the finger — instead of spinning
-          // about the core at a fixed rate (which felt far too fast).
+          if (grabHit.current) {
+            // Feed the LIVE cursor NDC; the frame loop steers the rotation so the grabbed
+            // surface point chases the pointer exactly (true "drag the globe" feel).
+            const w = canvasW.current || 1;
+            const h = canvasH.current || 1;
+            const ndcX = ((g.moveX - canvasPage.current.x) / w) * 2 - 1;
+            const ndcY = 1 - ((g.moveY - canvasPage.current.y) / h) * 2;
+            refs.dragTo.current(ndcX, ndcY);
+            return;
+          }
+          // FALLBACK (press began off the globe — nothing to grab): legacy incremental
+          // delta-rotate so a drag from empty space still turns the world. The gain scales
+          // with the on-screen globe size (∝ zoom) so it stays roughly surface-paced.
           const dX = g.dx - lastDrag.current.x;
           const dY = g.dy - lastDrag.current.y;
           lastDrag.current = { x: g.dx, y: g.dy };
@@ -2035,10 +2081,14 @@ export function Globe({
         },
         onPanResponderRelease: () => {
           refs.dragging.current = false;
+          refs.release.current(); // end the grab
+          grabHit.current = false;
           refs.wake.current?.(); // render through the post-release settle
         },
         onPanResponderTerminate: () => {
           refs.dragging.current = false;
+          refs.release.current();
+          grabHit.current = false;
           refs.wake.current?.();
         },
       }),
@@ -2051,6 +2101,7 @@ export function Globe({
   return (
     <View style={[styles.wrap, hero && styles.wrapHero]}>
       <View
+        ref={canvasViewRef}
         style={[
           styles.canvasWrap,
           hero ? styles.canvasHero : { height },
@@ -2059,6 +2110,12 @@ export function Globe({
         onLayout={(e) => {
           canvasH.current = e.nativeEvent.layout.height;
           canvasW.current = e.nativeEvent.layout.width;
+          // Cache the canvas's ABSOLUTE page origin so a PanResponder page coordinate can be
+          // made canvas-relative → NDC for the trackball grab (the gesture's pageX/pageY are
+          // viewport-relative, but the layout box is positioned within the page).
+          canvasViewRef.current?.measureInWindow((x, y) => {
+            canvasPage.current = { x, y };
+          });
         }}
         {...panResponder.panHandlers}
       >
