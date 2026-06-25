@@ -157,6 +157,19 @@ export function gatheringVisual(kind: string, icon?: string): GatheringVisual {
   };
 }
 
+/** Resolve a worldview EVENT category to its visual: a known EventCategory uses the curated
+ *  EVENT_CATEGORIES registry; a model-invented category gets a deterministic pastel, the
+ *  model's chosen icon (validated at render), and a label derived from the slug. */
+export function eventVisual(category: string, icon?: string): { color: string; icon: string; label: string } {
+  const known = (EVENT_CATEGORIES as Record<string, { color: string; label: string; icon: string }>)[category];
+  if (known) return { color: known.color, icon: known.icon, label: known.label };
+  return {
+    color: customKindColor(category || "event"),
+    icon: (icon && icon.trim()) || "ellipse",
+    label: kindLabel(category),
+  };
+}
+
 /** Keyword signatures per category (lowercase substrings scanned in title + dek). */
 const CATEGORY_KEYWORDS: Record<Exclude<EventCategory, "other">, string[]> = {
   conflict: ["war","airstrike","air strike","drone strike","missile","troops","invasion","offensive","military","bombing","shelling","frontline","combat","militant","insurgent","artillery","occupation","gunmen","clashes","killed in"],
@@ -212,8 +225,14 @@ export interface GeoAlert {
   id: string;
   title: string;
   topic: string;
-  /** World-event category (drives the marker colour + the legend). */
-  category: EventCategory;
+  /** World-event category — a known EventCategory OR a model-invented slug. */
+  category: string;
+  /** Resolved chip COLOUR for the category (known → registry, custom → hashed pastel). */
+  color: string;
+  /** Resolved Ionicon for the chip (the model's icon for a custom category). */
+  icon: string;
+  /** Resolved human label for the category (the legend lens). */
+  label: string;
   /** True for an ongoing/developing issue (vs a single settled event). */
   developing: boolean;
   /** Most recent contributing article time (epoch ms) — drives the RECENCY treatment
@@ -315,11 +334,19 @@ export function buildAlerts(
       dir = loc.dir;
       iso2 = undefined; // located, not a national protagonist → pin only, no flag
     }
+    // PREFER the model's worldview category (a known one OR a custom slug); fall back to the
+    // keyword classifier for stories synthesized before this field existed.
+    const category =
+      typeof s.category === "string" && s.category.trim() ? s.category.trim() : classifyEvent(s);
+    const v = eventVisual(category, s.categoryIcon);
     out.push({
       id: s.id,
       title: s.title,
       topic: s.topic,
-      category: classifyEvent(s),
+      category,
+      color: v.color,
+      icon: v.icon,
+      label: v.label,
       developing: !!s.developing,
       updatedAt: s.updatedAt,
       startedAt: s.startedAt,

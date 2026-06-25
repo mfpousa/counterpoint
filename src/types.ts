@@ -497,6 +497,14 @@ export interface Story {
     lon?: number;
   }[];
   /**
+   * Worldview EVENT category for the globe's map chip — a known EventCategory (conflict,
+   * diplomacy, unrest, health, tech, disaster, economy) OR a model-invented slug when none
+   * captures it. `categoryIcon` is the model's chosen Ionicon for a custom category. Absent
+   * on stories synthesized before this field existed → the client keyword-classifies instead.
+   */
+  category?: string;
+  categoryIcon?: string;
+  /**
    * True when synthesis is a graceful FALLBACK (model offline/failed): built
    * from the source one-line summaries without cross-outlet analysis. The UI
    * surfaces this so the distinction is never hidden.

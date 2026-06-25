@@ -1,6 +1,7 @@
 import {
   buildAlerts,
   classifyEvent,
+  eventVisual,
   locatePlace,
   locateStory,
   recencyOf,
@@ -127,6 +128,27 @@ describe("geoAlerts (locate ongoing stories on the globe)", () => {
     );
     expect(alert.updatedAt).toBe(1700);
     expect(alert.startedAt).toBe(900);
+  });
+
+  it("PREFERS the model's category over keywords and resolves a custom one's visual", () => {
+    // Text screams conflict, but the model labelled it diplomacy — trust the model.
+    const [known] = buildAlerts([story({ title: "War in Ukraine", category: "diplomacy" })], IDX);
+    expect(known.category).toBe("diplomacy");
+    expect(known.color).toBe(eventVisual("diplomacy").color); // curated registry colour
+
+    // A model-INVENTED category keeps its slug + carries a resolved icon/colour/label.
+    const [custom] = buildAlerts(
+      [story({ title: "Ukraine", category: "cyber", categoryIcon: "bug" })],
+      IDX,
+    );
+    expect(custom.category).toBe("cyber");
+    expect(custom.icon).toBe("bug");
+    expect(custom.label).toBe("Cyber");
+    expect(custom.color).toMatch(/^#[0-9a-f]{6}$/i);
+
+    // No model category → fall back to the keyword classifier (here: conflict).
+    const [fallback] = buildAlerts([story({ title: "Missile strike on Ukraine kills troops" })], IDX);
+    expect(fallback.category).toBe("conflict");
   });
 });
 

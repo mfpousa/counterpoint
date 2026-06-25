@@ -94,8 +94,10 @@ const SYNTH_SCHEMA: JsonSchema = {
           additionalProperties: false,
         },
       },
+      category: { type: "string" },
+      categoryIcon: { type: "string" },
     },
-    required: ["title", "summary", "synthesis", "angles", "sides", "contradictions", "protagonist", "links", "gatherings"],
+    required: ["title", "summary", "synthesis", "angles", "sides", "contradictions", "protagonist", "links", "gatherings", "category", "categoryIcon"],
     additionalProperties: false,
   },
 };
@@ -114,7 +116,9 @@ const SYNTH_RULES =
   '  "contradictions": ["specific points where the outlets disagree or report differently; [] if none are evident"],\n' +
   '  "protagonist": { "name": "the central actor/subject the story is MOST about (a country, organisation, or person)", "iso2": "if that protagonist IS a country or a national government/actor, its ISO 3166-1 alpha-2 code in lowercase (e.g. us, es, ua); otherwise an empty string" },\n' +
   '  "links": [ { "from": "<ISO-2 ORIGIN>", "to": "<ISO-2 DESTINATION>", "kind": "attack|tension|spread|trade|migration|aid|transport|<own-slug>", "icon": "<Ionicons name if custom kind, else empty>" } ],\n' +
-  '  "gatherings": [ { "kind": "summit|talks|agreement|ceasefire|visit|forum|vote|trial|exercise|aid|games|mission|ceremony|<own-slug>", "icon": "<Ionicons name if custom kind, else empty>", "place": "<city/venue>", "iso2": "<ISO-2 of its country>", "parties": ["<ISO-2>", "<ISO-2>", "..."], "coords": "<lat,lon or empty>" } ]\n' +
+  '  "gatherings": [ { "kind": "summit|talks|agreement|ceasefire|visit|forum|vote|trial|exercise|aid|games|mission|ceremony|<own-slug>", "icon": "<Ionicons name if custom kind, else empty>", "place": "<city/venue>", "iso2": "<ISO-2 of its country>", "parties": ["<ISO-2>", "<ISO-2>", "..."], "coords": "<lat,lon or empty>" } ],\n' +
+  '  "category": "conflict|diplomacy|unrest|health|tech|disaster|economy|<own-slug>",\n' +
+  '  "categoryIcon": "<Ionicons name if you INVENTED a category, else empty>"\n' +
   "}\n" +
   "For 'links', emit a DIRECTED connection ONLY when the story describes a PHYSICAL link/movement " +
   "OR a hostile/contested RELATIONSHIP between two DISTINCT countries, from an ORIGIN ('from') to a " +
@@ -146,6 +150,11 @@ const SYNTH_RULES =
   "opposing vantage points actually PRESENT (by zone) and describe how each side frames the story " +
   "\u2014 e.g. Western vs Ukrainian vs Russian media. Do NOT invent sides: use only zones present in " +
   "the reports, and return [] when all outlets share one vantage point. " +
+  "Set 'category' to the story's WORLDVIEW nature for the globe map: one of 'conflict', " +
+  "'diplomacy', 'unrest', 'health', 'tech', 'disaster', 'economy' — or, if NONE captures it, " +
+  "INVENT a short lowercase-hyphenated slug (e.g. 'cyber', 'space', 'energy') and set " +
+  "'categoryIcon' to the Ionicons (v5) glyph that best depicts it (leave 'categoryIcon' empty " +
+  "for a known category). " +
   "Base 'angles', 'sides', and 'contradictions' only on differences evident across the provided " +
   "reports. If the reports are consistent, return an empty contradictions array. No prose outside the JSON.";
 
@@ -267,6 +276,19 @@ function sanitizeKind(raw: unknown): string {
 function sanitizeIcon(raw: unknown): string {
   if (typeof raw !== "string") return "";
   return raw.trim().toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 32);
+}
+
+/** Known worldview EVENT categories (a custom slug is allowed; only known ones skip the icon). */
+const EVENT_CATEGORY_SET = new Set([
+  "conflict", "diplomacy", "unrest", "health", "tech", "disaster", "economy", "other",
+]);
+
+/** The model's worldview category (known or custom slug) + a chosen icon for a custom one. */
+function coerceCategory(rawKind: unknown, rawIcon: unknown): { category?: string; categoryIcon?: string } {
+  const category = sanitizeKind(rawKind);
+  if (!category) return {};
+  const icon = EVENT_CATEGORY_SET.has(category) ? "" : sanitizeIcon(rawIcon);
+  return { category, ...(icon ? { categoryIcon: icon } : {}) };
 }
 
 /**
@@ -550,6 +572,7 @@ export async function buildStory(members: StoredItem[], lang: Lang = "en"): Prom
   const contradictions = coerceStringArray(obj["contradictions"], 6);
   const links = coerceLinks(obj["links"]);
   const gatherings = coerceGatherings(obj["gatherings"]);
+  const cat = coerceCategory(obj["category"], obj["categoryIcon"]);
 
   // Nothing usable came back — fall back rather than ship an empty story.
   if (!title && synthesis.length === 0) return fallbackStory(members);
@@ -569,6 +592,7 @@ export async function buildStory(members: StoredItem[], lang: Lang = "en"): Prom
     ...(sides ? { sides } : {}),
     ...(links.length > 0 ? { links } : {}),
     ...(gatherings.length > 0 ? { gatherings } : {}),
+    ...cat,
     contradictions,
     ...(coerceProtagonist(obj["protagonist"]) ? { protagonist: coerceProtagonist(obj["protagonist"]) } : {}),
     relatedIds: [],
@@ -665,6 +689,8 @@ const DEVELOPING_SCHEMA: JsonSchema = {
           additionalProperties: false,
         },
       },
+      category: { type: "string" },
+      categoryIcon: { type: "string" },
     },
     required: [
       "title",
@@ -678,6 +704,8 @@ const DEVELOPING_SCHEMA: JsonSchema = {
       "protagonist",
       "links",
       "gatherings",
+      "category",
+      "categoryIcon",
     ],
     additionalProperties: false,
   },
@@ -723,6 +751,10 @@ const DEVELOPING_RULES =
   "lowercase-hyphenated 'kind' + set 'icon' to the best Ionicons glyph (empty for a known kind). " +
   "Set 'iso2' to the place's country and 'coords' to its 'latitude,longitude' (\"\" if unsure). " +
   "Needs \u2265 2 parties; [] when none. " +
+  'Also set "category" to the issue\'s WORLDVIEW nature for the globe map (one of conflict/' +
+  "diplomacy/unrest/health/tech/disaster/economy) \u2014 or, if NONE captures it, INVENT a short " +
+  'lowercase-hyphenated slug and set "categoryIcon" to the best Ionicons glyph for it (leave ' +
+  '"categoryIcon" empty for a known category). ' +
   "No prose outside the JSON.";
 
 function earliestAt(members: StoredItem[]): number {
@@ -846,6 +878,7 @@ export async function buildDevelopingStory(
   const sides = finalizeSides(coerceSides(obj["sides"], members), members);
   const links = coerceLinks(obj["links"]);
   const gatherings = coerceGatherings(obj["gatherings"]);
+  const cat = coerceCategory(obj["category"], obj["categoryIcon"]);
   const resolved = sanitizeModelText(obj["status"]).toLowerCase() === "resolved";
 
   if (!title && synthesis.length === 0) return fallbackDevelopingStory(orderedEvents);
@@ -873,6 +906,7 @@ export async function buildDevelopingStory(
     ...(sides ? { sides } : {}),
     ...(links.length > 0 ? { links } : {}),
     ...(gatherings.length > 0 ? { gatherings } : {}),
+    ...cat,
     ...(coerceProtagonist(obj["protagonist"]) ? { protagonist: coerceProtagonist(obj["protagonist"]) } : {}),
   };
 }

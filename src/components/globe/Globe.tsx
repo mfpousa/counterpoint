@@ -65,14 +65,12 @@ import {
   type GeoCentroids,
 } from "../../lib/geoShapes";
 import {
-  EVENT_CATEGORIES,
   RECENCY_OPACITY,
   buildAlerts,
   gatheringVisual,
   linkVisual,
   recencyOf,
   withinWindow,
-  type EventCategory,
   type GeoAlert,
   type TimeWindow,
 } from "../../lib/geoAlerts";
@@ -105,8 +103,8 @@ const clamp = (v: number, lo: number, hi: number) =>
 // red as a story gets hotter, so "which collapsed stories are hotter" reads at a glance.
 const heatColor = (sev: number) =>
   sev >= 0.8 ? "#ef4444" : sev >= 0.6 ? "#f97316" : sev >= 0.45 ? "#f2b705" : colors.textDim;
-// Valid Ionicons glyph name — EVENT_CATEGORIES stores icon names as plain strings, so we
-// cast through this when handing them to <Ionicons> for the event chips + legend lenses.
+// Valid Ionicons glyph name — registries/markers store icon names as plain strings, so we
+// cast through this when handing them to <Ionicons> for the chips + legend lenses.
 type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
 // A model-invented kind may carry an icon the bundled Ionicons set doesn't have; fall back to
 // a generic glyph so a CUSTOM badge/legend chip never renders blank.
@@ -119,6 +117,9 @@ const LINK_KIND_ORDER = ["attack", "tension", "spread", "trade", "migration", "a
 const GATHERING_KIND_ORDER = [
   "summit", "talks", "agreement", "ceasefire", "visit", "forum", "vote",
   "trial", "exercise", "aid", "games", "mission", "ceremony", "other",
+];
+const EVENT_CATEGORY_ORDER = [
+  "conflict", "diplomacy", "unrest", "health", "tech", "disaster", "economy", "other",
 ];
 // Known kinds first (registry order), then model-invented kinds alphabetical by label.
 function sortLegend(items: LegendKind[], order: string[]): LegendKind[] {
@@ -296,6 +297,10 @@ const MarkerLayer = forwardRef<
     onDismiss: () => void;
     /** Tap an event chip → open/focus it. */
     onPressMarker: (id: string) => void;
+    /** Tap a LINK/GATHERING badge → open the story it came from. */
+    onOpenStory: (storyId: string) => void;
+    /** Tap a magnetic CLUSTER puck → fly-to + zoom to split it (or fan out if it can't split). */
+    onExplodeCluster: (it: ProjectedMarker) => void;
     /** Pointer entered (id) / left (null) a chip — pauses/resumes the globe's auto-spin. */
     onHoverMarker: (id: string | null) => void;
     /** A wheel over the overlay (i.e. over a chip) — forwarded to the globe so scroll-zoom
@@ -305,9 +310,19 @@ const MarkerLayer = forwardRef<
     renderFocused: (it: ProjectedMarker) => React.ReactNode;
   }
 >(function MarkerLayer(
-  { focusedId, onDismiss, onPressMarker, onHoverMarker, onWheel, renderFocused },
+  {
+    focusedId,
+    onDismiss,
+    onPressMarker,
+    onOpenStory,
+    onExplodeCluster,
+    onHoverMarker,
+    onWheel,
+    renderFocused,
+  },
   ref,
 ) {
+  const t = useT();
   const [items, setItems] = useState<ProjectedMarker[]>([]);
   // Which event chip the pointer is over (web) — shows its headline bubble.
   const [hoverId, setHoverId] = useState<string | null>(null);
@@ -455,6 +470,50 @@ const MarkerLayer = forwardRef<
           { transform },
           isFocused && styles.markerAnchorTop,
         ];
+        // MAGNETIC CLUSTER: several nearby point markers (events + gatherings) folded into one
+        // "+N" puck — a count ringed in the strongest member's colour. TAP it to fly-to its
+        // centroid and zoom to the tier where it splits apart (recursive explode); when it can't
+        // split further (coincident at max zoom) the tap instead opens a fan-out card (handled by
+        // the host) so the reader can pick a story. Hover names how many it hides + pauses spin.
+        if (it.kind === "cluster") {
+          const count = it.count ?? it.members?.length ?? 2;
+          const showBubble = !isFocused && hoverId === it.id;
+          return (
+            <View key={it.id} ref={setNode(it.id)} style={anchorStyle} pointerEvents="box-none">
+              {isFocused ? (
+                <View style={[styles.markerStack, styles.markerFocusedWrap]} pointerEvents="box-none">
+                  <View style={[styles.markerCard, { borderColor: it.color }]} pointerEvents="auto">
+                    {renderFocused(it)}
+                  </View>
+                </View>
+              ) : showBubble ? (
+                <View style={[styles.markerStack, { bottom: 24 }]} pointerEvents="none">
+                  <View style={[styles.markerBubble, { borderColor: it.color }]}>
+                    <Text style={styles.markerBubbleText} numberOfLines={1}>
+                      {t("globe.clusterHint", { count })}
+                    </Text>
+                  </View>
+                </View>
+              ) : null}
+              <Pressable
+                style={[styles.clusterChip, { borderColor: it.color }]}
+                onPress={() => onExplodeCluster(it)}
+                onHoverIn={() => {
+                  setHoverId(it.id);
+                  onHoverMarker(it.id);
+                }}
+                onHoverOut={() => {
+                  setHoverId((h) => (h === it.id ? null : h));
+                  onHoverMarker(null);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={t("globe.clusterHint", { count })}
+              >
+                <Text style={[styles.clusterCount, { color: it.color }]}>{count}</Text>
+              </Pressable>
+            </View>
+          );
+        }
         // CO-LOCATED GATHERING: a localized badge AT the place — the event-nature ICON ringed
         // by a small FLAG per involved party (a "+N" chip when there are more), with the place
         // name tagged beneath. HOVERING reveals the kind, place, headline and full party list
@@ -487,6 +546,7 @@ const MarkerLayer = forwardRef<
               )}
               <Pressable
                 style={styles.gatheringInner}
+                onPress={() => it.storyId && onOpenStory(it.storyId)}
                 onHoverIn={() => {
                   setHoverId(it.id);
                   onHoverMarker(it.id);
@@ -495,6 +555,7 @@ const MarkerLayer = forwardRef<
                   setHoverId((h) => (h === it.id ? null : h));
                   onHoverMarker(null);
                 }}
+                accessibilityRole="link"
                 accessibilityLabel={it.detail}
               >
                 <View style={[styles.gatheringBadge, { backgroundColor: it.color }]}>
@@ -555,6 +616,7 @@ const MarkerLayer = forwardRef<
               <Pressable
                 ref={setBadge(it.id)}
                 style={[styles.linkBadge, { backgroundColor: it.color }]}
+                onPress={() => it.storyId && onOpenStory(it.storyId)}
                 onHoverIn={() => {
                   setHoverId(it.id);
                   onHoverMarker(it.id); // pause the auto-spin while the reader inspects
@@ -563,6 +625,7 @@ const MarkerLayer = forwardRef<
                   setHoverId((h) => (h === it.id ? null : h));
                   onHoverMarker(null);
                 }}
+                accessibilityRole="link"
                 accessibilityLabel={it.title}
               >
                 {isAttack ? (
@@ -645,7 +708,7 @@ const MarkerLayer = forwardRef<
                 accessibilityLabel={it.detail}
               >
                 <Ionicons
-                  name={EVENT_CATEGORIES[it.category].icon as IoniconName}
+                  name={safeIonicon(it.icon, "ellipse")}
                   size={Math.round(cr * 1.15)}
                   color="#0b0f14"
                 />
@@ -794,11 +857,11 @@ export function Globe({
   // Worldview LENSES: categories the reader has toggled OFF in the legend (hidden from the
   // map), so the globe answers "where are the {conflicts|disasters|…}?" by filtering. Empty
   // = show everything. Toggling a legend chip flips its category in/out.
-  const [hiddenCats, setHiddenCats] = useState<Set<EventCategory>>(() => new Set());
+  const [hiddenCats, setHiddenCats] = useState<Set<string>>(() => new Set());
   // Worldview TIME scrubber: narrow the map to events seen within a recency window
   // ("all" = no time filter; recency is still encoded on every chip regardless).
   const [timeWindow, setTimeWindow] = useState<TimeWindow>("all");
-  const toggleCat = useCallback((c: EventCategory) => {
+  const toggleCat = useCallback((c: string) => {
     setHiddenCats((prev) => {
       const next = new Set(prev);
       if (next.has(c)) next.delete(c);
@@ -1022,6 +1085,7 @@ export function Globe({
         const v = gatheringVisual(g.kind, g.icon);
         out.push({
           id: `gathering:${s.id}:${i}`,
+          storyId: s.id,
           dir,
           kind: g.kind,
           icon: v.icon,
@@ -1046,11 +1110,13 @@ export function Globe({
   );
 
   // The categories actually present, for the on-globe legend (in a stable order).
-  const legendCats = useMemo<EventCategory[]>(() => {
-    const present = new Set(alerts.map((a) => a.category));
-    return (Object.keys(EVENT_CATEGORIES) as EventCategory[]).filter((c) =>
-      present.has(c),
-    );
+  const legendCats = useMemo<LegendKind[]>(() => {
+    const m = new Map<string, LegendKind>();
+    for (const a of alerts) {
+      if (m.has(a.category)) continue;
+      m.set(a.category, { kind: a.category, color: a.color, icon: a.icon, label: a.label });
+    }
+    return sortLegend([...m.values()], EVENT_CATEGORY_ORDER);
   }, [alerts]);
 
   // The link KINDS currently on the globe, for the CONNECTIONS legend (stable order). Drawn
@@ -1279,7 +1345,50 @@ export function Globe({
     },
     [alertById, onAlertPress],
   );
+  // onAlertPress comes in as a fresh arrow each host render; read it through a ref so the
+  // handlers below stay REFERENTIALLY STABLE (they're passed to memo(GlobeScene), which would
+  // otherwise re-reconcile the whole scene on every 3s status poll).
+  const onAlertPressRef = useRef(onAlertPress);
+  onAlertPressRef.current = onAlertPress;
+  // Tapping a LINK or GATHERING badge opens the story it came from. These badges are 2D
+  // overlay Pressables (not through the globe's PanResponder), so — like the event chips —
+  // they need no `didDrag` guard. This also stops a badge sitting ON TOP of an event chip
+  // from swallowing the click: the badge now resolves it to its OWN story.
+  const onOpenStory = useCallback((storyId: string) => {
+    setFocusedMarkerId(null);
+    onAlertPressRef.current?.(storyId);
+  }, []);
+  // Clicking a LINK arc's LINE opens its story too. This DOES go through the canvas, so guard
+  // against a drag-to-rotate that happens to release over a tie (mirrors `activate`).
+  const onLinkPress = useCallback((storyId: string) => {
+    if (didDrag.current) return;
+    onAlertPressRef.current?.(storyId);
+  }, []);
   const clearFocus = useCallback(() => setFocusedMarkerId(null), []);
+  // Tapping a magnetic CLUSTER puck EXPLODES it: fly to its centroid and zoom to the tier where
+  // it splits apart (recursive — the sub-clusters can then be tapped in turn). When it can't be
+  // split by zooming (members near-coincident, so the break zoom is already at/over the cap),
+  // open its fan-out card instead so the reader can still pick a story. Overlay Pressable (not
+  // through the globe PanResponder), so no didDrag guard — same as the event chips.
+  const onExplodeCluster = useCallback(
+    (it: ProjectedMarker) => {
+      const d = it.clusterDir;
+      const z = it.clusterZoom ?? ZOOM_MAX;
+      if (d && z > refs.zoom.current + 0.08) {
+        setFocusedMarkerId(null);
+        refs.target.current = {
+          yaw: Math.atan2(-d.x, d.z),
+          pitch: clamp(Math.atan2(d.y, Math.hypot(d.x, d.z)), -1.2, 1.2),
+          zoom: Math.min(ZOOM_MAX, z),
+        };
+        refs.wake.current?.();
+      } else {
+        // No room to separate by zooming → fan out the folded markers for the reader to pick.
+        setFocusedMarkerId(it.id);
+      }
+    },
+    [refs],
+  );
   // Scroll-zoom forwarded from the overlay when the pointer is over a chip (the chip would
   // otherwise eat the wheel). Centred zoom mirroring r3f's wheel step; cancels any fly-to.
   const onOverlayWheel = useCallback(
@@ -1300,6 +1409,46 @@ export function Globe({
   // event pins show the headline + an "open story" link.
   const renderFocused = useCallback(
     (it: ProjectedMarker) => {
+      // MAGNETIC CLUSTER that can't be split by zooming (coincident at max zoom) → a fan-out
+      // list of every folded marker (events + gatherings mixed), hottest first, each a row that
+      // opens its story. Mirrors the stacked-alert fan-out so the two read as one affordance.
+      if (it.isCluster) {
+        const rows = [...(it.members ?? [])].sort((a, b) => b.severity - a.severity);
+        return (
+          <>
+            <Text style={styles.markerCardCount}>
+              {t("globe.storiesHere", { count: rows.length })}
+            </Text>
+            <ScrollView
+              style={styles.markerCardScroll}
+              contentContainerStyle={styles.markerCardScrollBody}
+              nestedScrollEnabled
+              showsVerticalScrollIndicator
+            >
+              {rows.map((m) => (
+                <Pressable
+                  key={m.id}
+                  style={styles.markerCardRow}
+                  onPress={() => {
+                    if (m.storyId) onAlertPress?.(m.storyId);
+                    setFocusedMarkerId(null);
+                  }}
+                  accessibilityRole="link"
+                >
+                  <View style={[styles.markerCardHeat, { backgroundColor: heatColor(m.severity) }]} />
+                  <Text style={styles.markerCardRowText}>{m.title}</Text>
+                  <Ionicons
+                    name="open-outline"
+                    size={13}
+                    color={colors.accent}
+                    style={styles.markerCardRowOpen}
+                  />
+                </Pressable>
+              ))}
+            </ScrollView>
+          </>
+        );
+      }
       if (it.kind === "alert") {
         // An aggregated chip (many stories on one country) FANS OUT: list every collapsed
         // headline, each its own tap-to-open row. A lone event keeps the simple card.
@@ -1905,6 +2054,7 @@ export function Globe({
             focusedMarkerId={focusedMarkerId}
             onMarkerHover={onMarkerHover}
             onLinkHover={onLinkHover}
+            onLinkPress={onLinkPress}
             onMarkersProject={onMarkersProject}
             rightInset={rightInset}
             autoSpin={browse === GEO_ROOT_ID && !activePoolId}
@@ -2187,30 +2337,25 @@ export function Globe({
                     disasters"; hidden ones dim. Icon + colour match the on-globe chips. */}
                 <View style={styles.legend} pointerEvents="box-none">
                   {legendCats.map((cat) => {
-                    const off = hiddenCats.has(cat);
+                    const off = hiddenCats.has(cat.kind);
                     return (
                       <Pressable
-                        key={cat}
+                        key={cat.kind}
                         style={[styles.legendItem, off && styles.legendItemOff]}
-                        onPress={() => toggleCat(cat)}
+                        onPress={() => toggleCat(cat.kind)}
                         accessibilityRole="button"
                         accessibilityState={{ selected: !off }}
-                        accessibilityLabel={EVENT_CATEGORIES[cat].label}
+                        accessibilityLabel={cat.label}
                       >
-                        <View
-                          style={[
-                            styles.legendDot,
-                            { backgroundColor: EVENT_CATEGORIES[cat].color },
-                          ]}
-                        >
+                        <View style={[styles.legendDot, { backgroundColor: cat.color }]}>
                           <Ionicons
-                            name={EVENT_CATEGORIES[cat].icon as IoniconName}
+                            name={safeIonicon(cat.icon, "ellipse")}
                             size={9}
                             color="#0b0f14"
                           />
                         </View>
                         <Text style={[styles.legendText, off && styles.legendTextOff]}>
-                          {EVENT_CATEGORIES[cat].label}
+                          {cat.label}
                         </Text>
                       </Pressable>
                     );
@@ -2281,6 +2426,8 @@ export function Globe({
           focusedId={focusedMarkerId}
           onDismiss={clearFocus}
           onPressMarker={onChipPress}
+          onOpenStory={onOpenStory}
+          onExplodeCluster={onExplodeCluster}
           onHoverMarker={onMarkerHover}
           onWheel={onOverlayWheel}
           renderFocused={renderFocused}
@@ -2489,6 +2636,28 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   eventCountText: { color: colors.text, fontSize: 9, fontWeight: "800" },
+  // MAGNETIC CLUSTER puck: a dark disc RINGED in the strongest member's colour with the folded
+  // count centred — visually distinct from a solid event chip so "this is a group, tap to zoom"
+  // reads at a glance. Centred on its globe point (negative offsets = half its size).
+  clusterChip: {
+    position: "absolute",
+    left: -17,
+    top: -17,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    paddingHorizontal: 3,
+    minWidth: 34,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2.5,
+    backgroundColor: colors.surface,
+    shadowColor: "#000",
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 1 },
+  },
+  clusterCount: { fontSize: 14, fontWeight: "900" },
   // Travelling badge on a physical-LINK arc (flag image for attacks, kind icon otherwise),
   // centred on the arc's flowing point. SOLID per-kind fill (set inline) + a dark icon keeps
   // it legible under motion, like the event chips.

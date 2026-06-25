@@ -24,7 +24,15 @@ import {
 import type { Group, LineBasicMaterial, Mesh, MeshBasicMaterial, PerspectiveCamera } from "three";
 import { colors } from "../../theme";
 import { greatCircleArc, greatCirclePoint, hashId, type Vec3 } from "../../lib/globeLayout";
-import { EVENT_CATEGORIES, type EventCategory, type GeoAlert } from "../../lib/geoAlerts";
+import { type GeoAlert } from "../../lib/geoAlerts";
+import {
+  breakZoom,
+  clusterAngleForTier,
+  clusterPoints,
+  clusterTier,
+  type Cluster,
+  type ClusterPoint,
+} from "../../lib/markerCluster";
 
 /** One geographic entity to render on the globe (a continent/country/region). */
 export interface GlobeEntityData {
@@ -339,9 +347,11 @@ function arcGeometry(
 function Arcs({
   arcs,
   onLinkHover,
+  onLinkPress,
 }: {
   arcs: ArcData[];
   onLinkHover?: (tip: LinkHoverTip | null) => void;
+  onLinkPress?: (storyId: string) => void;
 }) {
   const camera = useThree((s) => s.camera);
   const size = useThree((s) => s.size);
@@ -391,6 +401,17 @@ function Arcs({
             onPointerOver={g.kind ? (e) => reportHover(g, e) : undefined}
             onPointerMove={g.kind ? (e) => reportHover(g, e) : undefined}
             onPointerOut={g.kind ? () => onLinkHover?.(null) : undefined}
+            onClick={
+              g.kind && g.storyId
+                ? (e: ThreeEvent<MouseEvent>) => {
+                    e.stopPropagation();
+                    // Only when this line is the FRONTMOST hit — never click a tie through
+                    // the planet (occluded on the far hemisphere).
+                    if (e.intersections[0]?.object !== e.eventObject) return;
+                    onLinkPress?.(g.storyId!);
+                  }
+                : undefined
+            }
           >
             <bufferGeometry>
               <bufferAttribute attach="attributes-position" args={[g.line, 3]} />
@@ -638,6 +659,8 @@ function AskMarkers({
  *  NOT an arc — because it happened AT one place, not between places. */
 export interface GatheringData {
   id: string;
+  /** Id of the story this gathering came from — the handle to open it on a tap. */
+  storyId: string;
   dir: Vec3;
   /** Event nature (a known GatheringKind or a model-invented custom slug). */
   kind: string;
@@ -655,10 +678,23 @@ export interface GatheringData {
   title: string;
 }
 
+/** One point marker folded into a magnetic CLUSTER — its essentials for the "+N" badge's count
+ *  and the at-max-zoom fan-out list (when a coincident cluster can't be split by zooming). */
+export interface ClusterMember {
+  id: string;
+  /** Headline (alert) / story title (gathering) shown in the fan-out row. */
+  title: string;
+  /** 0..1 — drives the fan-out row's heat dot + the strongest-first sort. */
+  severity: number;
+  kind: "alert" | "gathering";
+  /** Story handle to open this member (alert id / gathering storyId). */
+  storyId?: string;
+}
+
 /** A marker projected to 2D screen space, for the wrapper's overlay chips/bubbles. */
 export interface ProjectedMarker {
   id: string;
-  kind: "ask" | "alert" | "link" | "gathering";
+  kind: "ask" | "alert" | "link" | "gathering" | "cluster";
   /** Screen position (px) of the marker's anchor on the globe. */
   x: number;
   y: number;
@@ -669,8 +705,9 @@ export interface ProjectedMarker {
   /** Tag/bubble accent colour. */
   color: string;
   hovered: boolean;
-  /** Event category (alerts only) — drives the overlay chip's ICON. */
-  category?: EventCategory;
+  /** Event category (alerts only) — a known category or a model-invented slug; the chip's
+   *  resolved ICON rides `icon` and its colour rides `color`. */
+  category?: string;
   /** 0..1 gravity (alerts only) — drives the chip size. */
   severity?: number;
   /** How many events collapsed onto this spot (alerts only) — drives a "+N" badge. */
@@ -699,6 +736,17 @@ export interface ProjectedMarker {
   icon?: string;
   /** Resolved human label for the kind (link/gathering tooltip + legend). */
   kindLabel?: string;
+  /** Id of the originating story (link/gathering badges) — tapping the badge opens it. */
+  storyId?: string;
+  /** MAGNETIC CLUSTER (kind === "cluster"): true when this badge folds several nearby point
+   *  markers. Drawn as a single "+N" puck that EXPLODES (fly-to + zoom) on click. */
+  isCluster?: boolean;
+  /** The point markers folded into this cluster (the "+N" count + the at-max-zoom fan-out). */
+  members?: ClusterMember[];
+  /** Centroid sphere direction (clusters only) — the fly-to face on a click-to-explode. */
+  clusterDir?: Vec3;
+  /** Zoom that splits this cluster apart (clusters only) — the click-to-explode target. */
+  clusterZoom?: number;
 }
 
 /** Reported up when the pointer is over a LINK arc LINE (not just its badge): the screen
@@ -711,6 +759,16 @@ export interface LinkHoverTip {
   toCc?: string;
   kind?: string;
 }
+
+// MAGNETIC CLUSTERING payload: what each clusterable point carries through the clusterer so a
+// LONE node can be re-drawn as its exact original marker, and an AGGREGATE can build its members.
+type ClusterPayload =
+  | { kind: "alert"; alert: GeoAlert }
+  | { kind: "gathering"; gathering: GatheringData };
+// Severity assigned to gatherings for the cluster representative pick (GatheringData carries no
+// gravity of its own): mid-pack, so a hot conflict alert reps a mixed cluster but a gathering
+// still out-reps low-severity events.
+const GATHERING_CLUSTER_SEVERITY = 0.55;
 
 // memo'd so the scene only re-renders when its OWN inputs change. Without this, every
 // AppContext update — notably the 3s background status poll and each live reloadPool —
@@ -732,6 +790,7 @@ export const GlobeScene = memo(function GlobeScene({
   focusedMarkerId = null,
   onMarkerHover,
   onLinkHover,
+  onLinkPress,
   onMarkersProject,
   autoSpin,
   focusedId,
@@ -765,6 +824,8 @@ export const GlobeScene = memo(function GlobeScene({
   onMarkerHover?: (id: string | null) => void;
   /** The pointer is over a LINK arc's LINE (tip) or left it (null) — for the link tooltip. */
   onLinkHover?: (tip: LinkHoverTip | null) => void;
+  /** A LINK arc's LINE was CLICKED — open its originating story. */
+  onLinkPress?: (storyId: string) => void;
   /** Per-frame: marker anchors projected to SCREEN px, for the wrapper's overlay
    *  label/detail bubbles. Only the front-hemisphere markers worth labelling are sent. */
   onMarkersProject?: (items: ProjectedMarker[]) => void;
@@ -797,6 +858,16 @@ export const GlobeScene = memo(function GlobeScene({
   // Combined with land-hover (focusedId) and marker-hover (hoveredMarkerId) it is the SOLE
   // signal that freezes the idle auto-spin — spin while off the globe, stop while on it.
   const overOcean = useRef(false);
+  // MAGNETIC CLUSTER cache. The alerts + gatherings fold into one another by ANGULAR distance,
+  // with a threshold that SHRINKS as zoom grows (so a tight cap separates as you zoom in). The
+  // clustering is O(n²) but only recomputed when the quantized zoom TIER flips OR the input set
+  // changes (reference equality on the memoized `alerts`/`gatherings` props) — never every frame.
+  const clusterCache = useRef<{
+    tier: number;
+    alerts: GeoAlert[] | null;
+    gatherings: GatheringData[] | null;
+    nodes: Cluster<ClusterPayload>[];
+  }>({ tier: NaN, alerts: null, gatherings: null, nodes: [] });
 
   // --- Render governor (on-demand rendering) ---------------------------------
   // The <Canvas> runs frameloop="demand": it only paints when invalidate() is called.
@@ -973,7 +1044,7 @@ export const GlobeScene = memo(function GlobeScene({
       const out: ProjectedMarker[] = [];
       const add = (
         id: string,
-        kind: "ask" | "alert" | "gathering",
+        kind: "ask" | "alert" | "gathering" | "cluster",
         dir: Vec3,
         label: string,
         detail: string,
@@ -990,6 +1061,11 @@ export const GlobeScene = memo(function GlobeScene({
             | "parties"
             | "icon"
             | "kindLabel"
+            | "storyId"
+            | "isCluster"
+            | "members"
+            | "clusterDir"
+            | "clusterZoom"
           >
         >,
       ) => {
@@ -1013,27 +1089,83 @@ export const GlobeScene = memo(function GlobeScene({
       for (const m of askMarkers) {
         add(m.id, "ask", m.dir, m.label, m.detail ?? "", colors.accent);
       }
-      // Every worldview EVENT is drawn as a legible icon chip in the 2D overlay (not an
-      // abstract 3D shape) — so project ALL of them (front hemisphere only). The chip's
-      // icon/colour/size come from the category + severity; the headline rides `detail`.
-      for (const a of alerts) {
-        add(a.id, "alert", a.dir, "", a.title, EVENT_CATEGORIES[a.category].color, {
-          category: a.category,
-          severity: a.severity,
-          count: a.count,
-          developing: a.developing,
-          updatedAt: a.updatedAt,
-        });
+      // MAGNETIC CLUSTERING. The worldview EVENT chips + CO-LOCATED GATHERING badges (all the
+      // POINT markers — link arcs stay lines) fold into one another by ANGULAR distance, with a
+      // threshold that shrinks as zoom grows. Recompute only when the quantized zoom TIER flips
+      // or the input set changes (cheap reference check) — never every frame. A LONE node draws
+      // as its exact original chip/badge; an AGGREGATE draws as one "+N" puck that explodes on
+      // click (fly-to its centroid + zoom to the tier where it splits).
+      const tier = clusterTier(refs.zoom.current);
+      const cc = clusterCache.current;
+      if (tier !== cc.tier || alerts !== cc.alerts || gatherings !== cc.gatherings) {
+        const pts: ClusterPoint<ClusterPayload>[] = [];
+        for (const a of alerts)
+          pts.push({ id: a.id, dir: a.dir, severity: a.severity, data: { kind: "alert", alert: a } });
+        for (const gth of gatherings)
+          pts.push({
+            id: gth.id,
+            dir: gth.dir,
+            severity: GATHERING_CLUSTER_SEVERITY,
+            data: { kind: "gathering", gathering: gth },
+          });
+        cc.tier = tier;
+        cc.alerts = alerts;
+        cc.gatherings = gatherings;
+        cc.nodes = clusterPoints(pts, clusterAngleForTier(tier));
       }
-      // CO-LOCATED GATHERINGS: one localized badge per multi-party event, at its resolved
-      // place. Static like the event chips (no animation), so projected here but never part
-      // of `markersLive` — the globe still sleeps with gatherings on screen.
-      for (const gth of gatherings) {
-        add(gth.id, "gathering", gth.dir, gth.place, gth.title, gth.color, {
-          gatheringKind: gth.kind,
-          parties: gth.parties,
-          icon: gth.icon,
-          kindLabel: gth.label,
+      for (const node of cc.nodes) {
+        if (!node.isCluster) {
+          // LONE point → its exact original marker (same as the pre-clustering render).
+          const p = node.rep.data;
+          if (p.kind === "alert") {
+            const a = p.alert;
+            add(a.id, "alert", a.dir, "", a.title, a.color, {
+              category: a.category,
+              icon: a.icon,
+              severity: a.severity,
+              count: a.count,
+              developing: a.developing,
+              updatedAt: a.updatedAt,
+            });
+          } else {
+            const gth = p.gathering;
+            add(gth.id, "gathering", gth.dir, gth.place, gth.title, gth.color, {
+              gatheringKind: gth.kind,
+              parties: gth.parties,
+              icon: gth.icon,
+              kindLabel: gth.label,
+              storyId: gth.storyId,
+            });
+          }
+          continue;
+        }
+        // AGGREGATE → one "+N" puck tinted the strongest member's colour. Its `members` ride
+        // along for the at-max-zoom fan-out; `clusterDir`/`clusterZoom` drive the click-explode.
+        const repColor =
+          node.rep.data.kind === "alert" ? node.rep.data.alert.color : node.rep.data.gathering.color;
+        const members: ClusterMember[] = node.members.map((m) =>
+          m.data.kind === "alert"
+            ? {
+                id: m.data.alert.id,
+                title: m.data.alert.title,
+                severity: m.data.alert.severity,
+                kind: "alert" as const,
+                storyId: m.data.alert.id,
+              }
+            : {
+                id: m.data.gathering.id,
+                title: m.data.gathering.title,
+                severity: GATHERING_CLUSTER_SEVERITY,
+                kind: "gathering" as const,
+                storyId: m.data.gathering.storyId,
+              },
+        );
+        add(node.id, "cluster", node.dir, "", "", repColor, {
+          count: node.members.length,
+          isCluster: true,
+          members,
+          clusterDir: node.dir,
+          clusterZoom: Math.min(ZOOM_MAX, breakZoom(node.radius)),
         });
       }
       // LINK ties: a flag/icon BADGE rides each link arc (origin → destination). Sample the
@@ -1080,6 +1212,7 @@ export const GlobeScene = memo(function GlobeScene({
           title: arc.title,
           icon: arc.icon,
           kindLabel: arc.label,
+          storyId: arc.storyId,
           pulse,
         });
       });
@@ -1265,7 +1398,9 @@ export const GlobeScene = memo(function GlobeScene({
         {/* CONNECTIONS: flowing great-circle LINK ties (Story.links, typed per kind). In the
             rotating group so the arcs ride the globe; drawn over the land but depth-tested, so
             ties on the far hemisphere are hidden behind the planet. */}
-        {arcs.length > 0 && <Arcs arcs={arcs} onLinkHover={onLinkHover} />}
+        {arcs.length > 0 && (
+          <Arcs arcs={arcs} onLinkHover={onLinkHover} onLinkPress={onLinkPress} />
+        )}
         {/* AI news-search results: accent pins on the places the answer is about. */}
         <AskMarkers
           markers={askMarkers}
