@@ -50,6 +50,7 @@ export const LINK_KINDS: Record<
   { color: string; icon: string; dash: "solid" | "dashed" | "dotted"; label: string }
 > = {
   attack: { color: "#ef4444", icon: "flame", dash: "solid", label: "Attack" },
+  tension: { color: "#ff7a5c", icon: "flash", dash: "solid", label: "Tension" },
   spread: { color: "#a3e635", icon: "medkit", dash: "dotted", label: "Spread" },
   trade: { color: "#38bdf8", icon: "boat", dash: "dashed", label: "Trade" },
   migration: { color: "#22d3ee", icon: "people", dash: "dashed", label: "Migration" },

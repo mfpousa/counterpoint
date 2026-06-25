@@ -261,9 +261,9 @@ function Outline({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// RELATIONSHIP ARCS — the third pillar: who is pulling against whom. A multi-side
-// conflict (Story.sides) becomes great-circle arcs between the sides' home zones,
-// each with a comet flowing along it so the tie reads as a live, directional link.
+// RELATIONSHIP ARCS — the third pillar: how places are CONNECTED. Each Story.links entry
+// (origin → destination, typed by kind: attack/tension/spread/trade/…) becomes a great-circle
+// arc, coloured + dashed per kind, with a flag/icon badge riding it (projected by the scene).
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** One tie to draw on the globe: a great circle from `a` to `b` (unit dirs). */
@@ -326,52 +326,49 @@ function arcGeometry(
   return { path, line };
 }
 
-/** The tension web: a glowing arc per tie with a comet flowing A→B along it. Rendered
- *  inside the rotating group so the ties spin with the globe. The comets advance in a
- *  single useFrame (the governor keeps the loop alive while any arc is present). */
-function Arcs({ arcs }: { arcs: ArcData[] }) {
+/** The connection web: a per-kind coloured great-circle LINE per physical/relational link,
+ *  rendered inside the rotating group so the ties spin with the globe. The travelling flag/icon
+ *  badge that rides each line is a 2D overlay projected by the scene's main loop (not drawn
+ *  here); hovering a line floats the link's story tooltip. */
+function Arcs({
+  arcs,
+  onLinkHover,
+}: {
+  arcs: ArcData[];
+  onLinkHover?: (tip: LinkHoverTip | null) => void;
+}) {
+  const camera = useThree((s) => s.camera);
+  const size = useThree((s) => s.size);
   const geoms = useMemo(
-    () =>
-      arcs.map((arc) => ({
-        ...arc,
-        // Angular length (rad) of the great circle a→b. Drives the flow rate below: speed
-        // ∝ length up to ARC_FLOW_FULL_SPAN, then capped (so short ties crawl, long ones top out).
-        omega: Math.acos(
-          Math.max(-1, Math.min(1, arc.a.x * arc.b.x + arc.a.y * arc.b.y + arc.a.z * arc.b.z)),
-        ),
-        ...arcGeometry(arc.a, arc.b, arc.dash ?? "solid"),
-      })),
+    () => arcs.map((arc) => ({ ...arc, ...arcGeometry(arc.a, arc.b, arc.dash ?? "solid") })),
     [arcs],
   );
-  const comets = useRef<(Mesh | null)[]>([]);
-  useFrame((state) => {
-    for (let i = 0; i < geoms.length; i++) {
-      const m = comets.current[i];
-      if (!m) continue;
-      const { path, omega } = geoms[i];
-      const segs = path.length / 3 - 1;
-      // Speed ∝ arc length up to a CAP (divide by max(FULL_SPAN, omega)): short ties crawl,
-      // long ones top out at ARC_FLOW_SPEED. Staggered phase so a hub doesn't pulse in lockstep.
-      const t =
-        (state.clock.elapsedTime * (ARC_FLOW_SPEED / Math.max(ARC_FLOW_FULL_SPAN, omega)) +
-          i * 0.13) %
-        1;
-      const f = t * segs;
-      const k = Math.min(segs - 1, Math.floor(f));
-      const r = f - k;
-      const o = k * 3;
-      m.position.set(
-        path[o] + (path[o + 3] - path[o]) * r,
-        path[o + 1] + (path[o + 4] - path[o + 1]) * r,
-        path[o + 2] + (path[o + 5] - path[o + 2]) * r,
-      );
-    }
-  });
+  // Hovering a LINK arc's LINE (the whole connection, not just its tiny moving badge) floats
+  // a tooltip at the hit point. Ignored unless this line is the FRONTMOST hit, so a line on
+  // the far hemisphere (occluded by the globe) isn't hovered through the planet.
+  const reportHover = (g: ArcData, e: ThreeEvent<PointerEvent>) => {
+    e.stopPropagation();
+    if (e.intersections[0]?.object !== e.eventObject) return;
+    const v = e.point.clone().project(camera);
+    onLinkHover?.({
+      x: ((v.x + 1) / 2) * size.width,
+      y: ((1 - v.y) / 2) * size.height,
+      title: g.title,
+      fromCc: g.fromCc,
+      toCc: g.toCc,
+      kind: g.kind,
+    });
+  };
   return (
     <group>
-      {geoms.map((g, i) => (
+      {geoms.map((g) => (
         <group key={g.id}>
-          <lineSegments frustumCulled={false}>
+          <lineSegments
+            frustumCulled={false}
+            onPointerOver={g.kind ? (e) => reportHover(g, e) : undefined}
+            onPointerMove={g.kind ? (e) => reportHover(g, e) : undefined}
+            onPointerOut={g.kind ? () => onLinkHover?.(null) : undefined}
+          >
             <bufferGeometry>
               <bufferAttribute attach="attributes-position" args={[g.line, 3]} />
             </bufferGeometry>
@@ -383,24 +380,6 @@ function Arcs({ arcs }: { arcs: ArcData[] }) {
               depthWrite={false}
             />
           </lineSegments>
-          {/* Tension ties (no kind) flow a 3D comet; physical links ride a 2D flag/icon
-              badge instead (projected by the scene loop), so no comet for them. */}
-          {!g.kind && (
-            <mesh
-              ref={(el) => {
-                comets.current[i] = el;
-              }}
-            >
-              <sphereGeometry args={[0.011 + 0.012 * g.severity, 12, 12]} />
-              <meshBasicMaterial
-                color={g.color ?? ARC_COLOR}
-                transparent
-                opacity={0.95}
-                blending={AdditiveBlending}
-                depthWrite={false}
-              />
-            </mesh>
-          )}
         </group>
       ))}
     </group>
@@ -662,6 +641,17 @@ export interface ProjectedMarker {
   title?: string;
 }
 
+/** Reported up when the pointer is over a LINK arc LINE (not just its badge): the screen
+ *  point hit + which link it is, so the wrapper can float a tooltip naming its story. */
+export interface LinkHoverTip {
+  x: number;
+  y: number;
+  title?: string;
+  fromCc?: string;
+  toCc?: string;
+  kind?: string;
+}
+
 // memo'd so the scene only re-renders when its OWN inputs change. Without this, every
 // AppContext update — notably the 3s background status poll and each live reloadPool —
 // re-rendered the parent Globe and forced r3f to re-reconcile the whole scene graph
@@ -680,6 +670,7 @@ export const GlobeScene = memo(function GlobeScene({
   hoveredMarkerId = null,
   focusedMarkerId = null,
   onMarkerHover,
+  onLinkHover,
   onMarkersProject,
   autoSpin,
   focusedId,
@@ -708,6 +699,8 @@ export const GlobeScene = memo(function GlobeScene({
   focusedMarkerId?: string | null;
   /** A marker was hovered (id) or left (null) — drives `hoveredMarkerId`. */
   onMarkerHover?: (id: string | null) => void;
+  /** The pointer is over a LINK arc's LINE (tip) or left it (null) — for the link tooltip. */
+  onLinkHover?: (tip: LinkHoverTip | null) => void;
   /** Per-frame: marker anchors projected to SCREEN px, for the wrapper's overlay
    *  label/detail bubbles. Only the front-hemisphere markers worth labelling are sent. */
   onMarkersProject?: (items: ProjectedMarker[]) => void;
@@ -1002,7 +995,7 @@ export const GlobeScene = memo(function GlobeScene({
     const easingZoom = Math.abs(refs.zoom.current - g.scale.x) > 1e-3;
     const easingOffset = Math.abs(rightInset / 2 - offsetPx.current) > 0.5;
     const spinning = autoSpin && !pointerOverGlobe;
-    // ASK pins pulse AND the arcs flow (tension comets + link flag/icon badges) → both keep
+    // ASK pins pulse AND the link arcs flow (flag/icon badges) → both keep
     // the loop awake AND (via fullRate below) run it at FULL vsync rate: a small, fast badge
     // the eye TRACKS judders at the throttled, non-vsync 30fps, so these steady-state
     // animations get the smooth path too. Worldview EVENT chips are static 2D overlay icons,
@@ -1172,10 +1165,10 @@ export const GlobeScene = memo(function GlobeScene({
         {/* Worldview EVENTS are no longer drawn in 3D — they're projected (above) to legible
             2D icon CHIPS in the wrapper's overlay (crisp, constant on-screen size, tappable),
             which reads far better than abstract shapes and lets the globe sleep when idle. */}
-        {/* RELATIONSHIPS: flowing great-circle ties between the zones of multi-side conflicts —
-            the tension web. In the rotating group so the arcs ride the globe; drawn over the
-            land but depth-tested, so ties on the far hemisphere are hidden behind the planet. */}
-        {arcs.length > 0 && <Arcs arcs={arcs} />}
+        {/* CONNECTIONS: flowing great-circle LINK ties (Story.links, typed per kind). In the
+            rotating group so the arcs ride the globe; drawn over the land but depth-tested, so
+            ties on the far hemisphere are hidden behind the planet. */}
+        {arcs.length > 0 && <Arcs arcs={arcs} onLinkHover={onLinkHover} />}
         {/* AI news-search results: accent pins on the places the answer is about. */}
         <AskMarkers
           markers={askMarkers}

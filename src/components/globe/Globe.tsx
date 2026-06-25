@@ -89,6 +89,7 @@ import {
   type GlobeCountry,
   type GlobeEntityData,
   type GlobeViewRefs,
+  type LinkHoverTip,
   type ProjectedMarker,
 } from "./GlobeScene";
 
@@ -110,9 +111,8 @@ const TIME_WINDOWS: TimeWindow[] = ["all", "week", "day", "now"];
 // Stable empty arcs reference — passed while an AI search owns the globe (so the tension
 // web hides), avoiding a fresh [] each render that would defeat React.memo(GlobeScene).
 const EMPTY_ARCS: ArcData[] = [];
-// Conflict TENSION ties are warm; physical-LINK ties take their per-kind colour from
-// LINK_KINDS (attack/spread/trade/… each distinct) so every connection is self-explanatory.
-const ARC_TENSION = "#ff7a5c";
+// Physical-LINK ties take their per-kind colour from LINK_KINDS (attack/spread/trade/… each
+// distinct) so every connection on the globe is self-explanatory.
 const WORLD_ZOOM = 0.9; // zoomed-OUT scale for the world landing (whole globe in view)
 // Pixels→radians drag gain: 2·cameraZ·tan(fov/2) = the world height the viewport spans
 // at the globe's distance. Dividing by (zoom·canvasHeightPx) makes a drag STICK to the
@@ -187,6 +187,29 @@ const CursorPin = forwardRef<
           {label}
         </Text>
       </View>
+    </View>
+  );
+});
+
+/** A floating tooltip pinned where the cursor meets a LINK arc's LINE — names the connection
+ *  (route + kind) and the STORY that drew it. Position is pushed imperatively (move) so sliding
+ *  along the line never re-renders the globe; only its text comes from props. Hidden when no
+ *  link is hovered (content null). */
+const LinkTip = forwardRef<
+  { move: (x: number, y: number) => void },
+  { content: { title: string; route: string } | null }
+>(function LinkTip({ content }, ref) {
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  useImperativeHandle(ref, () => ({ move: (x, y) => setPos({ x, y }) }), []);
+  if (!content || !pos) return null;
+  return (
+    <View style={[styles.linkTip, { left: pos.x, top: pos.y }]} pointerEvents="none">
+      <Text style={styles.linkBubbleRoute} numberOfLines={1}>
+        {content.route}
+      </Text>
+      <Text style={styles.markerBubbleText} numberOfLines={2}>
+        {content.title}
+      </Text>
     </View>
   );
 });
@@ -637,6 +660,12 @@ export function Globe({
   // Which globe marker (event or ask result) is under the pointer — pops its 3D core
   // and shows its detail bubble. A separate overlay holds the projected label positions.
   const [hoveredMarkerId, setHoveredMarkerId] = useState<string | null>(null);
+  // The link-line tooltip's TEXT (route + story headline); its POSITION is pushed imperatively
+  // to linkTipRef. `linkTipTitle` tracks the shown story so sliding along one line doesn't
+  // re-render the globe on every pointer move (only entering a DIFFERENT link does).
+  const [linkTip, setLinkTip] = useState<{ title: string; route: string } | null>(null);
+  const linkTipRef = useRef<{ move: (x: number, y: number) => void } | null>(null);
+  const linkTipTitle = useRef<string | null>(null);
   // The CLICKED marker, whose interactive card stays open (links + selectable text) until
   // the reader taps outside it.
   const [focusedMarkerId, setFocusedMarkerId] = useState<string | null>(null);
@@ -792,45 +821,17 @@ export function Globe({
     return [...byLoc.values()].slice(0, 40);
   }, [worldGeo, stories]);
 
-  // RELATIONSHIPS web — two kinds of flowing great-circle ties, time-windowed + capped so the
-  // globe reads as a clear instrument, not a hairball: (1) TENSION ties (warm) between the home
-  // zones of a multi-side conflict — who is pulling against whom; (2) LINK ties (cool) for any
-  // story that physically connects two places (model-emitted `links`, origin → destination):
-  // a disease spread, shipment, migration, route, … The comet always flows a → b.
+  // RELATIONSHIPS web — flowing great-circle LINK ties, time-windowed + capped so the globe
+  // reads as a clear instrument, not a hairball: one per story that physically connects two
+  // places (model-emitted `links`, origin → destination) — a disease spread, shipment,
+  // migration, route, attack, … Each takes its kind's colour/dash and rides a flag/icon badge
+  // (NO bare comet); the badge always flows a → b.
   const relationshipArcs = useMemo<ArcData[]>(() => {
     if (!worldGeo) return [];
     const byIso2 = worldGeo.centroids.byIso2;
     const now = Date.now();
-    const sideDir = (zones: string[]) => {
-      for (const z of zones) {
-        // A side's zone is now an ISO-2 COUNTRY code (placeSources side coverage), so
-        // resolve it directly; ZONE_ISO2 is only a fallback for legacy curated zone ids.
-        const iso = ZONE_ISO2[z] ?? (/^[a-z]{2}$/.test(z) ? z : undefined);
-        const dir = iso ? byIso2.get(iso) : undefined;
-        if (dir) return dir;
-      }
-      return undefined;
-    };
     const out: ArcData[] = [];
-    // (1) TENSION ties: top multi-side conflicts, pairwise between distinct side anchors.
-    const conflicts = stories
-      .filter((s) => (s.sides?.length ?? 0) >= 2 && withinWindow(s.updatedAt, timeWindow, now))
-      .sort((a, b) => (b.severity ?? 0) - (a.severity ?? 0))
-      .slice(0, 8);
-    for (const s of conflicts) {
-      const dirs = (s.sides ?? [])
-        .map((side) => sideDir(side.zones))
-        .filter((d): d is NonNullable<typeof d> => !!d);
-      for (let i = 0; i < dirs.length; i++) {
-        for (let j = i + 1; j < dirs.length; j++) {
-          const a = dirs[i];
-          const b = dirs[j];
-          if (a.x * b.x + a.y * b.y + a.z * b.z > 0.9999) continue; // same country → skip
-          out.push({ id: `${s.id}:${i}-${j}`, a, b, severity: s.severity ?? 0.6, color: ARC_TENSION });
-        }
-      }
-    }
-    // (2) LINK ties: any story connecting two physical places (origin → destination).
+    // LINK ties: any story connecting two physical places (origin → destination).
     const linked = stories
       .filter((s) => (s.links?.length ?? 0) > 0 && withinWindow(s.updatedAt, timeWindow, now))
       .sort((a, b) => (b.severity ?? 0) - (a.severity ?? 0))
@@ -882,7 +883,7 @@ export function Globe({
   const legendLinkKinds = useMemo<LinkKind[]>(() => {
     const present = new Set<string>();
     for (const arc of relationshipArcs) if (arc.kind) present.add(arc.kind);
-    const order: LinkKind[] = ["attack", "spread", "trade", "migration", "aid", "transport"];
+    const order: LinkKind[] = ["attack", "tension", "spread", "trade", "migration", "aid", "transport"];
     return order.filter((k) => present.has(k));
   }, [relationshipArcs]);
 
@@ -1522,6 +1523,29 @@ export function Globe({
   // A globe marker was hovered (id) or left (null). Stable identity so GlobeScene's
   // frame loop keeps the latest without churn.
   const onMarkerHover = useCallback((id: string | null) => setHoveredMarkerId(id), []);
+  // Pointer over a LINK arc's LINE → float a tooltip (route + kind + story headline) at the
+  // hit point and pause the auto-spin so the now-still line keeps it put; leaving clears it.
+  // Position updates imperatively every move; the TEXT re-renders ONLY when the link changes.
+  const onLinkHover = useCallback((tip: LinkHoverTip | null) => {
+    if (!tip || !tip.title) {
+      if (linkTipTitle.current !== null) {
+        linkTipTitle.current = null;
+        setLinkTip(null);
+        setHoveredMarkerId(null); // resume the auto-spin
+      }
+      return;
+    }
+    linkTipRef.current?.move(tip.x, tip.y);
+    if (linkTipTitle.current !== tip.title) {
+      linkTipTitle.current = tip.title;
+      const lk = (tip.kind ?? "other") as LinkKind;
+      const route =
+        `${tip.fromCc ? countryLabel(tip.fromCc) : "?"} → ` +
+        `${tip.toCc ? countryLabel(tip.toCc) : "?"} · ${LINK_KINDS[lk]?.label ?? "Link"}`;
+      setLinkTip({ title: tip.title, route });
+      setHoveredMarkerId("__link__"); // pause the auto-spin while inspecting
+    }
+  }, []);
   // Per-frame projected marker positions → pushed straight to the overlay (which
   // de-dupes), so labels track the spinning globe without re-rendering the scene.
   const onMarkersProject = useCallback(
@@ -1668,6 +1692,11 @@ export function Globe({
           // the pixels — both big cuts to the globe's sustained GPU/CPU load (heat).
           frameloop="demand"
           dpr={[1, 1.75]}
+          // A few-px hover tolerance so the thin LINK arc lines are easy to hover (the arcs are
+          // the only interactive lines, so this affects nothing else).
+          onCreated={({ raycaster }) => {
+            raycaster.params.Line = { threshold: 0.03 };
+          }}
           onPointerMissed={() => setFocusedId(null)}
         >
           <GlobeScene
@@ -1683,6 +1712,7 @@ export function Globe({
             hoveredMarkerId={hoveredMarkerId}
             focusedMarkerId={focusedMarkerId}
             onMarkerHover={onMarkerHover}
+            onLinkHover={onLinkHover}
             onMarkersProject={onMarkersProject}
             rightInset={rightInset}
             autoSpin={browse === GEO_ROOT_ID && !activePoolId}
@@ -2028,6 +2058,10 @@ export function Globe({
             to the globe (which selects). Position is pushed imperatively (onHoverMove). */}
         <CursorPin ref={pinRef} label={focused?.label ?? null} />
 
+        {/* Tooltip floating where the cursor meets a LINK arc's line — names the connection
+            and the story behind it. Position pushed imperatively; text from state. */}
+        <LinkTip ref={linkTipRef} content={linkTip} />
+
         {/* Labels/detail bubbles anchored ON the globe's markers (positions pushed
             imperatively from the scene's frame loop). The CLICKED pin's card is
             interactive (links + selectable text); tapping outside dismisses it. */}
@@ -2279,6 +2313,19 @@ const styles = StyleSheet.create({
     fontStyle: "italic",
     maxWidth: 200,
     textAlign: "right",
+  },
+  // Floating tooltip where the cursor meets a link line (route + kind over the story headline),
+  // offset down-right of the hit point so it doesn't sit under the cursor.
+  linkTip: {
+    position: "absolute",
+    maxWidth: 220,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface + "F5",
+    transform: [{ translateX: 12 }, { translateY: 12 }],
   },
   topBar: {
     position: "absolute",

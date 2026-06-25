@@ -72,7 +72,7 @@ const SYNTH_SCHEMA: JsonSchema = {
             to: { type: "string" },
             kind: {
               type: "string",
-              enum: ["attack", "spread", "trade", "migration", "aid", "transport"],
+              enum: ["attack", "tension", "spread", "trade", "migration", "aid", "transport"],
             },
           },
           required: ["from", "to", "kind"],
@@ -98,14 +98,16 @@ const SYNTH_RULES =
   '  "sides": [ { "label": "<short side label, e.g. \'Western media\', \'Russian media\', \'Ukrainian media\'>", "outlets": ["<exact outlet names on this side>"], "framing": "1-2 sentences on how THIS side frames/emphasizes the story" } ],\n' +
   '  "contradictions": ["specific points where the outlets disagree or report differently; [] if none are evident"],\n' +
   '  "protagonist": { "name": "the central actor/subject the story is MOST about (a country, organisation, or person)", "iso2": "if that protagonist IS a country or a national government/actor, its ISO 3166-1 alpha-2 code in lowercase (e.g. us, es, ua); otherwise an empty string" },\n' +
-  '  "links": [ { "from": "<ISO-2 ORIGIN>", "to": "<ISO-2 DESTINATION>", "kind": "attack|spread|trade|migration|aid|transport" } ]\n' +
+  '  "links": [ { "from": "<ISO-2 ORIGIN>", "to": "<ISO-2 DESTINATION>", "kind": "attack|tension|spread|trade|migration|aid|transport" } ]\n' +
   "}\n" +
-  "For 'links', emit a DIRECTED connection ONLY when the story describes a PHYSICAL link or " +
-  "movement between two DISTINCT countries, from an ORIGIN ('from') to a DESTINATION ('to'), both " +
-  "ISO 3166-1 alpha-2 lowercase, each with a 'kind': 'attack' (military strike/invasion/cross-border " +
-  "attack), 'spread' (disease/contagion), 'trade' (shipment/exports/energy/supply/pipeline), " +
-  "'migration' (people/refugees/evacuation), 'aid' (humanitarian or military assistance), " +
-  "'transport' (flight/route/travel). Only emit a link you can classify into ONE of these " +
+  "For 'links', emit a DIRECTED connection ONLY when the story describes a PHYSICAL link/movement " +
+  "OR a hostile/contested RELATIONSHIP between two DISTINCT countries, from an ORIGIN ('from') to a " +
+  "DESTINATION ('to'), both ISO 3166-1 alpha-2 lowercase, each with a 'kind': 'attack' (military " +
+  "strike/invasion/cross-border attack), 'tension' (standoff/rivalry/sanctions/border dispute, or the " +
+  "two main opposing sides of a conflict, when there's no single discrete attack), 'spread' " +
+  "(disease/contagion), 'trade' (shipment/exports/energy/supply/pipeline), 'migration' " +
+  "(people/refugees/evacuation), 'aid' (humanitarian or military assistance), 'transport' " +
+  "(flight/route/travel). Only emit a link you can classify into ONE of these " +
   "SPECIFIC kinds; if the relationship doesn't clearly fit one, OMIT that link (do NOT guess or " +
   "use a generic kind). Return [] when the story is not about a place-to-place connection. " +
   "For 'protagonist', pick the single entity the story most centres on and name it; set 'iso2' ONLY " +
@@ -227,6 +229,7 @@ function coerceProtagonist(raw: unknown): { name: string; iso2?: string } | unde
  */
 const LINK_KINDS = new Set<LinkKind>([
   "attack",
+  "tension",
   "spread",
   "trade",
   "migration",
@@ -513,7 +516,7 @@ const DEVELOPING_SCHEMA: JsonSchema = {
             to: { type: "string" },
             kind: {
               type: "string",
-              enum: ["attack", "spread", "trade", "migration", "aid", "transport"],
+              enum: ["attack", "tension", "spread", "trade", "migration", "aid", "transport"],
             },
           },
           required: ["from", "to", "kind"],
@@ -562,12 +565,13 @@ const DEVELOPING_RULES =
   "opposing geographic/affiliation vantage points actually PRESENT (by 'zone') and describe how each " +
   "frames the issue \u2014 e.g. Western vs Ukrainian vs Russian media. Use only zones present; return [] " +
   "when all outlets share one vantage point. " +
-  'Also include "links": [ { "from": "<ISO-2 ORIGIN>", "to": "<ISO-2 DESTINATION>", "kind": "attack|spread|trade|migration|aid|transport" } ] ' +
-  "\u2014 a DIRECTED connection ONLY when the issue describes a PHYSICAL link or movement between two " +
-  "DISTINCT countries from an ORIGIN to a DESTINATION, both lowercase, classified by 'kind' " +
-  "(attack/spread/trade/migration/aid/transport). Only emit a link you can classify into ONE of " +
-  "these SPECIFIC kinds; OMIT any link that doesn't clearly fit one (do NOT guess). [] when it is " +
-  "not about a place-to-place connection. " +
+  'Also include "links": [ { "from": "<ISO-2 ORIGIN>", "to": "<ISO-2 DESTINATION>", "kind": "attack|tension|spread|trade|migration|aid|transport" } ] ' +
+  "\u2014 a DIRECTED connection ONLY when the issue describes a PHYSICAL link/movement OR a hostile/" +
+  "contested RELATIONSHIP between two DISTINCT countries from an ORIGIN to a DESTINATION, both " +
+  "lowercase, classified by 'kind' (attack/tension/spread/trade/migration/aid/transport; 'tension' = " +
+  "a standoff/rivalry/conflict with no single discrete attack). Only emit a link you can classify " +
+  "into ONE of these SPECIFIC kinds; OMIT any link that doesn't clearly fit one (do NOT guess). " +
+  "[] when it is not about a place-to-place connection. " +
   "No prose outside the JSON.";
 
 function earliestAt(members: StoredItem[]): number {

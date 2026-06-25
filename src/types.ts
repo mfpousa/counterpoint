@@ -357,12 +357,14 @@ export interface StorySpectrum {
 }
 
 /**
- * How a story PHYSICALLY connects two places, so the globe can style each link
- * self-explanatorily: an `attack` flies the origin's flag; a disease `spread` is a
- * dotted line; `trade`/`aid`/`migration`/`transport` each get their own colour + icon.
+ * How a story connects two places, so the globe can style each link self-explanatorily:
+ * an `attack` flies the origin's flag; a `tension` (standoff/rivalry/conflict) is a warm
+ * solid line; a disease `spread` is a dotted line; `trade`/`aid`/`migration`/`transport`
+ * each get their own colour + icon.
  */
 export type LinkKind =
   | "attack"
+  | "tension"
   | "spread"
   | "trade"
   | "migration"
