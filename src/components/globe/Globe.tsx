@@ -869,6 +869,27 @@ export function Globe({
       return next;
     });
   }, []);
+  // CONNECTION + GATHERING legends are lenses too: link KINDS / gathering KINDS the reader has
+  // toggled OFF (hidden from the globe). Empty = show everything; the legend still lists every
+  // present kind so a hidden one can be toggled back on.
+  const [hiddenLinks, setHiddenLinks] = useState<Set<string>>(() => new Set());
+  const [hiddenGatherings, setHiddenGatherings] = useState<Set<string>>(() => new Set());
+  const toggleLink = useCallback((k: string) => {
+    setHiddenLinks((prev) => {
+      const next = new Set(prev);
+      if (next.has(k)) next.delete(k);
+      else next.add(k);
+      return next;
+    });
+  }, []);
+  const toggleGathering = useCallback((k: string) => {
+    setHiddenGatherings((prev) => {
+      const next = new Set(prev);
+      if (next.has(k)) next.delete(k);
+      else next.add(k);
+      return next;
+    });
+  }, []);
   const markerLayerRef = useRef<{ set: (items: ProjectedMarker[]) => void }>(null);
 
   // View state the gesture layer mutates and the frame loop reads (no re-renders).
@@ -1287,6 +1308,22 @@ export function Globe({
       (a) => !hiddenCats.has(a.category) && withinWindow(a.updatedAt, timeWindow, now),
     );
   }, [alerts, hiddenCats, timeWindow, askMarkers.length]);
+
+  // Connection arcs the globe actually draws: all of them MINUS any link KIND toggled off in the
+  // legend. Hidden behind an AI search (the answer's pins stand alone). Returns the original
+  // array verbatim when nothing's hidden, to keep the prop referentially stable for memo(Scene).
+  const visibleArcs = useMemo<ArcData[]>(() => {
+    if (askMarkers.length > 0) return EMPTY_ARCS;
+    if (hiddenLinks.size === 0) return relationshipArcs;
+    return relationshipArcs.filter((a) => !a.kind || !hiddenLinks.has(a.kind));
+  }, [relationshipArcs, hiddenLinks, askMarkers.length]);
+
+  // Gathering badges the globe actually draws: all of them MINUS any gathering KIND toggled off.
+  const visibleGatherings = useMemo<GatheringData[]>(() => {
+    if (askMarkers.length > 0) return EMPTY_GATHERINGS;
+    if (hiddenGatherings.size === 0) return gatheringMarkers;
+    return gatheringMarkers.filter((g) => !hiddenGatherings.has(g.kind));
+  }, [gatheringMarkers, hiddenGatherings, askMarkers.length]);
 
   // When an answer lands with locations, orient the globe to frame them (averaged
   // direction), zoomed out enough to take in the spread.
@@ -2046,9 +2083,9 @@ export function Globe({
             outline={regionOutline}
             gizmos={gizmos}
             alerts={visibleAlerts}
-            arcs={askMarkers.length > 0 ? EMPTY_ARCS : relationshipArcs}
+            arcs={visibleArcs}
             askMarkers={askMarkers}
-            gatherings={askMarkers.length > 0 ? EMPTY_GATHERINGS : gatheringMarkers}
+            gatherings={visibleGatherings}
             onAskMarkerPress={onMarkerSelect}
             hoveredMarkerId={hoveredMarkerId}
             focusedMarkerId={focusedMarkerId}
@@ -2057,7 +2094,6 @@ export function Globe({
             onLinkPress={onLinkPress}
             onMarkersProject={onMarkersProject}
             rightInset={rightInset}
-            autoSpin={browse === GEO_ROOT_ID && !activePoolId}
             focusedId={focusedId}
             onFocus={setFocusedId}
             onActivate={activate}
@@ -2363,47 +2399,68 @@ export function Globe({
                 </View>
               </>
             )}
-            {/* CONNECTIONS legend — names each link KIND currently flowing on the globe and
-                tells the reader the travelling badges are hoverable (→ their story). Static,
-                not lenses: links aren't filtered. */}
+            {/* CONNECTIONS legend = LENSES: tap a link KIND to hide/show its arcs on the globe;
+                hidden ones dim. Icon + colour match the travelling badges. */}
             {legendLinkKinds.length > 0 && (
               <View style={styles.linkLegendWrap} pointerEvents="box-none">
                 <View style={styles.legend}>
-                  {legendLinkKinds.map((k) => (
-                    <View key={k.kind} style={styles.legendItem}>
-                      <View style={[styles.legendDot, { backgroundColor: k.color }]}>
-                        <Ionicons
-                          name={safeIonicon(k.icon, "git-network")}
-                          size={9}
-                          color="#0b0f14"
-                        />
-                      </View>
-                      <Text style={styles.legendText}>{k.label}</Text>
-                    </View>
-                  ))}
+                  {legendLinkKinds.map((k) => {
+                    const off = hiddenLinks.has(k.kind);
+                    return (
+                      <Pressable
+                        key={k.kind}
+                        style={[styles.legendItem, off && styles.legendItemOff]}
+                        onPress={() => toggleLink(k.kind)}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: !off }}
+                        accessibilityLabel={k.label}
+                      >
+                        <View style={[styles.legendDot, { backgroundColor: k.color }]}>
+                          <Ionicons
+                            name={safeIonicon(k.icon, "git-network")}
+                            size={9}
+                            color="#0b0f14"
+                          />
+                        </View>
+                        <Text style={[styles.legendText, off && styles.legendTextOff]}>
+                          {k.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
                 </View>
-                <Text style={styles.linkLegendHint}>{t("globe.links.hint")}</Text>
               </View>
             )}
-            {/* GATHERINGS legend — names each co-located multi-party event KIND on the globe
-                and teaches that those badges open their story. Static, like CONNECTIONS. */}
+            {/* GATHERINGS legend = LENSES: tap a co-located event KIND to hide/show its badges;
+                hidden ones dim. */}
             {legendGatheringKinds.length > 0 && (
               <View style={styles.linkLegendWrap} pointerEvents="box-none">
                 <View style={styles.legend}>
-                  {legendGatheringKinds.map((k) => (
-                    <View key={k.kind} style={styles.legendItem}>
-                      <View style={[styles.legendDot, { backgroundColor: k.color }]}>
-                        <Ionicons
-                          name={safeIonicon(k.icon, "people-circle")}
-                          size={9}
-                          color="#0b0f14"
-                        />
-                      </View>
-                      <Text style={styles.legendText}>{k.label}</Text>
-                    </View>
-                  ))}
+                  {legendGatheringKinds.map((k) => {
+                    const off = hiddenGatherings.has(k.kind);
+                    return (
+                      <Pressable
+                        key={k.kind}
+                        style={[styles.legendItem, off && styles.legendItemOff]}
+                        onPress={() => toggleGathering(k.kind)}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: !off }}
+                        accessibilityLabel={k.label}
+                      >
+                        <View style={[styles.legendDot, { backgroundColor: k.color }]}>
+                          <Ionicons
+                            name={safeIonicon(k.icon, "people-circle")}
+                            size={9}
+                            color="#0b0f14"
+                          />
+                        </View>
+                        <Text style={[styles.legendText, off && styles.legendTextOff]}>
+                          {k.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
                 </View>
-                <Text style={styles.linkLegendHint}>{t("globe.gatherings.hint")}</Text>
               </View>
             )}
           </View>
@@ -2720,16 +2777,9 @@ const styles = StyleSheet.create({
     textShadowRadius: 3,
   },
   gatheringParties: { color: colors.textDim, fontSize: font.tiny, marginTop: 2 },
-  // CONNECTIONS legend block (sits under the category lenses): the kind chips + a hover hint
-  // teaching that the travelling badges open their story.
+  // CONNECTIONS / GATHERINGS legend block (sits under the category lenses): the kind chips,
+  // each a toggle lens that hides/shows that kind on the globe.
   linkLegendWrap: { marginTop: spacing.xs, alignItems: "flex-end", gap: 4 },
-  linkLegendHint: {
-    color: colors.textDim,
-    fontSize: font.tiny,
-    fontStyle: "italic",
-    maxWidth: 200,
-    textAlign: "right",
-  },
   // Floating tooltip where the cursor meets a link line (route + kind over the story headline),
   // offset down-right of the hit point so it doesn't sit under the cursor.
   linkTip: {

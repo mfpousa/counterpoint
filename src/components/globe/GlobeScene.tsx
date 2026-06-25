@@ -792,7 +792,6 @@ export const GlobeScene = memo(function GlobeScene({
   onLinkHover,
   onLinkPress,
   onMarkersProject,
-  autoSpin,
   focusedId,
   onFocus,
   onActivate,
@@ -829,8 +828,6 @@ export const GlobeScene = memo(function GlobeScene({
   /** Per-frame: marker anchors projected to SCREEN px, for the wrapper's overlay
    *  label/detail bubbles. Only the front-hemisphere markers worth labelling are sent. */
   onMarkersProject?: (items: ProjectedMarker[]) => void;
-  /** Idle auto-rotate ONLY on the pristine world landing; stops once a place is chosen. */
-  autoSpin: boolean;
   focusedId: string | null;
   onFocus: (id: string | null) => void;
   onActivate: (id: string) => void;
@@ -854,10 +851,6 @@ export const GlobeScene = memo(function GlobeScene({
   // by the same pixels, so the focused country on the near surface lands exactly on the
   // visible centre instead of overshooting.
   const offsetPx = useRef(0);
-  // Pointer-over-the-GLOBE flag (web hover): true while the cursor is over the ocean sphere.
-  // Combined with land-hover (focusedId) and marker-hover (hoveredMarkerId) it is the SOLE
-  // signal that freezes the idle auto-spin — spin while off the globe, stop while on it.
-  const overOcean = useRef(false);
   // MAGNETIC CLUSTER cache. The alerts + gatherings fold into one another by ANGULAR distance,
   // with a threshold that SHRINKS as zoom grows (so a tight cap separates as you zoom in). The
   // clustering is O(n²) but only recomputed when the quantized zoom TIER flips OR the input set
@@ -937,17 +930,9 @@ export const GlobeScene = memo(function GlobeScene({
     regions,
   ]);
 
-  useFrame((frame, delta) => {
+  useFrame((frame) => {
     const g = group.current;
     if (!g) return;
-    // SOLE rule for the idle spin: spin while the pointer is OFF the globe, freeze while it
-    // hovers the globe — ocean (overOcean), land (focusedId), or a marker (hoveredMarkerId) —
-    // OR while a pin's card is open (focusedMarkerId), so the open card never drifts.
-    const pointerOverGlobe =
-      overOcean.current ||
-      focusedId !== null ||
-      hoveredMarkerId !== null ||
-      focusedMarkerId !== null;
     if (refs.dragging.current) refs.target.current = null; // manual control cancels focus
     // A drag or a fly-to overrides the scroll-zoom cursor lock (the user took the wheel).
     if (refs.dragging.current || refs.target.current) zoomAnchor.current = null;
@@ -971,8 +956,6 @@ export const GlobeScene = memo(function GlobeScene({
       if (Math.abs(dy) < 2e-3 && Math.abs(dpitch) < 2e-3 && Math.abs(dzoom) < 2e-3) {
         refs.target.current = null;
       }
-    } else if (autoSpin && !pointerOverGlobe) {
-      refs.rot.current.yaw += delta * 0.05; // idle auto-spin (landing only; off-globe only)
     }
     g.rotation.y = refs.rot.current.yaw;
     g.rotation.x = Math.max(-1.2, Math.min(1.2, refs.rot.current.pitch));
@@ -1224,7 +1207,6 @@ export const GlobeScene = memo(function GlobeScene({
     // scheduling so the GPU drops to 0fps. Gestures/prop-changes call wake() to resume.
     const easingZoom = Math.abs(refs.zoom.current - g.scale.x) > 1e-3;
     const easingOffset = Math.abs(rightInset / 2 - offsetPx.current) > 0.5;
-    const spinning = autoSpin && !pointerOverGlobe;
     // ASK pins pulse AND the link arcs flow (flag/icon badges) → both keep
     // the loop awake AND (via fullRate below) run it at FULL vsync rate: a small, fast badge
     // the eye TRACKS judders at the throttled, non-vsync 30fps, so these steady-state
@@ -1252,7 +1234,6 @@ export const GlobeScene = memo(function GlobeScene({
     const needsMore =
       refs.dragging.current ||
       easingCamera ||
-      spinning ||
       markersLive ||
       Date.now() < settleUntil.current;
     if (nextFrame.current) {
@@ -1331,19 +1312,7 @@ export const GlobeScene = memo(function GlobeScene({
         </mesh>
         {/* The planet — a faceted icosahedron, deep ocean blue with a metallic sheen.
             Also the scroll-zoom target: it's always under the cursor (behind the land). */}
-        <mesh
-          onWheel={onWheel}
-          // Hovering the globe (its ocean sphere) FREEZES the idle spin; leaving it resumes.
-          // Land + markers are covered by focusedId / hoveredMarkerId (see pointerOverGlobe).
-          onPointerOver={() => {
-            overOcean.current = true;
-            refs.wake.current?.();
-          }}
-          onPointerOut={() => {
-            overOcean.current = false;
-            refs.wake.current?.();
-          }}
-        >
+        <mesh onWheel={onWheel}>
           <icosahedronGeometry args={[PLANET_RADIUS, 5]} />
           <meshStandardMaterial
             color="#173049"
