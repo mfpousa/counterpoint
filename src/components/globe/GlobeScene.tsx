@@ -789,6 +789,78 @@ type ClusterPayload =
 // still out-reps low-severity events.
 const GATHERING_CLUSTER_SEVERITY = 0.55;
 
+// ---------------------------------------------------------------------------
+// GROUND ANCHORS — every marker (event chips, gatherings, clusters, ask pins) is lifted ~0.06
+// off the land and the connection arcs bow ABOVE the surface, so without a contact mark they
+// read as floating. This paints a small flat disc ON the surface directly beneath each marker
+// AND at each arc ENDPOINT, in the element's colour, to pin it to an exact spot on the earth.
+// Drawn inside the rotating group so the discs ride + depth-occlude with the globe; static
+// (no per-frame work) and memoised so they only rebuild when the data changes.
+// ---------------------------------------------------------------------------
+
+const GROUND_ANCHOR_RADIUS = 1.009; // surface shell for the disc (just above the outlines at 1.006)
+const GROUND_ANCHOR_SIZE = 0.014; // disc radius (world units — scales with the globe, like the map)
+const FORWARD = new Vector3(0, 0, 1);
+
+/** Quaternion (as [x,y,z,w]) laying a +Z-facing disc (circleGeometry's default) TANGENT to the
+ *  sphere at `dir` — its normal points outward — so it reads as a mark painted on the ground. */
+function faceOutQuat(dir: Vec3): [number, number, number, number] {
+  const q = new Quaternion().setFromUnitVectors(
+    FORWARD,
+    new Vector3(dir.x, dir.y, dir.z).normalize(),
+  );
+  return [q.x, q.y, q.z, q.w];
+}
+
+function GroundAnchors({
+  alerts,
+  gatherings,
+  askMarkers,
+  arcs,
+}: {
+  alerts: GeoAlert[];
+  gatherings: GatheringData[];
+  askMarkers: AskMarkerData[];
+  arcs: ArcData[];
+}) {
+  // One disc per marker location + per arc endpoint, rebuilt only when the data changes.
+  const dots = useMemo(() => {
+    const out: { key: string; dir: Vec3; color: string }[] = [];
+    for (const a of alerts) out.push({ key: `a:${a.id}`, dir: a.dir, color: a.color });
+    for (const gth of gatherings) out.push({ key: `g:${gth.id}`, dir: gth.dir, color: gth.color });
+    for (const m of askMarkers) out.push({ key: `k:${m.id}`, dir: m.dir, color: colors.accent });
+    for (const arc of arcs) {
+      out.push({ key: `arcA:${arc.id}`, dir: arc.a, color: arc.color ?? ARC_COLOR });
+      out.push({ key: `arcB:${arc.id}`, dir: arc.b, color: arc.color ?? ARC_COLOR });
+    }
+    return out;
+  }, [alerts, gatherings, askMarkers, arcs]);
+  return (
+    <>
+      {dots.map((d) => (
+        <mesh
+          key={d.key}
+          position={[
+            d.dir.x * GROUND_ANCHOR_RADIUS,
+            d.dir.y * GROUND_ANCHOR_RADIUS,
+            d.dir.z * GROUND_ANCHOR_RADIUS,
+          ]}
+          quaternion={faceOutQuat(d.dir)}
+        >
+          <circleGeometry args={[GROUND_ANCHOR_SIZE, 20]} />
+          <meshBasicMaterial
+            color={d.color}
+            transparent
+            opacity={0.85}
+            side={DoubleSide}
+            depthWrite={false}
+          />
+        </mesh>
+      ))}
+    </>
+  );
+}
+
 // memo'd so the scene only re-renders when its OWN inputs change. Without this, every
 // AppContext update — notably the 3s background status poll and each live reloadPool —
 // re-rendered the parent Globe and forced r3f to re-reconcile the whole scene graph
@@ -1477,6 +1549,15 @@ export const GlobeScene = memo(function GlobeScene({
         {/* Worldview EVENTS are no longer drawn in 3D — they're projected (above) to legible
             2D icon CHIPS in the wrapper's overlay (crisp, constant on-screen size, tappable),
             which reads far better than abstract shapes and lets the globe sleep when idle. */}
+        {/* GROUND ANCHORS: a contact disc on the surface beneath every (lifted) marker + at each
+            arc endpoint, so nothing reads as floating without a point on the earth. Under the
+            land-occlusion path so far-side anchors hide behind the planet. */}
+        <GroundAnchors
+          alerts={alerts}
+          gatherings={gatherings}
+          askMarkers={askMarkers}
+          arcs={arcs}
+        />
         {/* CONNECTIONS: flowing great-circle LINK ties (Story.links, typed per kind). In the
             rotating group so the arcs ride the globe; drawn over the land but depth-tested, so
             ties on the far hemisphere are hidden behind the planet. */}
