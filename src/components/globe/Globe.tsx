@@ -319,6 +319,26 @@ const MarkerLayer = forwardRef<
       n.style.transform = `translate3d(${x}px, ${y}px, 0)`;
     }
   };
+  const badges = useRef<Map<string, React.ElementRef<typeof View>>>(new Map());
+  const setBadge = (id: string) => (node: React.ElementRef<typeof View> | null) => {
+    if (node) badges.current.set(id, node);
+    else badges.current.delete(id);
+  };
+  // THROB a TENSION badge in place (mutual strain, not a one-way flow): write a per-frame SCALE
+  // to the BADGE node itself — not the anchor — so its sibling hover tooltip doesn't pulse too.
+  // Imperative like moveNode (no React render): the scene loop feeds `pulse` every frame.
+  const scaleNode = (node: React.ElementRef<typeof View> | null | undefined, s: number) => {
+    if (!node) return;
+    const n = node as unknown as {
+      setNativeProps?: (props: { style: object }) => void;
+      style?: { transform: string };
+    };
+    if (typeof n.setNativeProps === "function") {
+      n.setNativeProps({ style: { transform: [{ scale: s }] } });
+    } else if (n.style) {
+      n.style.transform = `scale(${s})`;
+    }
+  };
   useImperativeHandle(
     ref,
     () => ({
@@ -328,6 +348,7 @@ const MarkerLayer = forwardRef<
           seen.add(it.id);
           pos.current.set(it.id, { x: it.x, y: it.y });
           moveNode(nodes.current.get(it.id), it.x, it.y);
+          if (it.pulse != null) scaleNode(badges.current.get(it.id), it.pulse);
         }
         for (const id of [...pos.current.keys()]) if (!seen.has(id)) pos.current.delete(id);
         // Re-render ONLY when the set, a chip's static content, its hovered flag, OR its
@@ -432,6 +453,7 @@ const MarkerLayer = forwardRef<
                 </View>
               )}
               <Pressable
+                ref={setBadge(it.id)}
                 style={[styles.linkBadge, { backgroundColor: it.color }]}
                 onHoverIn={() => {
                   setHoverId(it.id);

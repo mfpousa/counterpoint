@@ -5,6 +5,10 @@ describe("coerceLinks (place-to-place flow arcs)", () => {
     expect(coerceLinks([{ from: "CD", to: "fr", kind: "spread" }])).toEqual([
       { from: "cd", to: "fr", kind: "spread" },
     ]);
+    // 'tension' is a first-class link kind (conflict/standoff), not a separate provider.
+    expect(coerceLinks([{ from: "ru", to: "ua", kind: "tension" }])).toEqual([
+      { from: "ru", to: "ua", kind: "tension" },
+    ]);
   });
 
   it("drops links the model couldn't classify (missing / unknown / 'other' kind)", () => {

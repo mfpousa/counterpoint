@@ -21,7 +21,7 @@ import {
   Quaternion,
   Vector3,
 } from "three";
-import type { Group, Mesh, MeshBasicMaterial, PerspectiveCamera } from "three";
+import type { Group, LineBasicMaterial, Mesh, MeshBasicMaterial, PerspectiveCamera } from "three";
 import { colors } from "../../theme";
 import { greatCircleArc, greatCirclePoint, hashId, type Vec3 } from "../../lib/globeLayout";
 import { EVENT_CATEGORIES, type EventCategory, type GeoAlert } from "../../lib/geoAlerts";
@@ -271,16 +271,15 @@ export interface ArcData {
   id: string;
   a: Vec3;
   b: Vec3;
-  /** 0..1 — drives the arc's brightness, thickness-feel and comet size. */
+  /** 0..1 — drives the arc's brightness and thickness-feel. */
   severity: number;
-  /** Hex colour for this tie (warm = conflict tension, per-kind for a physical link).
-   *  Falls back to ARC_COLOR when omitted. */
+  /** Per-kind hex colour for this link. Falls back to ARC_COLOR when omitted. */
   color?: string;
-  /** Line style: tension ties are solid; physical links use their kind's dash. */
+  /** Line style per kind: tension/attack are solid; others dashed/dotted. */
   dash?: "solid" | "dashed" | "dotted";
-  /** Physical-link KIND (attack/spread/…). When set, the moving marker is a 2D BADGE
-   *  (flag for attack, kind icon otherwise) projected by the scene loop — NOT a 3D comet;
-   *  tension ties (no kind) keep the 3D comet. */
+  /** Link KIND (attack/tension/spread/…). The scene loop projects a 2D BADGE riding the arc
+   *  (flag for attack, kind icon otherwise). A DIRECTIONAL kind flows A→B; `tension` is mutual,
+   *  so its badge sits at the MIDPOINT and THROBS in place (the line throbs with it). */
   kind?: string;
   /** Origin country ISO-2 (links only) — flies its flag when kind === "attack". */
   fromCc?: string;
@@ -302,10 +301,13 @@ const ARC_FLOW_SPEED = 0.2; // CAP: the MAX on-screen flow speed (rad/sec). An a
 const ARC_FLOW_FULL_SPAN = 1.2; // arc angle (rad, ~69°) at which flow reaches the cap. Below
 // it the t-rate is fixed at ARC_FLOW_SPEED / ARC_FLOW_FULL_SPAN, so screen speed ∝ length.
 // Per-arc t-rate = ARC_FLOW_SPEED / max(ARC_FLOW_FULL_SPAN, arc-angle).
+const ARC_PULSE_HZ = 0.6; // TENSION throb: full pulses/sec for the midpoint badge's SCALE AND
+// the line's OPACITY (same phase). Tension is mutual, so it pulses in place instead of flowing.
 
 /** Build the bowed great-circle geometry between two unit directions: the continuous
- *  point list (for sampling the comet) plus the segment-pair buffer (for <lineSegments>).
- *  The sphere math lives in the pure, unit-tested `greatCircleArc`. */
+ *  point list plus the dash-filtered segment-pair buffer (for <lineSegments>). The sphere
+ *  math lives in the pure, unit-tested `greatCircleArc`; the travelling/throbbing badge is
+ *  sampled separately by the scene loop via `greatCirclePoint`. */
 function arcGeometry(
   a: Vec3,
   b: Vec3,
@@ -343,6 +345,23 @@ function Arcs({
     () => arcs.map((arc) => ({ ...arc, ...arcGeometry(arc.a, arc.b, arc.dash ?? "solid") })),
     [arcs],
   );
+  // TENSION lines THROB (mutual strain) instead of carrying a one-way flow: pulse each tension
+  // line's opacity in place, in sync with its midpoint badge's scale (same phase as the scene
+  // loop). Directional links keep their static per-kind opacity. Refs let us write the material
+  // each frame without re-rendering; the governor already keeps the loop alive while arcs exist.
+  const mats = useRef<(LineBasicMaterial | null)[]>([]);
+  useFrame((state) => {
+    for (let i = 0; i < geoms.length; i++) {
+      if (geoms[i].kind !== "tension") continue;
+      const m = mats.current[i];
+      if (!m) continue;
+      const sev = geoms[i].severity;
+      const beat = (Math.sin(state.clock.elapsedTime * ARC_PULSE_HZ * Math.PI * 2 + i * 0.9) + 1) / 2;
+      const lo = 0.2 + 0.15 * sev;
+      const hi = 0.55 + 0.35 * sev;
+      m.opacity = lo + (hi - lo) * beat;
+    }
+  });
   // Hovering a LINK arc's LINE (the whole connection, not just its tiny moving badge) floats
   // a tooltip at the hit point. Ignored unless this line is the FRONTMOST hit, so a line on
   // the far hemisphere (occluded by the globe) isn't hovered through the planet.
@@ -361,7 +380,7 @@ function Arcs({
   };
   return (
     <group>
-      {geoms.map((g) => (
+      {geoms.map((g, i) => (
         <group key={g.id}>
           <lineSegments
             frustumCulled={false}
@@ -373,6 +392,9 @@ function Arcs({
               <bufferAttribute attach="attributes-position" args={[g.line, 3]} />
             </bufferGeometry>
             <lineBasicMaterial
+              ref={(el) => {
+                mats.current[i] = el;
+              }}
               color={g.color ?? ARC_COLOR}
               transparent
               opacity={0.22 + 0.4 * g.severity}
@@ -639,6 +661,9 @@ export interface ProjectedMarker {
   toCc?: string;
   /** Origin story's headline (links only) — shown in the badge's hover tooltip. */
   title?: string;
+  /** TENSION links only — a per-frame badge SCALE (≈0.8→1.2) so it throbs in place; the
+   *  overlay writes it imperatively (never re-renders). Undefined for directional links. */
+  pulse?: number;
 }
 
 /** Reported up when the pointer is over a LINK arc LINE (not just its badge): the screen
@@ -952,20 +977,30 @@ export const GlobeScene = memo(function GlobeScene({
           updatedAt: a.updatedAt,
         });
       }
-      // LINK ties: a flag/icon BADGE rides each PHYSICAL-link arc (origin → destination).
-      // Sample the travelling point on the SAME bowed great circle as the line and project
-      // it, so the badge sits on the arc and flows with it (tension ties keep their 3D comet).
+      // LINK ties: a flag/icon BADGE rides each link arc (origin → destination). Sample the
+      // point on the SAME bowed great circle as the line and project it so the badge sits ON
+      // the arc. A DIRECTIONAL kind FLOWS A→B; TENSION is mutual, so its badge stays at the
+      // MIDPOINT and THROBS in place (no implied "sender"), in sync with the line's opacity.
       arcs.forEach((arc, i) => {
         if (!arc.kind) return;
-        // Speed ∝ arc length up to a CAP: short links crawl, long links top out at the cap
-        // (divide by max(FULL_SPAN, omega) — see ARC_FLOW_SPEED).
-        const omega = Math.acos(
-          Math.max(-1, Math.min(1, arc.a.x * arc.b.x + arc.a.y * arc.b.y + arc.a.z * arc.b.z)),
-        );
-        const t =
-          (frame.clock.elapsedTime * (ARC_FLOW_SPEED / Math.max(ARC_FLOW_FULL_SPAN, omega)) +
-            i * 0.13) %
-          1;
+        const tension = arc.kind === "tension";
+        let t: number;
+        let pulse: number | undefined;
+        if (tension) {
+          t = 0.5; // the friction point BETWEEN the two — no travel
+          const beat = (Math.sin(frame.clock.elapsedTime * ARC_PULSE_HZ * Math.PI * 2 + i * 0.9) + 1) / 2;
+          pulse = 0.8 + 0.4 * beat; // 0.8 → 1.2 scale, same phase as the line's opacity throb
+        } else {
+          // Speed ∝ arc length up to a CAP: short links crawl, long links top out at the cap
+          // (divide by max(FULL_SPAN, omega) — see ARC_FLOW_SPEED).
+          const omega = Math.acos(
+            Math.max(-1, Math.min(1, arc.a.x * arc.b.x + arc.a.y * arc.b.y + arc.a.z * arc.b.z)),
+          );
+          t =
+            (frame.clock.elapsedTime * (ARC_FLOW_SPEED / Math.max(ARC_FLOW_FULL_SPAN, omega)) +
+              i * 0.13) %
+            1;
+        }
         const p = greatCirclePoint(arc.a, arc.b, t, ARC_BASE_RADIUS, ARC_LIFT);
         _proj.set(p.x, p.y, p.z).applyMatrix4(g.matrix);
         if (_proj.z <= 0.02) return; // far hemisphere → occluded by the globe
@@ -984,6 +1019,7 @@ export const GlobeScene = memo(function GlobeScene({
           fromCc: arc.fromCc,
           toCc: arc.toCc,
           title: arc.title,
+          pulse,
         });
       });
       onMarkersProject(out);
