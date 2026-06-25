@@ -277,10 +277,14 @@ export interface ArcData {
   color?: string;
   /** Line style per kind: tension/attack are solid; others dashed/dotted. */
   dash?: "solid" | "dashed" | "dotted";
-  /** Link KIND (attack/tension/spread/…). The scene loop projects a 2D BADGE riding the arc
-   *  (flag for attack, kind icon otherwise). A DIRECTIONAL kind flows A→B; `tension` is mutual,
-   *  so its badge sits at the MIDPOINT and THROBS in place (the line throbs with it). */
+  /** Link KIND (attack/tension/spread/… or a model-invented custom slug). The scene loop
+   *  projects a 2D BADGE riding the arc (flag for attack, kind icon otherwise). A DIRECTIONAL
+   *  kind flows A→B; `tension` is mutual, so its badge sits at the MIDPOINT and THROBS. */
   kind?: string;
+  /** Resolved Ionicon for the badge (the model's icon for a custom kind; validated at render). */
+  icon?: string;
+  /** Resolved human label for this kind (legend + line-hover tooltip). */
+  label?: string;
   /** Origin country ISO-2 (links only) — flies its flag when kind === "attack". */
   fromCc?: string;
   /** Destination country ISO-2 (links only) — for the badge's hover-tooltip route. */
@@ -635,8 +639,12 @@ function AskMarkers({
 export interface GatheringData {
   id: string;
   dir: Vec3;
-  /** Event nature (GatheringKind) — maps to an icon + colour via GATHERING_KINDS. */
+  /** Event nature (a known GatheringKind or a model-invented custom slug). */
   kind: string;
+  /** Resolved Ionicon for the nature badge (the model's icon for a custom kind). */
+  icon: string;
+  /** Resolved human label for the kind (tooltip + legend). */
+  label: string;
   /** Place name where it happens (always-on tag). */
   place: string;
   /** Involved parties' ISO-2 codes (lowercase) — drawn as a ring of flags. */
@@ -687,6 +695,10 @@ export interface ProjectedMarker {
   gatheringKind?: string;
   /** Involved parties' ISO-2 codes (gatherings only) — drawn as a ring of small flags. */
   parties?: string[];
+  /** Resolved Ionicon for a link/gathering badge (the model's icon for a custom kind). */
+  icon?: string;
+  /** Resolved human label for the kind (link/gathering tooltip + legend). */
+  kindLabel?: string;
 }
 
 /** Reported up when the pointer is over a LINK arc LINE (not just its badge): the screen
@@ -976,6 +988,8 @@ export const GlobeScene = memo(function GlobeScene({
             | "updatedAt"
             | "gatheringKind"
             | "parties"
+            | "icon"
+            | "kindLabel"
           >
         >,
       ) => {
@@ -1018,6 +1032,8 @@ export const GlobeScene = memo(function GlobeScene({
         add(gth.id, "gathering", gth.dir, gth.place, gth.title, gth.color, {
           gatheringKind: gth.kind,
           parties: gth.parties,
+          icon: gth.icon,
+          kindLabel: gth.label,
         });
       }
       // LINK ties: a flag/icon BADGE rides each link arc (origin → destination). Sample the
@@ -1062,6 +1078,8 @@ export const GlobeScene = memo(function GlobeScene({
           fromCc: arc.fromCc,
           toCc: arc.toCc,
           title: arc.title,
+          icon: arc.icon,
+          kindLabel: arc.label,
           pulse,
         });
       });

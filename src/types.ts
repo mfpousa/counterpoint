@@ -470,7 +470,7 @@ export interface Story {
    * The globe draws a flowing arc per link (origin → destination). Absent when the story
    * isn't about a place-to-place connection.
    */
-  links?: { from: string; to: string; kind: LinkKind }[];
+  links?: { from: string; to: string; kind: string; icon?: string }[];
   /**
    * CO-LOCATED multi-party events: parties (countries, ISO 3166-1 alpha-2 lowercase)
    * CONVENING at ONE specific place — a summit, peace talks, a treaty signing, a ceasefire,
@@ -481,7 +481,11 @@ export interface Story {
    * fallback). Absent when the story isn't about parties meeting somewhere.
    */
   gatherings?: {
-    kind: GatheringKind;
+    /** A known GatheringKind OR a model-invented kind slug when none fit (e.g. "war-crimes-
+     *  tribunal"); the latter carries its own `icon` and renders with a derived label/colour. */
+    kind: string;
+    /** Ionicons glyph the model chose for a CUSTOM kind (ignored for known kinds). */
+    icon?: string;
     /** Human place name where it happens, e.g. "Geneva". */
     place: string;
     /** Host country ISO-2 (lowercase) — for bbox validation + centroid fallback. */

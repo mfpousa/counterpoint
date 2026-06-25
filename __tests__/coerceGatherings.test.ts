@@ -34,10 +34,25 @@ describe("coerceGatherings (co-located multi-party events)", () => {
     ).toEqual([]);
   });
 
-  it("coerces an unknown/missing kind to 'other' rather than dropping the gathering", () => {
+  it("keeps a model-invented custom kind with its icon (empty kind → 'other')", () => {
+    // No preset fits → keep the model's own slug + chosen icon.
     expect(
       coerceGatherings([
-        { kind: "shindig", place: "Davos", iso2: "ch", parties: ["us", "cn"], coords: "" },
+        { kind: "war-crimes-tribunal", icon: "hammer", place: "The Hague", iso2: "nl", parties: ["ua", "ru"], coords: "" },
+      ]),
+    ).toEqual([
+      { kind: "war-crimes-tribunal", icon: "hammer", place: "The Hague", iso2: "nl", parties: ["ua", "ru"] },
+    ]);
+    // A KNOWN kind ignores any model icon (curated visual).
+    expect(
+      coerceGatherings([
+        { kind: "summit", icon: "skull", place: "Geneva", iso2: "ch", parties: ["us", "ru"], coords: "" },
+      ]),
+    ).toEqual([{ kind: "summit", place: "Geneva", iso2: "ch", parties: ["us", "ru"] }]);
+    // An empty/garbage kind falls back to the generic "other" (still a real, kept event).
+    expect(
+      coerceGatherings([
+        { kind: "", place: "Davos", iso2: "ch", parties: ["us", "cn"], coords: "" },
       ]),
     ).toEqual([{ kind: "other", place: "Davos", iso2: "ch", parties: ["us", "cn"] }]);
   });

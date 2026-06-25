@@ -11,18 +11,25 @@ describe("coerceLinks (place-to-place flow arcs)", () => {
     ]);
   });
 
-  it("drops links the model couldn't classify (missing / unknown / 'other' kind)", () => {
-    // No generic fallback — an unclassifiable link is not a valid link.
+  it("KEEPS a model-invented custom kind (with its icon), dropping only a MISSING kind", () => {
+    // No preset fits → keep the model's own slug + chosen icon (a meaningful custom link).
+    expect(
+      coerceLinks([{ from: "ru", to: "ua", kind: "naval-blockade", icon: "boat" }]),
+    ).toEqual([{ from: "ru", to: "ua", kind: "naval-blockade", icon: "boat" }]);
+    // A KNOWN kind ignores any model icon (it has a curated visual).
+    expect(coerceLinks([{ from: "cd", to: "fr", kind: "spread", icon: "skull" }])).toEqual([
+      { from: "cd", to: "fr", kind: "spread" },
+    ]);
+    // Only a missing/empty kind is dropped — there's nothing to draw without one.
     expect(coerceLinks([{ from: "ru", to: "ua" }])).toEqual([]);
-    expect(coerceLinks([{ from: "ru", to: "ua", kind: "bogus" }])).toEqual([]);
-    expect(coerceLinks([{ from: "ru", to: "ua", kind: "other" }])).toEqual([]);
-    // A dropped link doesn't block a valid one for the same pair.
+    expect(coerceLinks([{ from: "ru", to: "ua", kind: "   " }])).toEqual([]);
+    // First link for a pair wins the dedupe (here the custom one).
     expect(
       coerceLinks([
-        { from: "ru", to: "ua", kind: "other" }, // dropped
-        { from: "ru", to: "ua", kind: "attack" }, // kept
+        { from: "ru", to: "ua", kind: "cyberattack", icon: "bug" },
+        { from: "ru", to: "ua", kind: "attack" }, // duplicate pair → dropped
       ]),
-    ).toEqual([{ from: "ru", to: "ua", kind: "attack" }]);
+    ).toEqual([{ from: "ru", to: "ua", kind: "cyberattack", icon: "bug" }]);
   });
 
   it("drops self-links, non-ISO-2 endpoints, and duplicates", () => {

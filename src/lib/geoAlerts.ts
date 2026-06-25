@@ -82,6 +82,81 @@ export const GATHERING_KINDS: Record<
   other: { color: "#9aa4b2", icon: "people-circle", label: "Gathering" },
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// CUSTOM KINDS — the curated registries above are a STARTING palette, not a cage. The
+// model may invent a more specific `kind` (with a fitting icon) when none fit; these
+// resolvers give a known kind its registry visual and a novel kind a deterministic
+// pastel + the model's icon + a label derived from the slug, so the globe can show ANY
+// connection / event self-explanatorily instead of collapsing everything to "other".
+// ─────────────────────────────────────────────────────────────────────────────
+
+type LinkVisual = { color: string; icon: string; dash: "solid" | "dashed" | "dotted"; label: string };
+type GatheringVisual = { color: string; icon: string; label: string };
+
+/** Convert HSL (h 0-360, s/l 0-100) to a #rrggbb hex string. */
+function hslToHex(h: number, s: number, l: number): string {
+  const sN = s / 100;
+  const lN = l / 100;
+  const c = (1 - Math.abs(2 * lN - 1)) * sN;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = lN - c / 2;
+  let r = 0;
+  let g = 0;
+  let b = 0;
+  if (h < 60) [r, g, b] = [c, x, 0];
+  else if (h < 120) [r, g, b] = [x, c, 0];
+  else if (h < 180) [r, g, b] = [0, c, x];
+  else if (h < 240) [r, g, b] = [0, x, c];
+  else if (h < 300) [r, g, b] = [x, 0, c];
+  else [r, g, b] = [c, 0, x];
+  const to = (v: number) => Math.round((v + m) * 255).toString(16).padStart(2, "0");
+  return `#${to(r)}${to(g)}${to(b)}`;
+}
+
+/** A deterministic, legible PASTEL for a model-invented kind — the same "light fill + dark
+ *  glyph" look as the curated palettes, so a novel kind still reads as a real badge and the
+ *  same kind always gets the same colour (stable across renders). */
+export function customKindColor(seed: string): string {
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i++) {
+    h ^= seed.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return hslToHex((h >>> 0) % 360, 68, 72);
+}
+
+/** Human label for a kind slug, e.g. "naval-blockade" → "Naval blockade". */
+export function kindLabel(kind: string): string {
+  const s = (kind || "").replace(/[-_]+/g, " ").trim();
+  return s ? s[0].toUpperCase() + s.slice(1) : "Other";
+}
+
+/** Resolve a LINK kind to its full visual: a known kind uses the curated registry; a
+ *  model-invented kind gets a deterministic pastel, the model's chosen icon (validated at
+ *  render against the Ionicons set), a dashed line, and a label derived from the slug. */
+export function linkVisual(kind: string, icon?: string): LinkVisual {
+  const known: LinkVisual | undefined = (LINK_KINDS as Record<string, LinkVisual>)[kind];
+  if (known) return { ...known };
+  return {
+    color: customKindColor(kind || "link"),
+    icon: (icon && icon.trim()) || "git-network",
+    dash: "dashed",
+    label: kindLabel(kind),
+  };
+}
+
+/** Resolve a GATHERING kind to its full visual (known → registry, custom → pastel + model
+ *  icon + derived label). */
+export function gatheringVisual(kind: string, icon?: string): GatheringVisual {
+  const known: GatheringVisual | undefined = (GATHERING_KINDS as Record<string, GatheringVisual>)[kind];
+  if (known) return { ...known };
+  return {
+    color: customKindColor(kind || "gathering"),
+    icon: (icon && icon.trim()) || "people-circle",
+    label: kindLabel(kind),
+  };
+}
+
 /** Keyword signatures per category (lowercase substrings scanned in title + dek). */
 const CATEGORY_KEYWORDS: Record<Exclude<EventCategory, "other">, string[]> = {
   conflict: ["war","airstrike","air strike","drone strike","missile","troops","invasion","offensive","military","bombing","shelling","frontline","combat","militant","insurgent","artillery","occupation","gunmen","clashes","killed in"],

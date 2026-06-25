@@ -66,10 +66,10 @@ import {
 } from "../../lib/geoShapes";
 import {
   EVENT_CATEGORIES,
-  GATHERING_KINDS,
-  LINK_KINDS,
   RECENCY_OPACITY,
   buildAlerts,
+  gatheringVisual,
+  linkVisual,
   recencyOf,
   withinWindow,
   type EventCategory,
@@ -82,7 +82,7 @@ import { appendAskStream, resetAskStream } from "../../lib/askStream";
 import { buildAskNameIndex, resolveAskPlace, scanCountries } from "../../lib/askLocate";
 import { lookupCity } from "../../lib/cityCoords";
 import { geocodeGathering } from "../../lib/placeGeocode";
-import type { AnalysisStatus, AskResult, GatheringKind, LinkKind, Story } from "../../types";
+import type { AnalysisStatus, AskResult, Story } from "../../types";
 import worldLand from "../../data/world/countries-50m.json";
 import { useApp, useT } from "../../store/AppContext";
 import { colors, font, radius, spacing } from "../../theme";
@@ -108,6 +108,27 @@ const heatColor = (sev: number) =>
 // Valid Ionicons glyph name — EVENT_CATEGORIES stores icon names as plain strings, so we
 // cast through this when handing them to <Ionicons> for the event chips + legend lenses.
 type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
+// A model-invented kind may carry an icon the bundled Ionicons set doesn't have; fall back to
+// a generic glyph so a CUSTOM badge/legend chip never renders blank.
+const IONICON_GLYPHS = (Ionicons as unknown as { glyphMap?: Record<string, number> }).glyphMap;
+const safeIonicon = (name: string | undefined, fallback: IoniconName): IoniconName =>
+  name && IONICON_GLYPHS && name in IONICON_GLYPHS ? (name as IoniconName) : fallback;
+// One legend chip: a present link/gathering KIND with its resolved visual (known or custom).
+type LegendKind = { kind: string; color: string; icon: string; label: string };
+const LINK_KIND_ORDER = ["attack", "tension", "spread", "trade", "migration", "aid", "transport"];
+const GATHERING_KIND_ORDER = [
+  "summit", "talks", "agreement", "ceasefire", "visit", "forum", "vote",
+  "trial", "exercise", "aid", "games", "mission", "ceremony", "other",
+];
+// Known kinds first (registry order), then model-invented kinds alphabetical by label.
+function sortLegend(items: LegendKind[], order: string[]): LegendKind[] {
+  return items.slice().sort((a, b) => {
+    const ia = order.indexOf(a.kind);
+    const ib = order.indexOf(b.kind);
+    if (ia !== ib && (ia !== -1 || ib !== -1)) return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+    return a.label.localeCompare(b.label);
+  });
+}
 const ZOOM_MIN = 0.6;
 const ZOOM_MAX = 2.6;
 // Worldview time scrubber, widest → narrowest. "all" is the default (the recency is still
@@ -439,8 +460,7 @@ const MarkerLayer = forwardRef<
         // name tagged beneath. HOVERING reveals the kind, place, headline and full party list
         // and pauses the spin. NOT an arc: it happened AT one place, not between places.
         if (it.kind === "gathering") {
-          const gk = (it.gatheringKind ?? "other") as GatheringKind;
-          const gStyle = GATHERING_KINDS[gk] ?? GATHERING_KINDS.other;
+          const gLabel = it.kindLabel ?? "Gathering";
           const parties = it.parties ?? [];
           const shownParties = parties.slice(0, 4);
           const moreParties = parties.length - shownParties.length;
@@ -452,7 +472,7 @@ const MarkerLayer = forwardRef<
                 <View style={[styles.markerStack, { bottom: 34 }]} pointerEvents="none">
                   <View style={[styles.markerBubble, { borderColor: it.color }]}>
                     <Text style={styles.linkBubbleRoute} numberOfLines={1}>
-                      {gStyle.label} · {it.label}
+                      {gLabel} · {it.label}
                     </Text>
                     <Text style={styles.markerBubbleText} numberOfLines={2}>
                       {it.detail}
@@ -478,7 +498,7 @@ const MarkerLayer = forwardRef<
                 accessibilityLabel={it.detail}
               >
                 <View style={[styles.gatheringBadge, { backgroundColor: it.color }]}>
-                  <Ionicons name={gStyle.icon as IoniconName} size={16} color="#0b0f14" />
+                  <Ionicons name={safeIonicon(it.icon, "people-circle")} size={16} color="#0b0f14" />
                 </View>
                 <View style={styles.partyRow} pointerEvents="none">
                   {shownParties.map((cc) => (
@@ -513,12 +533,11 @@ const MarkerLayer = forwardRef<
         // HOVERING it reveals which STORY drew the link (route + kind + headline) and pauses
         // the spin so the moving badge is easy to inspect.
         if (it.kind === "link") {
-          const lk = (it.linkKind ?? "other") as LinkKind;
-          const isAttack = lk === "attack" && !!it.fromCc;
+          const isAttack = it.linkKind === "attack" && !!it.fromCc;
           const showBubble = hoverId === it.id && !!it.title;
           const route =
             `${it.fromCc ? countryLabel(it.fromCc) : "?"} → ` +
-            `${it.toCc ? countryLabel(it.toCc) : "?"} · ${LINK_KINDS[lk]?.label ?? "Link"}`;
+            `${it.toCc ? countryLabel(it.toCc) : "?"} · ${it.kindLabel ?? "Link"}`;
           return (
             <View key={it.id} ref={setNode(it.id)} style={anchorStyle} pointerEvents="box-none">
               {showBubble && (
@@ -558,7 +577,7 @@ const MarkerLayer = forwardRef<
                   </>
                 ) : (
                   <Ionicons
-                    name={(LINK_KINDS[lk]?.icon ?? "swap-horizontal") as IoniconName}
+                    name={safeIonicon(it.icon, "git-network")}
                     size={15}
                     color="#0b0f14"
                   />
@@ -949,15 +968,18 @@ export function Globe({
         const b = byIso2.get(lk.to);
         if (!a || !b) continue;
         if (a.x * b.x + a.y * b.y + a.z * b.z > 0.9999) continue; // same country → skip
-        const style = LINK_KINDS[lk.kind] ?? LINK_KINDS.other;
+        // Known kind → curated visual; a model-invented kind → hashed colour + its own icon.
+        const v = linkVisual(lk.kind, lk.icon);
         out.push({
           id: `link:${s.id}:${i}`,
           a,
           b,
           severity: s.severity ?? 0.6,
-          color: style.color,
-          dash: style.dash,
+          color: v.color,
+          dash: v.dash,
           kind: lk.kind,
+          icon: v.icon,
+          label: v.label,
           fromCc: lk.from,
           toCc: lk.to,
           storyId: s.id,
@@ -996,14 +1018,17 @@ export function Globe({
         const key = `${dir.x.toFixed(2)}|${dir.y.toFixed(2)}|${dir.z.toFixed(2)}`;
         if (seen.has(key)) continue;
         seen.add(key);
-        const style = GATHERING_KINDS[g.kind as GatheringKind] ?? GATHERING_KINDS.other;
+        // Known kind → curated visual; a model-invented kind → hashed colour + its own icon.
+        const v = gatheringVisual(g.kind, g.icon);
         out.push({
           id: `gathering:${s.id}:${i}`,
           dir,
           kind: g.kind,
+          icon: v.icon,
+          label: v.label,
           place: g.place,
           parties: g.parties,
-          color: style.color,
+          color: v.color,
           title: s.title,
         });
         if (out.length >= 14) break;
@@ -1030,22 +1055,28 @@ export function Globe({
 
   // The link KINDS currently on the globe, for the CONNECTIONS legend (stable order). Drawn
   // from the time-windowed, capped relationshipArcs so it names only what's actually shown.
-  const legendLinkKinds = useMemo<LinkKind[]>(() => {
-    const present = new Set<string>();
-    for (const arc of relationshipArcs) if (arc.kind) present.add(arc.kind);
-    const order: LinkKind[] = ["attack", "tension", "spread", "trade", "migration", "aid", "transport"];
-    return order.filter((k) => present.has(k));
+  const legendLinkKinds = useMemo<LegendKind[]>(() => {
+    const m = new Map<string, LegendKind>();
+    for (const arc of relationshipArcs) {
+      if (!arc.kind || m.has(arc.kind)) continue;
+      m.set(arc.kind, {
+        kind: arc.kind,
+        color: arc.color ?? "#9aa4b2",
+        icon: arc.icon ?? "git-network",
+        label: arc.label ?? arc.kind,
+      });
+    }
+    return sortLegend([...m.values()], LINK_KIND_ORDER);
   }, [relationshipArcs]);
 
   // The gathering KINDS currently on the globe, for the GATHERINGS legend (stable order).
-  const legendGatheringKinds = useMemo<GatheringKind[]>(() => {
-    const present = new Set<string>();
-    for (const g of gatheringMarkers) present.add(g.kind);
-    const order: GatheringKind[] = [
-      "summit", "talks", "agreement", "ceasefire", "visit", "forum", "vote",
-      "trial", "exercise", "aid", "games", "mission", "ceremony", "other",
-    ];
-    return order.filter((k) => present.has(k));
+  const legendGatheringKinds = useMemo<LegendKind[]>(() => {
+    const m = new Map<string, LegendKind>();
+    for (const g of gatheringMarkers) {
+      if (m.has(g.kind)) continue;
+      m.set(g.kind, { kind: g.kind, color: g.color, icon: g.icon, label: g.label });
+    }
+    return sortLegend([...m.values()], GATHERING_KIND_ORDER);
   }, [gatheringMarkers]);
 
   // Unified place search (continents + countries) over the bundled centroids. Picking
@@ -1699,10 +1730,9 @@ export function Globe({
     linkTipRef.current?.move(tip.x, tip.y);
     if (linkTipTitle.current !== tip.title) {
       linkTipTitle.current = tip.title;
-      const lk = (tip.kind ?? "other") as LinkKind;
       const route =
         `${tip.fromCc ? countryLabel(tip.fromCc) : "?"} → ` +
-        `${tip.toCc ? countryLabel(tip.toCc) : "?"} · ${LINK_KINDS[lk]?.label ?? "Link"}`;
+        `${tip.toCc ? countryLabel(tip.toCc) : "?"} · ${linkVisual(tip.kind ?? "").label}`;
       setLinkTip({ title: tip.title, route });
       setHoveredMarkerId("__link__"); // pause the auto-spin while inspecting
     }
@@ -2195,17 +2225,15 @@ export function Globe({
               <View style={styles.linkLegendWrap} pointerEvents="box-none">
                 <View style={styles.legend}>
                   {legendLinkKinds.map((k) => (
-                    <View key={k} style={styles.legendItem}>
-                      <View
-                        style={[styles.legendDot, { backgroundColor: LINK_KINDS[k].color }]}
-                      >
+                    <View key={k.kind} style={styles.legendItem}>
+                      <View style={[styles.legendDot, { backgroundColor: k.color }]}>
                         <Ionicons
-                          name={LINK_KINDS[k].icon as IoniconName}
+                          name={safeIonicon(k.icon, "git-network")}
                           size={9}
                           color="#0b0f14"
                         />
                       </View>
-                      <Text style={styles.legendText}>{LINK_KINDS[k].label}</Text>
+                      <Text style={styles.legendText}>{k.label}</Text>
                     </View>
                   ))}
                 </View>
@@ -2218,17 +2246,15 @@ export function Globe({
               <View style={styles.linkLegendWrap} pointerEvents="box-none">
                 <View style={styles.legend}>
                   {legendGatheringKinds.map((k) => (
-                    <View key={k} style={styles.legendItem}>
-                      <View
-                        style={[styles.legendDot, { backgroundColor: GATHERING_KINDS[k].color }]}
-                      >
+                    <View key={k.kind} style={styles.legendItem}>
+                      <View style={[styles.legendDot, { backgroundColor: k.color }]}>
                         <Ionicons
-                          name={GATHERING_KINDS[k].icon as IoniconName}
+                          name={safeIonicon(k.icon, "people-circle")}
                           size={9}
                           color="#0b0f14"
                         />
                       </View>
-                      <Text style={styles.legendText}>{GATHERING_KINDS[k].label}</Text>
+                      <Text style={styles.legendText}>{k.label}</Text>
                     </View>
                   ))}
                 </View>

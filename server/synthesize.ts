@@ -71,12 +71,10 @@ const SYNTH_SCHEMA: JsonSchema = {
           properties: {
             from: { type: "string" },
             to: { type: "string" },
-            kind: {
-              type: "string",
-              enum: ["attack", "tension", "spread", "trade", "migration", "aid", "transport"],
-            },
+            kind: { type: "string" },
+            icon: { type: "string" },
           },
-          required: ["from", "to", "kind"],
+          required: ["from", "to", "kind", "icon"],
           additionalProperties: false,
         },
       },
@@ -85,16 +83,14 @@ const SYNTH_SCHEMA: JsonSchema = {
         items: {
           type: "object",
           properties: {
-            kind: {
-              type: "string",
-              enum: ["summit", "talks", "agreement", "ceasefire", "visit", "forum", "vote", "trial", "exercise", "aid", "games", "mission", "ceremony"],
-            },
+            kind: { type: "string" },
+            icon: { type: "string" },
             place: { type: "string" },
             iso2: { type: "string" },
             parties: { type: "array", items: { type: "string" } },
             coords: { type: "string" },
           },
-          required: ["kind", "place", "iso2", "parties", "coords"],
+          required: ["kind", "icon", "place", "iso2", "parties", "coords"],
           additionalProperties: false,
         },
       },
@@ -117,8 +113,8 @@ const SYNTH_RULES =
   '  "sides": [ { "label": "<short side label, e.g. \'Western media\', \'Russian media\', \'Ukrainian media\'>", "outlets": ["<exact outlet names on this side>"], "framing": "1-2 sentences on how THIS side frames/emphasizes the story" } ],\n' +
   '  "contradictions": ["specific points where the outlets disagree or report differently; [] if none are evident"],\n' +
   '  "protagonist": { "name": "the central actor/subject the story is MOST about (a country, organisation, or person)", "iso2": "if that protagonist IS a country or a national government/actor, its ISO 3166-1 alpha-2 code in lowercase (e.g. us, es, ua); otherwise an empty string" },\n' +
-  '  "links": [ { "from": "<ISO-2 ORIGIN>", "to": "<ISO-2 DESTINATION>", "kind": "attack|tension|spread|trade|migration|aid|transport" } ],\n' +
-  '  "gatherings": [ { "kind": "summit|talks|agreement|ceasefire|visit|forum|vote|trial|exercise|aid|games|mission|ceremony", "place": "<city/venue>", "iso2": "<ISO-2 of its country>", "parties": ["<ISO-2>", "<ISO-2>", "..."], "coords": "<lat,lon or empty>" } ]\n' +
+  '  "links": [ { "from": "<ISO-2 ORIGIN>", "to": "<ISO-2 DESTINATION>", "kind": "attack|tension|spread|trade|migration|aid|transport|<own-slug>", "icon": "<Ionicons name if custom kind, else empty>" } ],\n' +
+  '  "gatherings": [ { "kind": "summit|talks|agreement|ceasefire|visit|forum|vote|trial|exercise|aid|games|mission|ceremony|<own-slug>", "icon": "<Ionicons name if custom kind, else empty>", "place": "<city/venue>", "iso2": "<ISO-2 of its country>", "parties": ["<ISO-2>", "<ISO-2>", "..."], "coords": "<lat,lon or empty>" } ]\n' +
   "}\n" +
   "For 'links', emit a DIRECTED connection ONLY when the story describes a PHYSICAL link/movement " +
   "OR a hostile/contested RELATIONSHIP between two DISTINCT countries, from an ORIGIN ('from') to a " +
@@ -127,16 +123,20 @@ const SYNTH_RULES =
   "two main opposing sides of a conflict, when there's no single discrete attack), 'spread' " +
   "(disease/contagion), 'trade' (shipment/exports/energy/supply/pipeline), 'migration' " +
   "(people/refugees/evacuation), 'aid' (humanitarian or military assistance), 'transport' " +
-  "(flight/route/travel). Only emit a link you can classify into ONE of these " +
-  "SPECIFIC kinds; if the relationship doesn't clearly fit one, OMIT that link (do NOT guess or " +
-  "use a generic kind). Return [] when the story is not about a place-to-place connection. " +
+  "(flight/route/travel). PREFER one of those kinds; if NONE truly fits, INVENT a short " +
+  "lowercase-hyphenated 'kind' slug naming the relationship (e.g. 'naval-blockade', 'espionage', " +
+  "'cyberattack') and set 'icon' to the Ionicons (v5) glyph that best depicts it (e.g. 'boat', " +
+  "'eye', 'bug') \u2014 leave 'icon' empty when you used a known kind. Return [] when the story is " +
+  "not about a place-to-place connection. " +
   "For 'gatherings', emit a CO-LOCATED multi-party event: TWO OR MORE countries (ISO 3166-1 alpha-2 " +
   "lowercase in 'parties') CONVENING AT ONE place \u2014 'summit' (leaders meet), 'talks' (negotiations), " +
   "'agreement' (treaty/deal signed), 'ceasefire' (truce), 'visit' (state visit), 'forum' " +
   "(conference/assembly, e.g. G20/UN/COP), 'vote' (international resolution/ballot), 'trial' " +
   "(international court), 'exercise' (joint military drills), 'aid' (donor/relief operation), 'games' " +
   "(sporting event), 'mission' (joint scientific/space effort) or 'ceremony' " +
-  "(commemoration/inauguration). Set 'place' to the city/venue, 'iso2' to that place's country, and " +
+  "(commemoration/inauguration); if NONE truly fits, INVENT a short lowercase-hyphenated 'kind' " +
+  "slug and set 'icon' to the Ionicons glyph that best depicts it (leave 'icon' empty for a known " +
+  "kind). Set 'place' to the city/venue, 'iso2' to that place's country, and " +
   "'coords' to its 'latitude,longitude' in decimal degrees (\"\" if unsure). A gathering is anchored AT " +
   "ONE place (NOT a flow between places \u2014 that's 'links') and needs AT LEAST TWO parties; return [] " +
   "when no such event is described. " +
@@ -250,12 +250,32 @@ function coerceProtagonist(raw: unknown): { name: string; iso2?: string } | unde
   return iso2 ? { name, iso2 } : { name };
 }
 
+/** Sanitize a model `kind` into a short lowercase-hyphenated slug — a KNOWN kind or a
+ *  model-invented custom one ("naval-blockade"). "" when missing/garbage. */
+function sanitizeKind(raw: unknown): string {
+  if (typeof raw !== "string") return "";
+  return raw
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 24);
+}
+
+/** Sanitize a model-supplied Ionicons glyph name to a plausible shape (its real existence is
+ *  validated against the bundled icon set at RENDER, with a generic fallback). */
+function sanitizeIcon(raw: unknown): string {
+  if (typeof raw !== "string") return "";
+  return raw.trim().toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 32);
+}
+
 /**
- * Parse the model's place-to-place LINKS — directed physical connections between two
- * DISTINCT countries (a spread, route, shipment, migration, evacuation, aid, attack, …).
- * Validates ISO 3166-1 alpha-2 endpoints, drops self/degenerate + duplicate links, DROPS
- * links the model couldn't classify into a SPECIFIC kind (no generic catch-all), and caps
- * the count. The globe draws a flowing arc per link (origin → destination).
+ * Parse the model's place-to-place LINKS — directed connections between two DISTINCT
+ * countries (a spread, route, shipment, migration, attack, …). Validates ISO 3166-1 alpha-2
+ * endpoints, drops self/degenerate + duplicate links, and KEEPS each link's kind: a KNOWN
+ * kind uses its curated visual, otherwise the model's own slug + chosen `icon` are kept (a
+ * meaningful CUSTOM connection). Only a MISSING kind is dropped (nothing to show). Caps the
+ * count. The globe draws a flowing arc per link (origin → destination).
  */
 const LINK_KINDS = new Set<LinkKind>([
   "attack",
@@ -270,9 +290,9 @@ const LINK_KINDS = new Set<LinkKind>([
 export function coerceLinks(
   raw: unknown,
   max = 4,
-): { from: string; to: string; kind: LinkKind }[] {
+): { from: string; to: string; kind: string; icon?: string }[] {
   if (!Array.isArray(raw)) return [];
-  const out: { from: string; to: string; kind: LinkKind }[] = [];
+  const out: { from: string; to: string; kind: string; icon?: string }[] = [];
   const seen = new Set<string>();
   for (const row of raw) {
     if (!row || typeof row !== "object") continue;
@@ -280,15 +300,14 @@ export function coerceLinks(
     const from = typeof r["from"] === "string" ? r["from"].trim().toLowerCase() : "";
     const to = typeof r["to"] === "string" ? r["to"].trim().toLowerCase() : "";
     if (!/^[a-z]{2}$/.test(from) || !/^[a-z]{2}$/.test(to) || from === to) continue;
-    // A link is only VALID when the model classified it into a SPECIFIC kind. A missing,
-    // unknown, or catch-all kind means the relationship couldn't be determined → drop it
-    // rather than draw a generic, meaningless connection.
-    const k = typeof r["kind"] === "string" ? (r["kind"].trim().toLowerCase() as LinkKind) : null;
-    if (!k || !LINK_KINDS.has(k)) continue;
+    const kind = sanitizeKind(r["kind"]);
+    if (!kind) continue; // the kind IS the link's meaning — nothing to draw without one
     const key = `${from}>${to}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    out.push({ from, to, kind: k });
+    // A known kind has a curated visual; a CUSTOM kind keeps the model's chosen icon.
+    const icon = LINK_KINDS.has(kind as LinkKind) ? "" : sanitizeIcon(r["icon"]);
+    out.push({ from, to, kind, ...(icon ? { icon } : {}) });
     if (out.length >= max) break;
   }
   return out;
@@ -342,10 +361,8 @@ export function coerceGatherings(
   for (const row of raw) {
     if (!row || typeof row !== "object") continue;
     const r = row as Record<string, unknown>;
-    const kRaw = typeof r["kind"] === "string" ? r["kind"].trim().toLowerCase() : "";
-    const kind: GatheringKind = GATHERING_KIND_SET.has(kRaw as GatheringKind)
-      ? (kRaw as GatheringKind)
-      : "other";
+    // A known kind uses its curated visual; otherwise the model's own slug + icon are kept.
+    const kind = sanitizeKind(r["kind"]) || "other";
     const place = typeof r["place"] === "string" ? r["place"].trim().slice(0, 80) : "";
     if (!place) continue;
     const iso2 = typeof r["iso2"] === "string" ? r["iso2"].trim().toLowerCase() : "";
@@ -366,7 +383,8 @@ export function coerceGatherings(
     if (seen.has(key)) continue;
     seen.add(key);
     const coords = parseLatLon(r["coords"]);
-    out.push({ kind, place, iso2, parties, ...(coords ?? {}) });
+    const icon = GATHERING_KIND_SET.has(kind as GatheringKind) ? "" : sanitizeIcon(r["icon"]);
+    out.push({ kind, ...(icon ? { icon } : {}), place, iso2, parties, ...(coords ?? {}) });
     if (out.length >= max) break;
   }
   return out;
@@ -624,12 +642,10 @@ const DEVELOPING_SCHEMA: JsonSchema = {
           properties: {
             from: { type: "string" },
             to: { type: "string" },
-            kind: {
-              type: "string",
-              enum: ["attack", "tension", "spread", "trade", "migration", "aid", "transport"],
-            },
+            kind: { type: "string" },
+            icon: { type: "string" },
           },
-          required: ["from", "to", "kind"],
+          required: ["from", "to", "kind", "icon"],
           additionalProperties: false,
         },
       },
@@ -638,16 +654,14 @@ const DEVELOPING_SCHEMA: JsonSchema = {
         items: {
           type: "object",
           properties: {
-            kind: {
-              type: "string",
-              enum: ["summit", "talks", "agreement", "ceasefire", "visit", "forum", "vote", "trial", "exercise", "aid", "games", "mission", "ceremony"],
-            },
+            kind: { type: "string" },
+            icon: { type: "string" },
             place: { type: "string" },
             iso2: { type: "string" },
             parties: { type: "array", items: { type: "string" } },
             coords: { type: "string" },
           },
-          required: ["kind", "place", "iso2", "parties", "coords"],
+          required: ["kind", "icon", "place", "iso2", "parties", "coords"],
           additionalProperties: false,
         },
       },
@@ -694,18 +708,21 @@ const DEVELOPING_RULES =
   "opposing geographic/affiliation vantage points actually PRESENT (by 'zone') and describe how each " +
   "frames the issue \u2014 e.g. Western vs Ukrainian vs Russian media. Use only zones present; return [] " +
   "when all outlets share one vantage point. " +
-  'Also include "links": [ { "from": "<ISO-2 ORIGIN>", "to": "<ISO-2 DESTINATION>", "kind": "attack|tension|spread|trade|migration|aid|transport" } ] ' +
+  'Also include "links": [ { "from": "<ISO-2 ORIGIN>", "to": "<ISO-2 DESTINATION>", "kind": "attack|tension|spread|trade|migration|aid|transport|<own-slug>", "icon": "<Ionicons name if custom, else empty>" } ] ' +
   "\u2014 a DIRECTED connection ONLY when the issue describes a PHYSICAL link/movement OR a hostile/" +
   "contested RELATIONSHIP between two DISTINCT countries from an ORIGIN to a DESTINATION, both " +
   "lowercase, classified by 'kind' (attack/tension/spread/trade/migration/aid/transport; 'tension' = " +
-  "a standoff/rivalry/conflict with no single discrete attack). Only emit a link you can classify " +
-  "into ONE of these SPECIFIC kinds; OMIT any link that doesn't clearly fit one (do NOT guess). " +
+  "a standoff/rivalry/conflict with no single discrete attack). " +
+  "PREFER one of those kinds; if NONE fits, INVENT a short lowercase-hyphenated 'kind' slug + set " +
+  "'icon' to the best Ionicons glyph (leave 'icon' empty for a known kind). " +
   "[] when it is not about a place-to-place connection. " +
-  'Also include "gatherings": [ { "kind": "summit|talks|agreement|ceasefire|visit|forum|vote|trial|exercise|aid|games|mission|ceremony", "place": "<city/venue>", "iso2": "<ISO-2 of its country>", "parties": ["<ISO-2>", "..."], "coords": "<lat,lon or empty>" } ] ' +
+  'Also include "gatherings": [ { "kind": "summit|talks|agreement|ceasefire|visit|forum|vote|trial|exercise|aid|games|mission|ceremony|<own-slug>", "icon": "<Ionicons name if custom, else empty>", "place": "<city/venue>", "iso2": "<ISO-2 of its country>", "parties": ["<ISO-2>", "..."], "coords": "<lat,lon or empty>" } ] ' +
   "\u2014 a CO-LOCATED event where TWO OR MORE countries CONVENE at ONE place (a summit, talks, treaty " +
   "signing, ceasefire, forum, vote, trial, joint exercise, aid effort, games, mission or ceremony), " +
-  "anchored AT 'place' (NOT a flow between places). Set 'iso2' to the place's country and 'coords' to " +
-  "its 'latitude,longitude' (\"\" if unsure). Needs \u2265 2 parties; [] when none. " +
+  "anchored AT 'place' (NOT a flow between places). If none of those kinds fits, INVENT a short " +
+  "lowercase-hyphenated 'kind' + set 'icon' to the best Ionicons glyph (empty for a known kind). " +
+  "Set 'iso2' to the place's country and 'coords' to its 'latitude,longitude' (\"\" if unsure). " +
+  "Needs \u2265 2 parties; [] when none. " +
   "No prose outside the JSON.";
 
 function earliestAt(members: StoredItem[]): number {
